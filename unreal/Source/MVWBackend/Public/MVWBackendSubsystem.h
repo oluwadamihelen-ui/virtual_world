@@ -63,8 +63,14 @@ public:
 
 	static FString NewIdempotencyKey() { return FGuid::NewGuid().ToString(EGuidFormats::DigitsWithHyphensLower); }
 
+	/**
+	 * Generic call used by gameplay code. With an empty BearerToken the request is sent as the game server (x-server-key);
+	 * with a token it is sent as that player (Authorization: Bearer), for the player-facing endpoints (login, characters, tickets).
+	 */
+	void Request(const FString& Verb, const FString& Path, TSharedPtr<FJsonObject> Body, const FString& BearerToken, FMVWBackendCallback Callback);
+
 private:
-	void Send(const FString& Verb, const FString& Path, TSharedPtr<FJsonObject> Body, FMVWBackendCallback Callback);
+	void Send(const FString& Verb, const FString& Path, TSharedPtr<FJsonObject> Body, FMVWBackendCallback Callback, const FString& BearerToken = FString());
 
 	FString BaseUrl;
 	FString ServerKey;

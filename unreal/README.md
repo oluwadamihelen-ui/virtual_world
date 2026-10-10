@@ -14,6 +14,9 @@ Step-by-step with screenshots-in-words: **[docs/SETUP_WINDOWS_FULL.md](../docs/S
 4. Add a dedicated-server target (`MVWServer.Target.cs`, `TargetType.Server`) — requires a source-built engine for packaged dedicated servers.
 5. Run the backend, set `MVW_SERVER_KEY`, start the server with `-log -MvwBackendUrl=http://127.0.0.1:3000`, connect two clients (PIE with "Run Under One Process" off, net mode "Play As Client", 2 players).
 
+## Maple Court
+See **[docs/MAPLE_COURT.md](../docs/MAPLE_COURT.md)** for the greybox neighborhood (`MVWMapleCourt.*`).
+
 ## Recommended build order for the in-engine slice
 1. Greybox residential block (one street, one enterable room, one shop counter, one workstation) in a World Partition-free small level.
 2. Login screen → character list/create (player JWT REST) → connect to server with `characterId` + a short-lived join ticket (**backend endpoint for tickets does not exist yet**: add before trusting the client-supplied `characterId`; today the game server must establish identity itself).

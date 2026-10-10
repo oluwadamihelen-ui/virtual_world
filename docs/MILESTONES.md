@@ -82,6 +82,15 @@ Legend: ✅ done and verified by automated tests · 🟡 done but unverified/par
 | Name rule bug fixed (names differing only by digits 2/6/8/9 collided) found by the load test | ✅ | |
 | Load test script and first run | 🟡 | indicative only; see `docs/LOAD_TESTING.md` |
 
+## Milestone 4: Maple Court greybox (Unreal, **uncompiled, untested**)
+
+| Item | State | Note |
+|---|---|---|
+| Unreal module builds on UE 5.8 (backend subsystem + console commands) | ✅ | built and `mvw.health` showed ONLINE on the user's machine |
+| Maple Court subsystem: auto-built cube neighborhood, spawn, door/counter/work interactions, HUD, dev identity + ticket login | 🟡 | written, reviewed, **not compiled or run**: see `docs/MAPLE_COURT.md` test checklist |
+| Multiplayer interactions (server RPCs for clients) | ⬜ | next |
+| Real art, interiors, pedestrians, day/night, audio | ⬜ | |
+
 ## Remaining tasks (sequenced)
 1. **UE5 project + dedicated server + greybox block** (blocks everything player-facing). Compile `MVWBackend`. *Done when:* two clients see each other on a dedicated server.
 2. ~~Join-ticket endpoint~~ done on the backend. *Remaining:* the game server must use it (Unreal).

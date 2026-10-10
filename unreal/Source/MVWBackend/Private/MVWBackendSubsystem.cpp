@@ -33,12 +33,24 @@ void UMVWBackendSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	UE_LOG(LogMVWBackend, Log, TEXT("Backend: %s"), *BaseUrl);
 }
 
-void UMVWBackendSubsystem::Send(const FString& Verb, const FString& Path, TSharedPtr<FJsonObject> Body, FMVWBackendCallback Callback)
+void UMVWBackendSubsystem::Request(const FString& Verb, const FString& Path, TSharedPtr<FJsonObject> Body, const FString& BearerToken, FMVWBackendCallback Callback)
+{
+	Send(Verb, Path, Body, Callback, BearerToken);
+}
+
+void UMVWBackendSubsystem::Send(const FString& Verb, const FString& Path, TSharedPtr<FJsonObject> Body, FMVWBackendCallback Callback, const FString& BearerToken)
 {
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Req = FHttpModule::Get().CreateRequest();
 	Req->SetURL(BaseUrl + Path);
 	Req->SetVerb(Verb);
-	Req->SetHeader(TEXT("x-server-key"), ServerKey);
+	if (!BearerToken.IsEmpty())
+	{
+		Req->SetHeader(TEXT("Authorization"), TEXT("Bearer ") + BearerToken);
+	}
+	else
+	{
+		Req->SetHeader(TEXT("x-server-key"), ServerKey);
+	}
 	Req->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
 	Req->SetTimeout(10.f);
 	if (Body.IsValid())
