@@ -9,6 +9,10 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "HAL/PlatformMisc.h"
+#include "HAL/IConsoleManager.h"
+#include "Engine/Engine.h"
+#include "Engine/GameInstance.h"
+#include "Engine/World.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogMVWBackend, Log, All);
 
@@ -59,6 +63,16 @@ void UMVWBackendSubsystem::Send(const FString& Verb, const FString& Path, TShare
 }
 
 static TSharedPtr<FJsonObject> MakeBody() { return MakeShared<FJsonObject>(); }
+
+void UMVWBackendSubsystem::CheckHealth(FMVWBackendCallback Callback)
+{
+	Send(TEXT("GET"), TEXT("/healthz"), nullptr, Callback);
+}
+
+void UMVWBackendSubsystem::FetchShop(const FString& ShopId, FMVWBackendCallback Callback)
+{
+	Send(TEXT("GET"), FString::Printf(TEXT("/v1/game/world/shops/%s"), *ShopId), nullptr, Callback);
+}
 
 void UMVWBackendSubsystem::RedeemJoinTicket(const FString& Ticket, FMVWBackendCallback Callback)
 {
@@ -139,3 +153,57 @@ void UMVWBackendSubsystem::SavePosition(const FString& CharacterId, const FStrin
 	B->SetNumberField(TEXT("z"), Location.Z);
 	Send(TEXT("PUT"), FString::Printf(TEXT("/v1/game/characters/%s/position"), *CharacterId), B, FMVWBackendCallback());
 }
+
+// ---------------------------------------------------------------------------------------------
+// In-editor smoke tests. Open the console with the ` (tilde) key while playing and type:
+//   mvw.health   -> shows whether the backend answers
+//   mvw.shop     -> shows the Corner Grocery stock (proves the server key works)
+// ---------------------------------------------------------------------------------------------
+static void MvwShow(const FString& Msg, const FColor& Color)
+{
+	UE_LOG(LogMVWBackend, Log, TEXT("%s"), *Msg);
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 10.f, Color, Msg);
+	}
+}
+
+static UMVWBackendSubsystem* MvwGetSubsystem(UWorld* World)
+{
+	UGameInstance* GI = World ? World->GetGameInstance() : nullptr;
+	return GI ? GI->GetSubsystem<UMVWBackendSubsystem>() : nullptr;
+}
+
+static FAutoConsoleCommandWithWorldAndArgs GMvwHealthCmd(
+	TEXT("mvw.health"), TEXT("Check that the MVW backend is reachable"),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>&, UWorld* World)
+	{
+		UMVWBackendSubsystem* Sub = MvwGetSubsystem(World);
+		if (!Sub) { MvwShow(TEXT("MVW: backend subsystem not available (it only runs in the editor or on a dedicated server)"), FColor::Red); return; }
+		Sub->CheckHealth(FMVWBackendCallback::CreateLambda([](const FMVWBackendResult& R)
+		{
+			if (R.Ok()) { MvwShow(TEXT("MVW backend: ONLINE"), FColor::Green); }
+			else { MvwShow(FString::Printf(TEXT("MVW backend: NOT REACHABLE (status %d). Is 'npm run dev' running?"), R.Status), FColor::Red); }
+		}));
+	}));
+
+static FAutoConsoleCommandWithWorldAndArgs GMvwShopCmd(
+	TEXT("mvw.shop"), TEXT("Show Corner Grocery stock from the MVW backend (needs MVW_SERVER_KEY)"),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>&, UWorld* World)
+	{
+		UMVWBackendSubsystem* Sub = MvwGetSubsystem(World);
+		if (!Sub) { MvwShow(TEXT("MVW: backend subsystem not available"), FColor::Red); return; }
+		Sub->FetchShop(TEXT("shop_corner_grocery"), FMVWBackendCallback::CreateLambda([](const FMVWBackendResult& R)
+		{
+			if (!R.Ok()) { MvwShow(FString::Printf(TEXT("MVW shop: failed (status %d, %s). Check MVW_SERVER_KEY."), R.Status, *R.ErrorCode()), FColor::Red); return; }
+			const TArray<TSharedPtr<FJsonValue>>* Stock = nullptr;
+			if (R.Json->TryGetArrayField(TEXT("stock"), Stock))
+			{
+				for (const TSharedPtr<FJsonValue>& V : *Stock)
+				{
+					const TSharedPtr<FJsonObject> O = V->AsObject();
+					MvwShow(FString::Printf(TEXT("Shop: %s - %d MVC"), *O->GetStringField(TEXT("name")), (int32)O->GetNumberField(TEXT("price"))), FColor::Cyan);
+				}
+			}
+		}));
+	}));

@@ -5,7 +5,9 @@
 ## What exists
 `Source/MVWBackend`: `UMVWBackendSubsystem` (GameInstance subsystem). Server-only bridge exposing `JoinCharacter`, `Purchase`, `RentProperty`, `StartShift`, `CompleteShiftTask`, `CompleteShift`, `SavePosition` with idempotency keys. It does nothing unless running as a dedicated server (or in the editor). Config: `-MvwBackendUrl=http://host:3000` and env var `MVW_SERVER_KEY`.
 
-## Setup on Windows (to do)
+## Setup on Windows
+Step-by-step with screenshots-in-words: **[docs/SETUP_WINDOWS_FULL.md](../docs/SETUP_WINDOWS_FULL.md)**. The notes below are the short technical version.
+
 1. Install UE 5.4+ (Epic Launcher) and Visual Studio 2022 with the C++ game workload.
 2. Create a C++ project from the *Third Person* template named `MVW` in `unreal/` (this gives you character movement, replication-ready defaults).
 3. Copy `Source/MVWBackend` into the project's `Source/`, add `"MVWBackend"` to the module list in `MVW.uproject`, and add it to `PublicDependencyModuleNames` of the game module. Generate project files and build.

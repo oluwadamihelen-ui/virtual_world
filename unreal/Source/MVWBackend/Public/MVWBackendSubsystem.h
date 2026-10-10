@@ -12,7 +12,7 @@ struct FMVWBackendResult
 	int32 Status = 0;
 	TSharedPtr<FJsonObject> Json;
 	bool Ok() const { return Status >= 200 && Status < 300; }
-	FString ErrorCode() const { return Json.IsValid() ? Json->GetStringField(TEXT("error")) : TEXT("transport_error"); }
+	FString ErrorCode() const { FString E; return (Json.IsValid() && Json->TryGetStringField(TEXT("error"), E)) ? E : FString(TEXT("transport_error")); }
 };
 DECLARE_DELEGATE_OneParam(FMVWBackendCallback, const FMVWBackendResult&);
 
@@ -36,6 +36,11 @@ public:
 	 * The result's Json is the character summary (it includes "characterId"). Never trust a characterId sent by a client.
 	 */
 	void RedeemJoinTicket(const FString& Ticket, FMVWBackendCallback Callback);
+
+	/** Unauthenticated GET /healthz. Used by the `mvw.health` console command. */
+	void CheckHealth(FMVWBackendCallback Callback);
+	/** GET the Corner Grocery stock (needs MVW_SERVER_KEY). Used by the `mvw.shop` console command. */
+	void FetchShop(const FString& ShopId, FMVWBackendCallback Callback);
 
 	/** Dev/test only (the backend disables this route in production): join by bare character id. */
 	void JoinCharacter(const FString& CharacterId, FMVWBackendCallback Callback);

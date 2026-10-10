@@ -38,7 +38,7 @@ docs/           Architecture, setup, milestones, economy tuning, API
 
 ## Quick start
 
-**New to this? Read [docs/GUIDE_FOR_BEGINNERS.md](docs/GUIDE_FOR_BEGINNERS.md)**: install, run, and click through the engine room in your browser at `http://localhost:3000/dev` (a developer test console, not the game client).
+**New to this? Read [docs/SETUP_WINDOWS_FULL.md](docs/SETUP_WINDOWS_FULL.md)** (backend + Unreal, step by step), or the shorter backend-only [docs/GUIDE_FOR_BEGINNERS.md](docs/GUIDE_FOR_BEGINNERS.md): install, run, and click through the engine room in your browser at `http://localhost:3000/dev` (a developer test console, not the game client).
 
 See [docs/SETUP_WINDOWS.md](docs/SETUP_WINDOWS.md) for Windows. In short: install Node 20+ and PostgreSQL 16, create the DB, copy `backend/.env.example` to `backend/.env`, then `npm install`, `npm run setup` (creates `.env` + databases), `npm test`, `npm run dev` inside `backend/`.
 
