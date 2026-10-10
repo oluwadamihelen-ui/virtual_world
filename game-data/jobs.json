@@ -1,0 +1,14 @@
+[
+  {
+    "id": "job_grocery_assistant",
+    "name": "Grocery Shop Assistant",
+    "employer": "Corner Grocery (NPC)",
+    "district": "residential",
+    "wagePerShift": 250,
+    "tasksPerShift": 5,
+    "minSecondsPerTask": 20,
+    "maxShiftsPer24h": 4,
+    "requirements": { "minReputation": 0 },
+    "skill": { "id": "retail", "xpPerShift": 10 }
+  }
+]

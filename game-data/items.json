@@ -1,0 +1,7 @@
+[
+  { "id": "bottled_water", "name": "Bottled Water", "category": "grocery" },
+  { "id": "sandwich", "name": "Sandwich", "category": "grocery" },
+  { "id": "coffee", "name": "Coffee", "category": "cafe" },
+  { "id": "desk_lamp", "name": "Desk Lamp", "category": "furniture" },
+  { "id": "starter_sofa", "name": "Starter Sofa", "category": "furniture" }
+]

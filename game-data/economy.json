@@ -1,0 +1,12 @@
+{
+  "_comment": "Placeholder prototype values. Tune through playtesting. See docs/ECONOMY_TUNING.md.",
+  "currency": { "code": "MVC", "name": "My Virtual Credit" },
+  "startingBalance": 2000,
+  "rentPeriodHours": 168,
+  "rentGraceHours": 48,
+  "maxActiveTenanciesPerCharacter": 1,
+  "displayName": { "minLength": 3, "maxLength": 20, "reserved": ["admin", "administrator", "moderator", "mod", "system", "staff", "support", "mvw", "newmeridian", "official", "gm"] },
+  "smallBusinessSetupCost": 3000,
+  "starterInventoryCost": 500,
+  "basicLicenseCost": 100
+}

@@ -1,0 +1,13 @@
+[
+  {
+    "id": "shop_corner_grocery",
+    "name": "Corner Grocery",
+    "district": "residential",
+    "stock": [
+      { "itemId": "bottled_water", "price": 8, "quantity": null },
+      { "itemId": "sandwich", "price": 25, "quantity": null },
+      { "itemId": "desk_lamp", "price": 120, "quantity": 5 },
+      { "itemId": "starter_sofa", "price": 350, "quantity": 2 }
+    ]
+  }
+]

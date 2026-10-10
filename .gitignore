@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+*.log
+backups/
+# Unreal
+unreal/Binaries/
+unreal/Intermediate/
+unreal/Saved/
+unreal/DerivedDataCache/
+unreal/.vs/

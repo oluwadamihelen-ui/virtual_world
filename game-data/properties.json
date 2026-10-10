@@ -1,0 +1,5 @@
+[
+  { "id": "prop_resi_room_101", "type": "room", "district": "residential", "name": "Room 101, Maple Court", "rentPerPeriod": 500, "capacity": 1, "furnitureSlots": 4 },
+  { "id": "prop_resi_room_102", "type": "room", "district": "residential", "name": "Room 102, Maple Court", "rentPerPeriod": 500, "capacity": 1, "furnitureSlots": 4 },
+  { "id": "prop_resi_apt_201", "type": "apartment", "district": "residential", "name": "Apartment 201, Maple Court", "rentPerPeriod": 900, "capacity": 2, "furnitureSlots": 8 }
+]

@@ -1,0 +1,7 @@
+{
+  "bodyPresets": ["body_a", "body_b", "body_c", "body_d"],
+  "skinTones": [0, 1, 2, 3, 4, 5, 6, 7],
+  "hairstyles": ["short", "long", "curly", "braids", "buzz", "bun"],
+  "hairColors": ["black", "brown", "blonde", "red", "grey", "blue"],
+  "outfits": ["casual_1", "casual_2", "smart_1", "work_1"]
+}
