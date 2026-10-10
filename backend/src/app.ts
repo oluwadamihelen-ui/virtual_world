@@ -12,6 +12,8 @@ import * as mod from './modules/moderation/moderation.js';
 import * as ledger from './modules/economy/ledger.js';
 import { characterSummary } from './modules/summary.js';
 import { withTx } from './db.js';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 const uuid = z.string().uuid();
 const Idem = z.object({ idempotencyKey: z.string().min(8).max(100) });
@@ -38,6 +40,12 @@ export async function buildApp(ctx: AppContext, opts: { rateLimit?: boolean } = 
     await ctx.pool.query('SELECT 1');
     return { status: 'ok' };
   });
+
+  // Developer test console (browser buttons for the API). Never registered in production.
+  if (ctx.config.NODE_ENV !== 'production') {
+    const html = readFileSync(fileURLToPath(new URL('../public/dev.html', import.meta.url)), 'utf8');
+    app.get('/dev', async (_req, reply) => reply.type('text/html; charset=utf-8').send(html));
+  }
 
   // ---------- Account & character (player JWT) ----------
   const authLimit = { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } };

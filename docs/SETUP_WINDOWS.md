@@ -29,7 +29,7 @@ cd backend
 copy .env.example .env
 ```
 
-Edit `.env`: set `JWT_SECRET` and `SERVER_API_KEY` to long random values:
+Shortcut: `npm run setup` does steps 2 and this .env step for you (creates the role, databases and random secrets). Manual route: edit `.env`: set `JWT_SECRET` and `SERVER_API_KEY` to long random values:
 
 ```bat
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"

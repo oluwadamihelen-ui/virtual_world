@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MVW Test Console</title>
+<style>
+:root{--bg:#0f1420;--card:#1a2233;--ink:#e8ecf5;--mut:#93a0ba;--acc:#4cc9a7;--bad:#ff7b7b;--btn:#2f6fed}
+@media (prefers-color-scheme:light){:root{--bg:#f2f5fb;--card:#fff;--ink:#17202f;--mut:#58637a;--acc:#0a8f6b;--bad:#c62828}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,Segoe UI,sans-serif;padding:16px;max-width:900px;margin-inline:auto}
+h1{font-size:22px;margin:0 0 4px}.sub{color:var(--mut);margin:0 0 16px}
+.card{background:var(--card);border-radius:12px;padding:14px;margin-bottom:14px}
+.card h2{font-size:17px;margin:0 0 8px}
+button{background:var(--btn);color:#fff;border:0;border-radius:8px;padding:9px 13px;font:inherit;cursor:pointer;margin:3px 4px 3px 0}
+button:disabled{opacity:.45;cursor:not-allowed}button.alt{background:#556}
+input{font:inherit;padding:8px;border-radius:8px;border:1px solid #6677;background:transparent;color:var(--ink);width:100%}
+.money{font-size:34px;font-weight:700;color:var(--acc)}
+#log{font:13px/1.5 ui-monospace,Consolas,monospace;max-height:260px;overflow:auto;white-space:pre-wrap}
+.ok{color:var(--acc)}.err{color:var(--bad)}.mut{color:var(--mut)}
+.row{display:flex;gap:10px;flex-wrap:wrap}.row>div{flex:1 1 260px}
+progress{width:100%;height:14px}
+</style></head><body>
+<h1>My Virtual World – Test Console</h1>
+<p class="sub">A helper page for developers. The real game will be 3D. This page lets you poke the game's "engine room" with buttons.</p>
+
+<div class="card" id="setup"><h2>Step 1 – Secret key</h2>
+<p class="mut">Open the file <b>backend\.env</b>, find the line <b>SERVER_API_KEY=…</b> and paste the long text after the = sign here. (Only the game server knows it – it's what stops cheaters.)</p>
+<input id="key" placeholder="paste SERVER_API_KEY here" autocomplete="off">
+</div>
+
+<div class="card"><h2>Step 2 – Make a player</h2>
+<input id="cname" placeholder="Pick a character name (3–20 letters/numbers)" maxlength="20" style="margin-bottom:8px">
+<button id="create">Create my character</button> <span id="who" class="mut">not created yet</span></div>
+
+<div class="card"><h2>Your stuff</h2>
+<div class="money"><span id="bal">–</span> MVC</div>
+<div id="home" class="mut">Home: –</div>
+<div id="inv" class="mut">Backpack: –</div>
+<div id="skill" class="mut">Skills: –</div>
+<button id="refresh" class="alt">🔄 Pretend I disconnected &amp; reconnected</button></div>
+
+<div class="row">
+<div class="card"><h2>🏠 Homes</h2><div id="props" class="mut">…</div></div>
+<div class="card"><h2>🛒 Corner Grocery</h2><div id="shop" class="mut">…</div></div></div>
+
+<div class="card"><h2>💼 Job: Grocery Shop Assistant (pays 250 MVC)</h2>
+<p class="mut">A shift is 5 tasks and each task needs 20 seconds. The server keeps the clock, so you can't hurry it.</p>
+<button id="work">Work a shift (about 100 seconds)</button><progress id="bar" value="0" max="5"></progress></div>
+
+<div class="card"><h2>🧾 Money history</h2><div id="ledger" class="mut">…</div></div>
+<div class="card"><h2>What just happened</h2><div id="log"></div></div>
+
+<script>
+const $=id=>document.getElementById(id);
+let cid=null, token=null;
+const rk=()=>crypto.randomUUID();
+const log=(m,c='')=>{const d=document.createElement('div');d.className=c;d.textContent=new Date().toLocaleTimeString()+'  '+m;$('log').prepend(d)};
+$('key').value=localStorage.getItem('mvwkey')||'';$('key').oninput=()=>localStorage.setItem('mvwkey',$('key').value.trim());
+async function api(method,path,body,player){
+  const h={'content-type':'application/json'};
+  if(player) h.authorization='Bearer '+token; else h['x-server-key']=$('key').value.trim();
+  const r=await fetch(path,{method,headers:h,body:method==='GET'?undefined:JSON.stringify(body??{})});
+  const j=await r.json().catch(()=>({}));return{ok:r.ok,status:r.status,j};
+}
+const G=p=>`/v1/game/characters/${cid}${p}`;
+const explain=j=>({insufficient_funds:'Not enough MVC!',out_of_stock:'Sold out!',property_unavailable:'Someone else already has that home.',tenancy_limit:'You already rent a home.',invalid_server_key:'The secret key is wrong or missing (Step 1).',shift_limit_reached:'You worked enough shifts for today.',display_name_taken:'That name is taken.',display_name_reserved:'That name is not allowed.',invalid_display_name:j.message}[j.error]||j.error);
+async function load(){
+  const [p,s,ph]=await Promise.all([api('GET','/v1/game/world/properties'),api('GET','/v1/game/world/shops/shop_corner_grocery'),null]);
+  if(!p.ok){log(explain(p.j),'err');return}
+  $('props').innerHTML='';p.j.properties.forEach(x=>{const d=document.createElement('div');d.innerHTML=`<b>${x.name}</b> – ${x.rentPerPeriod} MVC/week ${x.available?'':'<i>(taken)</i>'} `;
+    const b=document.createElement('button');b.textContent='Rent';b.disabled=!x.available||!cid;b.onclick=()=>act(()=>api('POST',G('/rent'),{propertyId:x.propertyId,idempotencyKey:rk()}),'Rented '+x.name);d.append(b);$('props').append(d)});
+  $('shop').innerHTML='';s.j.stock.forEach(x=>{const d=document.createElement('div');d.innerHTML=`${x.name} – ${x.price} MVC ${x.quantity===null?'':'('+x.quantity+' left)'} `;
+    const b=document.createElement('button');b.textContent='Buy 1';b.disabled=!cid||x.quantity===0;b.onclick=()=>act(()=>api('POST',G('/shops/shop_corner_grocery/purchase'),{itemId:x.itemId,quantity:1,idempotencyKey:rk()}),'Bought '+x.name);d.append(b);$('shop').append(d)});
+  if(cid){const j=(await api('POST',G('/join'))).j;show(j);
+    const l=(await api('GET',G('/ledger?limit=10'))).j.entries||[];
+    $('ledger').innerHTML=l.map(e=>`<div>${e.delta>0?'<span class=ok>+':'<span class=err>'}${e.delta}</span> → balance ${e.balance_after} <span class=mut>(${e.type.replace(/_/g,' ')})</span></div>`).join('')||'nothing yet';}
+}
+function show(s){$('bal').textContent=s.balance;$('who').textContent='Playing as '+s.displayName;
+  $('home').textContent='Home: '+(s.tenancy?`${s.tenancy.propertyName} (${s.tenancy.status}, paid until ${new Date(s.tenancy.paidUntil).toLocaleDateString()})`:'none yet');
+  $('inv').textContent='Backpack: '+(s.inventory.map(i=>i.quantity+' × '+i.itemId.replace(/_/g,' ')).join(', ')||'empty');
+  $('skill').textContent='Skills: '+(s.skills.map(k=>k.skillId+' '+k.xp+' xp').join(', ')||'none yet');}
+async function act(fn,okMsg){const r=await fn();log(r.ok?okMsg+' ✔':'Oops: '+explain(r.j),r.ok?'ok':'err');await load()}
+$('create').onclick=async()=>{
+  const email=`kid${Date.now()}@example.com`,password='a long test password';
+  let r=await api('POST','/v1/auth/register',{email,password},true);if(!r.ok)return log(explain(r.j),'err');
+  r=await api('POST','/v1/auth/login',{email,password},true);token=r.j.token;
+  r=await api('POST','/v1/characters',{displayName:$('cname').value||'Kid '+Math.floor(Math.random()*1e4),appearance:{bodyPreset:'body_a',skinTone:2,hairstyle:'short',hairColor:'brown',outfit:'casual_1'}},true);
+  if(!r.ok)return log('Oops: '+explain(r.j),'err');cid=r.j.characterId;localStorage.setItem('mvwcid',cid);
+  log('Character created! You got 2000 MVC to start.','ok');await load()};
+$('refresh').onclick=async()=>{log('Reconnecting… everything should still be here.');await load()};
+$('work').onclick=async()=>{
+  $('work').disabled=true;try{
+  let r=await api('POST',G('/shifts'),{jobId:'job_grocery_assistant'});if(!r.ok)return log('Oops: '+explain(r.j),'err');
+  const sid=r.j.shiftId;log('Shift started!','ok');
+  for(let i=1;i<=r.j.tasksRequired;i++){
+    for(let t=0;t<21;t++){$('work').textContent=`Task ${i}/${r.j.tasksRequired}… ${21-t}s`;await new Promise(z=>setTimeout(z,1000))}
+    const k=await api('POST',G(`/shifts/${sid}/task`));if(!k.ok)return log('Oops: '+explain(k.j),'err');$('bar').value=i;log(`Task ${i} done`)}
+  const c=await api('POST',G(`/shifts/${sid}/complete`));log(c.ok?`Shift finished! You earned ${c.j.wage} MVC.`:'Oops: '+explain(c.j),c.ok?'ok':'err');
+  }finally{$('work').disabled=false;$('work').textContent='Work a shift (about 100 seconds)';$('bar').value=0;await load()}};
+const saved=localStorage.getItem('mvwcid');load();
+</script></body></html>

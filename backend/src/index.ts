@@ -13,7 +13,16 @@ const data = loadGameData(config.gameDataDir);
 const pool = createPool(config.DATABASE_URL);
 const ctx = { pool, config, data, now: () => new Date() };
 
-await migrate(pool);
+try {
+  await migrate(pool);
+} catch (err: any) {
+  if (err?.code === 'ECONNREFUSED' || err?.code === '28P01' || err?.code === '3D000') {
+    console.error('\nCould not use the database. Is PostgreSQL running, and do DATABASE_URL in .env and the database name/password match what you created?');
+    console.error(`(technical detail: ${err.code} ${err.message})\n`);
+    process.exit(1);
+  }
+  throw err;
+}
 await syncGameData(pool, data);
 const app = await buildApp(ctx);
 
