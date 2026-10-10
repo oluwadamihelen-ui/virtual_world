@@ -46,6 +46,14 @@ describe('identity', () => {
     expect(nameKey('Ad-min')).toBe('admin');
   });
 
+  it('names that differ only by digits without letter lookalikes are distinct', async () => {
+    const a = await w.newPlayer(); const b = await w.newPlayer();
+    expect((await mkChar(a.token, 'Player 2')).status).toBe(201);
+    expect((await mkChar(b.token, 'Player 6')).status).toBe(201);
+    expect((await mkChar(b.token, 'player2')).status).toBe(409); // same name, different spacing/case
+    expect(nameKey('Player 2')).not.toBe(nameKey('Player 6'));
+  });
+
   it('validates appearance against the allowed catalogue', async () => {
     const p = await w.newPlayer();
     expect((await mkChar(p.token, 'Somebody', { ...appearance, hairstyle: 'mohawk_9000' })).status).toBe(400);

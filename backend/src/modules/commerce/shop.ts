@@ -26,7 +26,11 @@ export async function purchase(ctx: AppContext, characterId: string, i: Purchase
     await tx.query('SELECT 1 FROM characters WHERE id=$1 FOR UPDATE', [characterId]);
 
     const key = `${characterId}:purchase:${i.idempotencyKey}`;
-    const stockRow = await tx.query('SELECT price, quantity FROM shop_stock WHERE shop_id=$1 AND item_id=$2 FOR UPDATE', [i.shopId, i.itemId]);
+    // Unlimited NPC stock needs no row lock (nothing to decrement); locking it would serialize every buyer of a popular item.
+    let stockRow = await tx.query('SELECT price, quantity FROM shop_stock WHERE shop_id=$1 AND item_id=$2', [i.shopId, i.itemId]);
+    if (stockRow.rows[0] && stockRow.rows[0].quantity !== null) {
+      stockRow = await tx.query('SELECT price, quantity FROM shop_stock WHERE shop_id=$1 AND item_id=$2 FOR UPDATE', [i.shopId, i.itemId]);
+    }
     const stock = stockRow.rows[0];
     if (!stock) throw notFound('item_not_sold_here');
     const total = (stock.price as number) * i.quantity;

@@ -149,3 +149,24 @@ describe('production hardening', () => {
     } finally { await prod.close(); }
   });
 });
+
+describe('rate limiting', () => {
+  it('limits login attempts per IP, never throttles the authenticated game server, and still limits wrong-key guessers', async () => {
+    const { buildApp } = await import('../src/app.js');
+    const rl = await buildApp(w.ctx, { rateLimit: true });
+    try {
+      const p = await w.newPlayer();
+      const login = () => rl.inject({ method: 'POST', url: '/v1/auth/login', payload: { email: 'x@example.com', password: 'nope nope nope' } });
+      const codes: number[] = [];
+      for (let i = 0; i < 14; i++) codes.push((await login()).statusCode);
+      expect(codes.filter((c) => c === 429).length).toBeGreaterThanOrEqual(3);      // brute-force protection kicks in
+      expect(codes.slice(0, 10).every((c) => c === 401)).toBe(true);
+      const good = { 'x-server-key': w.ctx.config.SERVER_API_KEY };
+      const rs = await Promise.all(Array.from({ length: 400 }, () => rl.inject({ method: 'GET', url: `/v1/game/characters/${p.characterId}/summary`, headers: good })));
+      expect(rs.every((r) => r.statusCode === 200)).toBe(true);                      // 400 > 300/min limit, all served
+      const bad = { 'x-server-key': 'wrong-wrong-wrong-wrong-wrong-0' };
+      const gs = await Promise.all(Array.from({ length: 350 }, () => rl.inject({ method: 'GET', url: `/v1/game/characters/${p.characterId}/summary`, headers: bad })));
+      expect(gs.filter((r) => r.statusCode === 429).length).toBeGreaterThan(0);      // guessers get throttled
+    } finally { await rl.close(); }
+  });
+});

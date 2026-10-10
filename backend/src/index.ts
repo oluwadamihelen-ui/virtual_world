@@ -25,7 +25,9 @@ try {
   throw err;
 }
 await syncGameData(pool, data);
-const app = await buildApp(ctx);
+const rateLimitOn = config.NODE_ENV === 'production' || config.RATE_LIMIT_DISABLED !== '1';
+if (!rateLimitOn) console.warn('WARNING: rate limiting is DISABLED (load-test mode)');
+const app = await buildApp(ctx, { rateLimit: rateLimitOn });
 
 const timer = setInterval(() => {
   sweepTenancies(ctx).catch((err) => app.log.error({ err }, 'tenancy sweep failed'));

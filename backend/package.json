@@ -14,7 +14,8 @@
     "dev": "tsx src/index.ts",
     "migrate": "tsx src/migrate-cli.ts",
     "test": "vitest run",
-    "setup": "node scripts/setup.mjs"
+    "setup": "node scripts/setup.mjs",
+    "set-role": "node scripts/set-role.mjs"
   },
   "dependencies": {
     "@fastify/rate-limit": "^11.2.1",

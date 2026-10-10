@@ -55,4 +55,8 @@ Promoting the first moderator/admin is done directly in SQL (`UPDATE accounts SE
 
 **Moderator:** resolve action `mute` (`hours`, `note`) added; `lift-sanction` also clears mutes.
 
+**Trading** (all under `/v1/game/characters/:id`): `POST /trades {partnerId}` · `GET /trades/:tid` · `PUT /trades/:tid/offer {mvc, items:[{itemId,quantity}]}` (any change voids confirmations) · `POST /trades/:tid/confirm {version}` (executes when both confirmed the current version) · `POST /trades/:tid/cancel`. Trades expire after 5 minutes; max 3 open per character; blocked/sanctioned players cannot trade. The game server must verify both players are present at the trade window.
+
+**Pages:** `GET /mod` is the moderator console (always served; authenticates with the moderator's own login). Operators promote accounts locally with `npm run set-role -- <email> <role>`.
+
 **Dev only** (not registered in production): `GET /dev` (test console), `POST /v1/dev/grant`, `POST /v1/dev/run-customers`.

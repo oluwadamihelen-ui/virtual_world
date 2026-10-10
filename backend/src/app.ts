@@ -12,6 +12,7 @@ import * as mod from './modules/moderation/moderation.js';
 import * as ledger from './modules/economy/ledger.js';
 import { characterSummary } from './modules/summary.js';
 import * as biz from './modules/commerce/business.js';
+import * as trade from './modules/commerce/trade.js';
 import * as social from './modules/social/social.js';
 import * as tickets from './modules/identity/tickets.js';
 import { withTx } from './db.js';
@@ -22,10 +23,15 @@ const uuid = z.string().uuid();
 const Idem = z.object({ idempotencyKey: z.string().min(8).max(100) });
 
 export async function buildApp(ctx: AppContext, opts: { rateLimit?: boolean } = {}): Promise<FastifyInstance> {
-  const app = Fastify({ logger: ctx.config.NODE_ENV === 'test' ? false : { level: 'info', redact: ['req.headers.authorization', 'req.headers["x-server-key"]'] }, bodyLimit: 64 * 1024 });
+  const app = Fastify({ logger: ctx.config.NODE_ENV === 'test' ? false : { level: ctx.config.LOG_LEVEL, redact: ['req.headers.authorization', 'req.headers["x-server-key"]'] }, bodyLimit: 64 * 1024 });
 
   if (opts.rateLimit !== false) {
-    await app.register(rateLimit, { global: true, max: 300, timeWindow: '1 minute' });
+    // The dedicated game server calls from ONE address at high volume, so requests carrying the correct server key are exempt.
+    // Everyone else (players, attackers, wrong-key guessers) is limited per IP.
+    await app.register(rateLimit, {
+      global: true, max: 300, timeWindow: '1 minute',
+      allowList: (req) => { try { requireGameServer(ctx.config, req); return true; } catch { return false; } },
+    });
   }
 
   app.setErrorHandler((err: any, req, reply) => {
@@ -43,6 +49,10 @@ export async function buildApp(ctx: AppContext, opts: { rateLimit?: boolean } = 
     await ctx.pool.query('SELECT 1');
     return { status: 'ok' };
   });
+
+  // Moderator console: static page, no secrets; every action is authenticated with the moderator's own login token.
+  const modHtml = readFileSync(fileURLToPath(new URL('../public/mod.html', import.meta.url)), 'utf8');
+  app.get('/mod', async (_req, reply) => reply.type('text/html; charset=utf-8').header('cache-control', 'no-store').send(modHtml));
 
   // Developer test console (browser buttons for the API). Never registered in production.
   if (ctx.config.NODE_ENV !== 'production') {
@@ -272,6 +282,26 @@ export async function buildApp(ctx: AppContext, opts: { rateLimit?: boolean } = 
     const b = Idem.extend({ itemId: z.string(), quantity: z.number().int() }).parse(req.body);
     return biz.purchaseFromBusiness(ctx, uuid.parse((req.params as any).id), bid(req), b);
   });
+
+  // ---------- Player-to-player trading ----------
+  const tid = (req: any) => uuid.parse(req.params.tid);
+  app.post(`${G}/characters/:id/trades`, async (req) => {
+    gs(req);
+    const b = z.object({ partnerId: uuid }).parse(req.body);
+    return trade.openTrade(ctx, uuid.parse((req.params as any).id), b.partnerId);
+  });
+  app.get(`${G}/characters/:id/trades/:tid`, async (req) => { gs(req); return trade.viewTrade(ctx, uuid.parse((req.params as any).id), tid(req)); });
+  app.put(`${G}/characters/:id/trades/:tid/offer`, async (req) => {
+    gs(req);
+    const b = z.object({ mvc: z.number().int(), items: z.array(z.object({ itemId: z.string(), quantity: z.number().int() })).max(20) }).parse(req.body);
+    return trade.setOffer(ctx, uuid.parse((req.params as any).id), tid(req), b);
+  });
+  app.post(`${G}/characters/:id/trades/:tid/confirm`, async (req) => {
+    gs(req);
+    const b = z.object({ version: z.number().int() }).parse(req.body);
+    return trade.confirmTrade(ctx, uuid.parse((req.params as any).id), tid(req), b.version);
+  });
+  app.post(`${G}/characters/:id/trades/:tid/cancel`, async (req) => { gs(req); return trade.cancelTrade(ctx, uuid.parse((req.params as any).id), tid(req)); });
 
   // ---------- Social safety (block / chat check) ----------
   app.get(`${G}/characters/:id/blocks`, async (req) => { gs(req); return { blocked: await social.listBlocks(ctx, uuid.parse((req.params as any).id)) }; });

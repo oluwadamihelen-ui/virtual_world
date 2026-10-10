@@ -92,11 +92,16 @@ The **Money history** box is the game's receipt book. Every coin that moves is w
 
 ---
 
+### Be a moderator 🛡️ (optional)
+1. On the test page, make a second character in another browser window and use it later to report the first one (reports are filed by the game; there is no button on this page yet).
+2. Make an account a moderator: in the black window press **Ctrl+C**, then type `npm run set-role -- your-email@example.com moderator` (use the email of an account you registered, then start the server again).
+3. Open **http://localhost:3000/mod**, sign in, and you'll see the report queue with buttons to dismiss, warn, mute or suspend (you must write a short note).
+
 ## Part 4 — Stopping and starting again
 
 - **Stop:** click the black window and press **Ctrl + C** (then Y if it asks).
 - **Start again later:** open the `backend` folder, type `cmd` in the address bar, then `npm run dev`. (You don't need `npm install` or `npm run setup` again.) Your characters and money are saved in PostgreSQL, so they're still there.
-- **Run the safety checks** (optional): `npm test`. It takes about 15 seconds and should say **72 passed**.
+- **Run the safety checks** (optional): `npm test`. It takes about 15 seconds and should say **83 passed**.
 
 ## When something goes wrong
 

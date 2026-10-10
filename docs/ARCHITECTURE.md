@@ -52,6 +52,14 @@ A business owns a **ledger account** (`kind='business'`) as its till. Money flow
 
 `blocks` (two-way effect), `accounts.muted_until` (moderator mute, lifted by appeal), `POST /chat/check` (control-character stripping, length cap, per-character rate limit, word masking, mute/suspension check) — the **game server** calls these before broadcasting. Achievements are awarded once (`achievements` primary key) inside the same transaction as the action that earns them and grant reputation, which gates better jobs.
 
+## Trading
+
+Two-sided offers with a monotonically increasing `version`. Changing either offer bumps the version and clears both confirmations; `confirm` must name the version the player saw. When both confirmations equal the current version, one DB transaction re-checks holdings, moves items, posts the net MVC through the ledger (idempotency key `trade:<id>`) and marks the trade completed under a row lock — so double execution, stale offers and duplicated items are impossible (tests cover the races). Offers are promises, not escrow: if a player spent the money meanwhile the swap fails whole and the trade stays open.
+
+## Rate limiting
+
+Per-IP limits on all routes (10/min on register/login, 300/min otherwise). Requests carrying the correct game-server key are exempt (the game server calls from one address); wrong-key guessers stay limited. Counters are in process memory: use Redis before running multiple backend instances.
+
 ## Rent lifecycle
 
 Rent is charged for the first period at signup. When due, the server auto-pays from the wallet (one idempotent charge per billing period). If the wallet cannot cover it, the tenancy enters **grace** (`rentGraceHours`, default 48h, counted from the first failure) with access retained; paying up during grace restores `active`. If grace lapses, the tenancy **ends**, the property is released and placed furniture is returned to the tenant's inventory. Nothing is destroyed. Tenancies of suspended or banned accounts are not processed, so a sanction never costs someone their home. The sweep runs every minute and on player join.

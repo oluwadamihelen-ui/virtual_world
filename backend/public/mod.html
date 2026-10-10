@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MVW Moderation</title>
+<style>
+:root{--bg:#10151f;--card:#1a2233;--ink:#e8ecf5;--mut:#93a0ba;--acc:#4cc9a7;--bad:#ff7b7b;--btn:#2f6fed}
+@media (prefers-color-scheme:light){:root{--bg:#f2f5fb;--card:#fff;--ink:#17202f;--mut:#58637a;--acc:#0a8f6b;--bad:#c62828}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,Segoe UI,sans-serif;padding:16px;max-width:980px;margin-inline:auto}
+h1{font-size:21px;margin:0 0 12px}h2{font-size:16px;margin:0 0 8px}.card{background:var(--card);border-radius:12px;padding:14px;margin-bottom:14px}
+button{background:var(--btn);color:#fff;border:0;border-radius:8px;padding:7px 11px;font:inherit;cursor:pointer;margin:2px 4px 2px 0}button.bad{background:#b3332f}button.alt{background:#556}
+input{font:inherit;padding:7px;border-radius:8px;border:1px solid #6677;background:transparent;color:var(--ink);width:100%;margin:3px 0}
+.mut{color:var(--mut)}.ok{color:var(--acc)}.err{color:var(--bad)}.rep{border-top:1px solid #6674;padding:10px 0}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{text-align:left;padding:4px 6px;border-bottom:1px solid #6673;vertical-align:top}
+</style></head><body>
+<h1>My Virtual World – Moderation</h1>
+<div class="card" id="login"><h2>Sign in</h2>
+<p class="mut">Moderator or admin accounts only. (Operator: <code>npm run set-role -- email moderator</code>.)</p>
+<input id="em" placeholder="email" autocomplete="username"><input id="pw" type="password" placeholder="password" autocomplete="current-password">
+<button id="go">Sign in</button> <span id="lmsg" class="err"></span></div>
+<div id="app" hidden>
+ <div class="card"><b id="me"></b> <button class="alt" id="out">Sign out</button> <button class="alt" id="refresh">Refresh</button></div>
+ <div class="card"><h2>Open reports</h2><div id="reports" class="mut">…</div></div>
+ <div class="card" id="adm" hidden><h2>Admin: ledger integrity</h2><button id="chk">Check now</button> <span id="integ"></span>
+  <h2 style="margin-top:12px">Audit log (latest 100)</h2><div id="audit"></div></div>
+</div>
+<script>
+const $=id=>document.getElementById(id);let tok=null,role=null;
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function api(m,p,b){const r=await fetch(p,{method:m,headers:{'content-type':'application/json',authorization:'Bearer '+tok},body:m==='GET'?undefined:JSON.stringify(b??{})});return{ok:r.ok,status:r.status,j:await r.json().catch(()=>({}))}}
+$('go').onclick=async()=>{$('lmsg').textContent='';
+ const r=await fetch('/v1/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:$('em').value,password:$('pw').value})});
+ const j=await r.json();if(!r.ok)return $('lmsg').textContent='Sign-in failed.';
+ if(!['moderator','admin'].includes(j.role))return $('lmsg').textContent='This account is not a moderator.';
+ tok=j.token;role=j.role;$('pw').value='';$('login').hidden=true;$('app').hidden=false;$('me').textContent='Signed in as '+j.role;$('adm').hidden=role!=='admin';load()};
+$('out').onclick=()=>{tok=null;location.reload()};$('refresh').onclick=()=>load();
+async function act(id,body){const note=document.getElementById('n'+id).value.trim();
+ if(body.action!=='dismiss'&&note.length<3)return alert('Please write a short note (3+ characters) explaining the decision.');
+ const r=await api('POST','/v1/mod/reports/'+id+'/resolve',{...body,note});if(!r.ok)alert('Failed: '+(r.j.error||r.status));load()}
+async function load(){
+ const r=await api('GET','/v1/mod/reports?status=open');const box=$('reports');
+ if(!r.ok){box.textContent='Could not load ('+r.status+').';return}
+ if(!r.j.reports.length){box.textContent='No open reports. 🎉';}else{box.innerHTML='';
+  for(const x of r.j.reports){const d=document.createElement('div');d.className='rep';
+   d.innerHTML=`<b>${esc(x.target)}</b> reported by ${esc(x.reporter)} <span class="mut">· ${esc(x.category)} · ${new Date(x.createdAt).toLocaleString()}</span><div>${esc(x.detail)||'<span class=mut>(no details)</span>'}</div><input id="n${x.reportId}" placeholder="Decision note (required for sanctions)">`;
+   const add=(t,body,cls)=>{const b=document.createElement('button');b.textContent=t;if(cls)b.className=cls;b.onclick=()=>act(x.reportId,body);d.append(b)};
+   add('Dismiss',{action:'dismiss'},'alt');add('Warn',{action:'warn'});add('Mute 1h',{action:'mute',hours:1});add('Mute 24h',{action:'mute',hours:24});add('Suspend 24h',{action:'suspend',hours:24},'bad');add('Suspend 7d',{action:'suspend',hours:168},'bad');
+   if(role==='admin')add('Ban',{action:'ban'},'bad');
+   box.append(d)}}
+ if(role==='admin'){const a=await api('GET','/v1/admin/audit');$('audit').innerHTML='<table><tr><th>When</th><th>Action</th><th>Target</th><th>Detail</th></tr>'+(a.j.entries||[]).map(e=>`<tr><td>${new Date(e.created_at).toLocaleString()}</td><td>${esc(e.action)}</td><td>${esc(e.target_type)} ${esc(String(e.target_id||'').slice(0,8))}</td><td>${esc(JSON.stringify(e.detail))}</td></tr>`).join('')+'</table>'}}
+$('chk').onclick=async()=>{const r=await api('GET','/v1/admin/ledger-integrity');$('integ').innerHTML=r.j.ok?'<span class=ok>✔ ledger is consistent</span>':'<span class=err>✘ PROBLEM: '+esc(JSON.stringify(r.j))+'</span>'};
+</script></body></html>

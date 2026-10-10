@@ -6,12 +6,15 @@ A persistent 3D multiplayer life-simulation. Players rent homes, work jobs, trad
 
 | Part | State |
 |---|---|
-| Authoritative backend (TypeScript + PostgreSQL) | **Built and tested**: 72 automated tests pass against a real PostgreSQL 16 |
+| Authoritative backend (TypeScript + PostgreSQL) | **Built and tested**: 83 automated tests pass against a real PostgreSQL 16 |
 | Ledger, wallet, idempotency, concurrency safety | **Built and tested** (see `docs/MILESTONES.md`) |
 | Identity, characters, housing/rent lifecycle, jobs (4), shop, moderation (report/mute/suspend/ban), admin audit | **Built and tested** |
 | Single-use join tickets (client → game server identity binding) | **Built and tested** |
 | Player businesses: premises, till, wholesale restock, price bounds, player + simulated NPC customers, profit report | **Built and tested** |
 | Block list, chat check (filter, rate limit, mute), achievements → reputation → job unlocks | **Built and tested** |
+| Player-to-player trading (versioned confirmation, atomic swap, anti-bait-and-switch) | **Built and tested** |
+| Moderator web console (`/mod`), operator role script, rate limiting (tested) | **Built and tested** |
+| Load test script + first measured results on a shared 4-core VM (`docs/LOAD_TESTING.md`) | **Done once, indicative only** |
 | Crash/fault-injection tests (error mid-payment, DB connection killed mid-transaction) | **Built and tested** |
 | Backup / restore procedure | **Drill performed once** on Linux/PostgreSQL 16 (`scripts/`) |
 | Unreal Engine 5 client + dedicated server | **Not built.** UE5 was not available in the build environment. Only a small, **uncompiled** server-side backend bridge exists (`unreal/Source/MVWBackend`). |
@@ -41,4 +44,4 @@ See [docs/SETUP_WINDOWS.md](docs/SETUP_WINDOWS.md) for Windows. In short: instal
 
 ## Documents
 
-- [Architecture](docs/ARCHITECTURE.md) · [Setup (Windows)](docs/SETUP_WINDOWS.md) · [Milestones](docs/MILESTONES.md) · [Economy tuning](docs/ECONOMY_TUNING.md) · [API](docs/API.md) · [Unreal notes](unreal/README.md)
+- [Load testing](docs/LOAD_TESTING.md) · [Architecture](docs/ARCHITECTURE.md) · [Setup (Windows)](docs/SETUP_WINDOWS.md) · [Milestones](docs/MILESTONES.md) · [Economy tuning](docs/ECONOMY_TUNING.md) · [API](docs/API.md) · [Unreal notes](unreal/README.md)

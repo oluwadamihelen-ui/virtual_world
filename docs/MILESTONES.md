@@ -22,7 +22,7 @@ Legend: ✅ done and verified by automated tests · 🟡 done but unverified/par
 | 14 | UE5 project, greybox neighborhood, movement, 2 players on a dedicated server | ⬜ | Needs Unreal Engine. `unreal/Source/MVWBackend` is uncompiled. |
 
 ### Test results (last run)
-`cd backend && npm test` → **8 files, 72 tests passed** (PostgreSQL 16.15, Node 22). `npm run typecheck` clean. The real server entry point was started and answered `/healthz`, rejected a call without the server key, and served `/world/properties` with it.
+`cd backend && npm test` → **9 files, 83 tests passed** (PostgreSQL 16.15, Node 22). `npm run typecheck` clean. The real server entry point was started and answered `/healthz`, rejected a call without the server key, and served `/world/properties` with it.
 
 ### Acceptance criteria status
 
@@ -50,10 +50,10 @@ Legend: ✅ done and verified by automated tests · 🟡 done but unverified/par
 - The chat rate limiter is per backend process (in memory). Move it to Redis before running more than one backend instance.
 - The chat blocklist is a four-word placeholder; it is not a real safety filter.
 - Business closing forfeits remaining shelf stock; businesses have no rent, staff, loans or taxes yet.
-- Rate limiting is configured but **not covered by tests** (disabled in the test app).
+- Rate limiting is tested (login brute-force limit, game-server exemption, wrong-key throttling) but limits are per backend process (in memory).
 - No email verification, password reset, age gating, chat filtering, block/mute, TLS (use a reverse proxy), metrics, or scheduled backups.
 - Rent timing uses real hours; no in-game calendar yet.
-- No load testing. **No claim is made about concurrent player capacity.**
+- Backend load tested once on a shared 4-core VM (see `docs/LOAD_TESTING.md`). **No claim is made about concurrent player capacity of the full game; the Unreal server is untested.**
 - Appearance options and all game data are placeholders.
 
 ## Milestone 2 — Phase-3 gameplay foundations (backend only)
@@ -71,11 +71,22 @@ Legend: ✅ done and verified by automated tests · 🟡 done but unverified/par
 | Housing customization | ✅ (furnishing, from milestone 1) | |
 | City services, moderator UI, Redis, metrics | ⬜ | |
 
+## Milestone 3 — trading, moderation console, load test
+
+| Item | State | Evidence |
+|---|---|---|
+| Player trading: offer/confirm with versions, atomic swap, bait-and-switch protection, 2-way confirm race, duplicated-item race, funds vanish → no partial swap, blocks/expiry/limits | ✅ | `trade.test.ts` (9) |
+| Moderator console `/mod` (sign-in, report queue, dismiss/warn/mute/suspend/ban with required notes, admin audit + integrity) | ✅ | exercised in a real browser: refused non-mod login, required note, HTML in reports shown as text, mute took effect |
+| `npm run set-role` (operator-only promotion, audited) | ✅ | |
+| Rate limiting: tests + game-server exemption (fixes a throttling flaw found by review) | ✅ | |
+| Name rule bug fixed (names differing only by digits 2/6/8/9 collided) found by the load test | ✅ | |
+| Load test script and first run | 🟡 | indicative only; see `docs/LOAD_TESTING.md` |
+
 ## Remaining tasks (sequenced)
 1. **UE5 project + dedicated server + greybox block** (blocks everything player-facing). Compile `MVWBackend`. *Done when:* two clients see each other on a dedicated server.
 2. ~~Join-ticket endpoint~~ done on the backend. *Remaining:* the game server must use it (Unreal).
 3. In-engine interactables (door/counter/workstation) wired to the subsystem; HUD for MVC/inventory. *Done when:* acceptance steps 1–11 pass on a build.
-4. ~~Fault-injection tests~~ done. *Remaining:* a small load test of the purchase/rent paths.
+4. ~~Fault-injection tests~~ and ~~backend load test~~ done once. *Remaining:* soak test, bigger populations, real hardware, Unreal server load.
 5. Phase 3: more jobs, businesses + NPC customers, progression, proximity chat, block/mute, chat filter, moderator UI, Redis for sessions, metrics/alerts, scheduled backups.
 6. Before a wider playtest, define and measure thresholds. Suggested starting targets (proposals, not measured): p95 purchase API latency < 150 ms at 40 concurrent players; zero ledger-integrity violations across a soak test; server tick ≥ 30 Hz at 40 players; restore RTO < 30 min / RPO < 15 min.
 
