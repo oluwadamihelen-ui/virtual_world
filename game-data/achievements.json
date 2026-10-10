@@ -1,0 +1,7 @@
+[
+  { "id": "first_shift",    "name": "First Day on the Job",  "reputation": 1 },
+  { "id": "first_home",     "name": "Home Sweet Home",       "reputation": 1 },
+  { "id": "first_purchase", "name": "Shopper",               "reputation": 0 },
+  { "id": "first_business", "name": "Open for Business",     "reputation": 2 },
+  { "id": "first_sale",     "name": "First Customer",        "reputation": 1 }
+]

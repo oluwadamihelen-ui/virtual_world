@@ -22,7 +22,7 @@ Legend: ✅ done and verified by automated tests · 🟡 done but unverified/par
 | 14 | UE5 project, greybox neighborhood, movement, 2 players on a dedicated server | ⬜ | Needs Unreal Engine. `unreal/Source/MVWBackend` is uncompiled. |
 
 ### Test results (last run)
-`cd backend && npm test` → **5 files, 43 tests passed** (PostgreSQL 16.15, Node 22). `npm run typecheck` clean. The real server entry point was started and answered `/healthz`, rejected a call without the server key, and served `/world/properties` with it.
+`cd backend && npm test` → **8 files, 72 tests passed** (PostgreSQL 16.15, Node 22). `npm run typecheck` clean. The real server entry point was started and answered `/healthz`, rejected a call without the server key, and served `/world/properties` with it.
 
 ### Acceptance criteria status
 
@@ -39,25 +39,43 @@ Legend: ✅ done and verified by automated tests · 🟡 done but unverified/par
 | Duplicate request does not duplicate payment | ✅ (sequential and 50 concurrent) |
 | Simultaneous purchases of exclusive stock/property: only one succeeds | ✅ |
 | Client manipulation cannot create MVC | ✅ at API level (no client path to the economy API; price/amount fields ignored). Needs re-verification once a real client exists. |
-| Backend failures don't corrupt confirmed transactions | 🟡 transactional design + constraint tests; **no fault-injection / crash-mid-write test yet** |
+| Backend failures don't corrupt confirmed transactions | ✅ fault-injection tests: error after payment posted, and DB connection killed mid-transaction, both leave no partial state and the same key can be retried |
 | Moderators review reports and enforce sanctions | ✅ |
 | Backup and recovery tested | 🟡 see item 12 |
 
 **The overall milestone is NOT complete** because the 3D game, movement and in-world interaction do not exist.
 
 ## Known limitations
-- `characterId` is supplied by the caller of `/v1/game/*`. Without a join-ticket flow, the game server must be trusted to bind a connection to the right character. Add signed, short-lived join tickets from the player JWT before any public test.
+- Join tickets exist (single use, 60 s, audience-separated from login tokens) and the bare-id join route is disabled in production. The game server must still be written to use them: **the Unreal side of this flow is uncompiled and unexercised.**
+- The chat rate limiter is per backend process (in memory). Move it to Redis before running more than one backend instance.
+- The chat blocklist is a four-word placeholder; it is not a real safety filter.
+- Business closing forfeits remaining shelf stock; businesses have no rent, staff, loans or taxes yet.
 - Rate limiting is configured but **not covered by tests** (disabled in the test app).
 - No email verification, password reset, age gating, chat filtering, block/mute, TLS (use a reverse proxy), metrics, or scheduled backups.
 - Rent timing uses real hours; no in-game calendar yet.
 - No load testing. **No claim is made about concurrent player capacity.**
 - Appearance options and all game data are placeholders.
 
+## Milestone 2 — Phase-3 gameplay foundations (backend only)
+
+| Item | State | Evidence |
+|---|---|---|
+| Join tickets: issue, single-use redeem (50-way race), expiry, tamper/forgery/wrong-audience rejection, sanction checks | ✅ | `tickets-faults.test.ts` |
+| Fault injection (see above) + production hardening (dev routes absent in prod) | ✅ | `tickets-faults.test.ts` |
+| Businesses: exclusive premises (5-way race), till deposits/withdrawals, wholesale restock, price bounds, owner-only controls, player purchases (8-way last-units race), close | ✅ | `business.test.ts` |
+| Simulated NPC customers: weighted by price, shared city-wide pool (cheaper shops win, overpriced get none), idempotent per tick | ✅ | `business.test.ts` |
+| Owner report: revenue, expenses (restock), net profit, kept separate from deposits/withdrawals | ✅ | |
+| 3 more jobs (barista, courier, office assistant gated by reputation) | ✅ | `social-progression.test.ts` |
+| Achievements → reputation → unlocks | ✅ | |
+| Block list, chat check (mask, length, rate limit, mute/suspend), moderator mute | ✅ | |
+| Housing customization | ✅ (furnishing, from milestone 1) | |
+| City services, moderator UI, Redis, metrics | ⬜ | |
+
 ## Remaining tasks (sequenced)
 1. **UE5 project + dedicated server + greybox block** (blocks everything player-facing). Compile `MVWBackend`. *Done when:* two clients see each other on a dedicated server.
-2. **Join-ticket endpoint** (player JWT → short-lived signed ticket → game server validates). *Done when:* the game server never accepts a bare characterId from a client; tested.
+2. ~~Join-ticket endpoint~~ done on the backend. *Remaining:* the game server must use it (Unreal).
 3. In-engine interactables (door/counter/workstation) wired to the subsystem; HUD for MVC/inventory. *Done when:* acceptance steps 1–11 pass on a build.
-4. Fault-injection tests (kill backend/DB mid-transaction) and a small load test of the purchase/rent paths.
+4. ~~Fault-injection tests~~ done. *Remaining:* a small load test of the purchase/rent paths.
 5. Phase 3: more jobs, businesses + NPC customers, progression, proximity chat, block/mute, chat filter, moderator UI, Redis for sessions, metrics/alerts, scheduled backups.
 6. Before a wider playtest, define and measure thresholds. Suggested starting targets (proposals, not measured): p95 purchase API latency < 150 ms at 40 concurrent players; zero ledger-integrity violations across a soak test; server tick ≥ 30 Hz at 40 players; restore RTO < 30 min / RPO < 15 min.
 

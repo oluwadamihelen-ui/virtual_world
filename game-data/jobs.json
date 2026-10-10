@@ -8,7 +8,63 @@
     "tasksPerShift": 5,
     "minSecondsPerTask": 20,
     "maxShiftsPer24h": 4,
-    "requirements": { "minReputation": 0 },
-    "skill": { "id": "retail", "xpPerShift": 10 }
+    "requirements": {
+      "minReputation": 0
+    },
+    "skill": {
+      "id": "retail",
+      "xpPerShift": 10
+    }
+  },
+  {
+    "id": "job_cafe_barista",
+    "name": "Cafe Barista",
+    "employer": "Market Cafe (NPC)",
+    "district": "market",
+    "wagePerShift": 260,
+    "tasksPerShift": 6,
+    "minSecondsPerTask": 20,
+    "maxShiftsPer24h": 3,
+    "requirements": {
+      "minReputation": 0
+    },
+    "skill": {
+      "id": "hospitality",
+      "xpPerShift": 12
+    }
+  },
+  {
+    "id": "job_courier",
+    "name": "Delivery Courier",
+    "employer": "Meridian Express (NPC)",
+    "district": "central",
+    "wagePerShift": 300,
+    "tasksPerShift": 4,
+    "minSecondsPerTask": 45,
+    "maxShiftsPer24h": 3,
+    "requirements": {
+      "minReputation": 0
+    },
+    "skill": {
+      "id": "logistics",
+      "xpPerShift": 12
+    }
+  },
+  {
+    "id": "job_office_assistant",
+    "name": "Office Assistant",
+    "employer": "Central Admin Office (NPC)",
+    "district": "central",
+    "wagePerShift": 340,
+    "tasksPerShift": 5,
+    "minSecondsPerTask": 30,
+    "maxShiftsPer24h": 2,
+    "requirements": {
+      "minReputation": 1
+    },
+    "skill": {
+      "id": "admin",
+      "xpPerShift": 15
+    }
   }
 ]

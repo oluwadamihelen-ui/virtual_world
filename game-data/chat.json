@@ -1,0 +1,7 @@
+{
+  "_comment": "Starter blocklist (masked with asterisks). Extend and maintain with moderation input before any public test; this is NOT a complete filter.",
+  "maxLength": 200,
+  "messagesPerWindow": 8,
+  "windowSeconds": 10,
+  "blockedWords": ["idiot", "stupid", "loser", "scam link"]
+}

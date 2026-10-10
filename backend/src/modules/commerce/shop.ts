@@ -4,6 +4,7 @@ import { badRequest, conflict, notFound } from '../../errors.js';
 import { assertCanAct } from '../identity/service.js';
 import { claim, post, finish, playerAccount, systemAccount, balanceOf } from '../economy/ledger.js';
 import { addItem } from '../inventory/inventory.js';
+import { awardAchievement } from '../social/social.js';
 
 export interface PurchaseInput { shopId: string; itemId: string; quantity: number; idempotencyKey: string }
 
@@ -45,6 +46,7 @@ export async function purchase(ctx: AppContext, characterId: string, i: Purchase
       { account: systemAccount(`shop:${i.shopId}`), delta: total },
     ]);
     await addItem(tx, characterId, i.itemId, i.quantity);
+    await awardAchievement(ctx, tx, characterId, 'first_purchase');
     const response: PurchaseResult = { txId: c.txId, shopId: i.shopId, itemId: i.itemId, quantity: i.quantity, totalPrice: total, balance: await balanceOf(tx, characterId), replayed: false };
     await finish(tx, c.txId, response);
     return response;

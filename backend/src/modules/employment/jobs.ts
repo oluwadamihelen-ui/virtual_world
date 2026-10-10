@@ -2,6 +2,7 @@ import type { AppContext } from '../../context.js';
 import { withTx, type Tx } from '../../db.js';
 import { conflict, notFound } from '../../errors.js';
 import { assertCanAct } from '../identity/service.js';
+import { awardAchievement } from '../social/social.js';
 import { transfer, playerAccount, systemAccount, balanceOf } from '../economy/ledger.js';
 
 const HOUR = 3600_000;
@@ -92,6 +93,7 @@ export async function completeShift(ctx: AppContext, characterId: string, shiftI
     await tx.query(
       `INSERT INTO skills (character_id,skill_id,xp) VALUES ($1,$2,$3) ON CONFLICT (character_id,skill_id) DO UPDATE SET xp = skills.xp + EXCLUDED.xp`,
       [characterId, job.skill.id, job.skill.xpPerShift]);
+    await awardAchievement(ctx, tx, characterId, 'first_shift');
     return { shiftId, wage: job.wagePerShift, balance: await balanceOf(tx, characterId), replayed: false };
   });
 }

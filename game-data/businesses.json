@@ -1,0 +1,23 @@
+{
+  "_comment": "Placeholder values for playtesting. See docs/ECONOMY_TUNING.md.",
+  "maxOpenPerOwner": 2,
+  "maxStockPerItem": 500,
+  "maxRestockPerOrder": 200,
+  "priceMinMultiplier": 0.5,
+  "priceMaxMultiplier": 3,
+  "types": {
+    "convenience_shop": { "name": "Convenience Shop", "categories": ["grocery"] },
+    "cafe": { "name": "Cafe", "categories": ["cafe"] }
+  },
+  "premises": [
+    { "id": "prem_market_01", "district": "market", "name": "Unit 1, Market Row", "setupCost": 3000 },
+    { "id": "prem_market_02", "district": "market", "name": "Unit 2, Market Row", "setupCost": 3000 },
+    { "id": "prem_market_03", "district": "market", "name": "Unit 3, Market Row", "setupCost": 3500 }
+  ],
+  "npcDemand": {
+    "customersPerTick": 6,
+    "tickSeconds": 60,
+    "maxPriceMultiplier": 1.6,
+    "priceSensitivity": 2
+  }
+}

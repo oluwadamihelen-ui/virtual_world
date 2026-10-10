@@ -26,7 +26,7 @@ export async function listReports(ctx: AppContext, status: string) {
   return r.rows.map((x) => ({ reportId: x.id, reporter: x.reporter_name, target: x.target_name, targetCharacterId: x.target_character_id, category: x.category, detail: x.detail, status: x.status, createdAt: x.created_at }));
 }
 
-export type Resolution = { action: 'dismiss' } | { action: 'warn'; note: string } | { action: 'suspend'; hours: number; note: string } | { action: 'ban'; note: string };
+export type Resolution = { action: 'dismiss' } | { action: 'warn'; note: string } | { action: 'suspend'; hours: number; note: string } | { action: 'mute'; hours: number; note: string } | { action: 'ban'; note: string };
 
 /** Resolve a report. Every sanction is written to the audit log with the acting moderator. */
 export async function resolveReport(ctx: AppContext, moderatorAccountId: string, reportId: string, res: Resolution) {
@@ -40,6 +40,9 @@ export async function resolveReport(ctx: AppContext, moderatorAccountId: string,
       if (!(res.hours > 0 && res.hours <= 24 * 90)) throw badRequest('invalid_duration');
       await tx.query(`UPDATE accounts SET status='suspended', suspended_until=$2 WHERE id=$1 AND status <> 'banned'`,
         [target.account_id, new Date(ctx.now().getTime() + res.hours * 3600_000)]);
+    } else if (res.action === 'mute') {
+      if (!(res.hours > 0 && res.hours <= 24 * 30)) throw badRequest('invalid_duration');
+      await tx.query(`UPDATE accounts SET muted_until=$2 WHERE id=$1`, [target.account_id, new Date(ctx.now().getTime() + res.hours * 3600_000)]);
     } else if (res.action === 'ban') {
       await tx.query(`UPDATE accounts SET status='banned' WHERE id=$1`, [target.account_id]);
     }
@@ -55,7 +58,7 @@ export async function liftSanction(ctx: AppContext, moderatorAccountId: string, 
   return withTx(ctx.pool, async (tx) => {
     const t = (await tx.query('SELECT account_id FROM characters WHERE id=$1', [characterId])).rows[0];
     if (!t) throw notFound('character_not_found');
-    await tx.query(`UPDATE accounts SET status='active', suspended_until=NULL WHERE id=$1`, [t.account_id]);
+    await tx.query(`UPDATE accounts SET status='active', suspended_until=NULL, muted_until=NULL WHERE id=$1`, [t.account_id]);
     await audit(tx, moderatorAccountId, 'sanction.lift', 'character', characterId, { note });
     return { characterId, status: 'active' };
   });

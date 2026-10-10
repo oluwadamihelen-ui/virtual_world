@@ -6,6 +6,7 @@ import { migrate } from './migrate.js';
 import { syncGameData } from './seed.js';
 import { buildApp } from './app.js';
 import { sweepTenancies } from './modules/housing/housing.js';
+import { simulateNpcCustomers } from './modules/commerce/business.js';
 
 loadEnvFile();
 const config = loadConfig();
@@ -30,7 +31,12 @@ const timer = setInterval(() => {
   sweepTenancies(ctx).catch((err) => app.log.error({ err }, 'tenancy sweep failed'));
 }, 60_000);
 
-const shutdown = async () => { clearInterval(timer); await app.close(); await pool.end(); process.exit(0); };
+const npcTimer = setInterval(() => {
+  const tickId = new Date().toISOString().slice(0, 16); // one tick id per minute keeps sales idempotent across instances
+  simulateNpcCustomers(ctx, tickId).catch((err) => app.log.error({ err }, 'npc customer tick failed'));
+}, data.businesses.npcDemand.tickSeconds * 1000);
+
+const shutdown = async () => { clearInterval(timer); clearInterval(npcTimer); await app.close(); await pool.end(); process.exit(0); };
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 

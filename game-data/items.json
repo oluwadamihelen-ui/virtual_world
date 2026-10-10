@@ -1,7 +1,9 @@
 [
-  { "id": "bottled_water", "name": "Bottled Water", "category": "grocery" },
-  { "id": "sandwich", "name": "Sandwich", "category": "grocery" },
-  { "id": "coffee", "name": "Coffee", "category": "cafe" },
-  { "id": "desk_lamp", "name": "Desk Lamp", "category": "furniture" },
-  { "id": "starter_sofa", "name": "Starter Sofa", "category": "furniture" }
+  { "id": "bottled_water", "name": "Bottled Water", "category": "grocery", "basePrice": 8,  "wholesalePrice": 4,  "npcDemand": 3 },
+  { "id": "sandwich",      "name": "Sandwich",      "category": "grocery", "basePrice": 25, "wholesalePrice": 12, "npcDemand": 2 },
+  { "id": "snack_bar",     "name": "Snack Bar",     "category": "grocery", "basePrice": 7,  "wholesalePrice": 3,  "npcDemand": 3 },
+  { "id": "coffee",        "name": "Coffee",        "category": "cafe",    "basePrice": 15, "wholesalePrice": 5,  "npcDemand": 4 },
+  { "id": "croissant",     "name": "Croissant",     "category": "cafe",    "basePrice": 12, "wholesalePrice": 5,  "npcDemand": 2 },
+  { "id": "desk_lamp",     "name": "Desk Lamp",     "category": "furniture" },
+  { "id": "starter_sofa",  "name": "Starter Sofa",  "category": "furniture" }
 ]

@@ -6,9 +6,13 @@ A persistent 3D multiplayer life-simulation. Players rent homes, work jobs, trad
 
 | Part | State |
 |---|---|
-| Authoritative backend (TypeScript + PostgreSQL) | **Built and tested**: 43 automated tests pass against a real PostgreSQL 16 |
+| Authoritative backend (TypeScript + PostgreSQL) | **Built and tested**: 72 automated tests pass against a real PostgreSQL 16 |
 | Ledger, wallet, idempotency, concurrency safety | **Built and tested** (see `docs/MILESTONES.md`) |
-| Identity, characters, housing/rent lifecycle, jobs, shop, moderation, admin audit | **Built and tested** |
+| Identity, characters, housing/rent lifecycle, jobs (4), shop, moderation (report/mute/suspend/ban), admin audit | **Built and tested** |
+| Single-use join tickets (client → game server identity binding) | **Built and tested** |
+| Player businesses: premises, till, wholesale restock, price bounds, player + simulated NPC customers, profit report | **Built and tested** |
+| Block list, chat check (filter, rate limit, mute), achievements → reputation → job unlocks | **Built and tested** |
+| Crash/fault-injection tests (error mid-payment, DB connection killed mid-transaction) | **Built and tested** |
 | Backup / restore procedure | **Drill performed once** on Linux/PostgreSQL 16 (`scripts/`) |
 | Unreal Engine 5 client + dedicated server | **Not built.** UE5 was not available in the build environment. Only a small, **uncompiled** server-side backend bridge exists (`unreal/Source/MVWBackend`). |
 | 3D neighborhood, movement, replication, chat, emotes | **Not started** (needs Unreal Engine) |

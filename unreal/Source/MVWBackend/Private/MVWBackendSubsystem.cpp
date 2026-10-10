@@ -60,6 +60,36 @@ void UMVWBackendSubsystem::Send(const FString& Verb, const FString& Path, TShare
 
 static TSharedPtr<FJsonObject> MakeBody() { return MakeShared<FJsonObject>(); }
 
+void UMVWBackendSubsystem::RedeemJoinTicket(const FString& Ticket, FMVWBackendCallback Callback)
+{
+	TSharedPtr<FJsonObject> B = MakeBody();
+	B->SetStringField(TEXT("ticket"), Ticket);
+	Send(TEXT("POST"), TEXT("/v1/game/tickets/redeem"), B, Callback);
+}
+
+void UMVWBackendSubsystem::BusinessPurchase(const FString& CharacterId, const FString& BusinessId, const FString& ItemId, int32 Quantity,
+	const FString& IdempotencyKey, FMVWBackendCallback Callback)
+{
+	TSharedPtr<FJsonObject> B = MakeBody();
+	B->SetStringField(TEXT("itemId"), ItemId);
+	B->SetNumberField(TEXT("quantity"), Quantity);
+	B->SetStringField(TEXT("idempotencyKey"), IdempotencyKey);
+	Send(TEXT("POST"), FString::Printf(TEXT("/v1/game/characters/%s/business-purchase/%s"), *CharacterId, *BusinessId), B, Callback);
+}
+
+void UMVWBackendSubsystem::CheckChat(const FString& CharacterId, const FString& Text, FMVWBackendCallback Callback)
+{
+	TSharedPtr<FJsonObject> B = MakeBody();
+	B->SetStringField(TEXT("characterId"), CharacterId);
+	B->SetStringField(TEXT("text"), Text);
+	Send(TEXT("POST"), TEXT("/v1/game/chat/check"), B, Callback);
+}
+
+void UMVWBackendSubsystem::IsBlocked(const FString& CharacterA, const FString& CharacterB, FMVWBackendCallback Callback)
+{
+	Send(TEXT("GET"), FString::Printf(TEXT("/v1/game/social/blocked/%s/%s"), *CharacterA, *CharacterB), nullptr, Callback);
+}
+
 void UMVWBackendSubsystem::JoinCharacter(const FString& CharacterId, FMVWBackendCallback Callback)
 {
 	Send(TEXT("POST"), FString::Printf(TEXT("/v1/game/characters/%s/join"), *CharacterId), MakeBody(), Callback);

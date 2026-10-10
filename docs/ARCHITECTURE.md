@@ -40,6 +40,18 @@ The backend cannot see the 3D world. It enforces what it can see: a shift must b
 
 Amounts are integer MVC stored as `bigint` and read as JS numbers; inputs are bounded to 10¹² (well below 2⁵³).
 
+## Join tickets (client → server identity)
+
+The game server must never trust a `characterId` sent by a client. Instead: the client (player JWT) requests `POST /v1/characters/:id/join-ticket`; the backend verifies ownership and account standing and returns a 60-second HS256 token (audience `mvw-join-ticket`, key derived separately from login tokens, unique `jti`). The client presents it to the dedicated server, which redeems it via `POST /v1/game/tickets/redeem`; the `jti` is recorded in `join_tickets_used` (primary key = single use, race-safe). In production the bare-id join route does not exist.
+
+## Businesses
+
+A business owns a **ledger account** (`kind='business'`) as its till. Money flows: owner wallet ⇄ till (deposit/withdraw: neither profit nor loss), till → `sink:supplier_npc` (restock = expense), customer → till (sale = revenue; NPC customers are paid from `faucet:npc_customers`). The owner report derives revenue, expenses and net profit from ledger transaction types, so it cannot drift from the real balances. Premises are exclusive via a partial unique index. NPC customer simulation shares one city-wide demand pool (see `docs/ECONOMY_TUNING.md`) so owners compete; each simulated sale claims an idempotency key `npc-sale:<tick>:<n>`, so overlapping ticks cannot double-sell.
+
+## Social safety & progression
+
+`blocks` (two-way effect), `accounts.muted_until` (moderator mute, lifted by appeal), `POST /chat/check` (control-character stripping, length cap, per-character rate limit, word masking, mute/suspension check) — the **game server** calls these before broadcasting. Achievements are awarded once (`achievements` primary key) inside the same transaction as the action that earns them and grant reputation, which gates better jobs.
+
 ## Rent lifecycle
 
 Rent is charged for the first period at signup. When due, the server auto-pays from the wallet (one idempotent charge per billing period). If the wallet cannot cover it, the tenancy enters **grace** (`rentGraceHours`, default 48h, counted from the first failure) with access retained; paying up during grace restores `active`. If grace lapses, the tenancy **ends**, the property is released and placed furniture is returned to the tenant's inventory. Nothing is destroyed. Tenancies of suspended or banned accounts are not processed, so a sanction never costs someone their home. The sweep runs every minute and on player join.
@@ -59,4 +71,4 @@ Unreal dedicated server, authoritative movement (CharacterMovementComponent), re
 ## Security notes / known gaps
 
 Done: scrypt hashing, uniform login errors, JWT roles, constant-time server-key check, per-route rate limits (10/min on auth, 300/min global), Zod input validation, no internals leaked in 500s, secrets only via env (`.env` is git-ignored; production refuses placeholder secrets), request body limit.
-Not yet done: email verification and password reset, age gating/parental flows and privacy policy (needed before any teen access), TLS termination (run behind a reverse proxy), chat filtering, block/mute, refresh tokens/JWT revocation, per-account login lockout, structured metrics/monitoring, automated scheduled backups, Redis, AI features (kept out of the authoritative path by design).
+Not yet done: Redis-backed shared rate limiting, a real chat filter, email verification and password reset, age gating/parental flows and privacy policy (needed before any teen access), TLS termination (run behind a reverse proxy), chat filtering, block/mute, refresh tokens/JWT revocation, per-account login lockout, structured metrics/monitoring, automated scheduled backups, Redis, AI features (kept out of the authoritative path by design).

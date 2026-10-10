@@ -4,6 +4,7 @@ import { AppError, badRequest, conflict, notFound } from '../../errors.js';
 import { assertCanAct } from '../identity/service.js';
 import { claim, post, finish, playerAccount, systemAccount } from '../economy/ledger.js';
 import { addItem, removeItem } from '../inventory/inventory.js';
+import { awardAchievement } from '../social/social.js';
 
 const HOUR = 3600_000;
 const LIVE = ['active', 'grace'];
@@ -49,6 +50,7 @@ export async function rent(ctx: AppContext, characterId: string, propertyId: str
     )).rows[0];
     await tx.query(`INSERT INTO rent_payments (tenancy_id,tx_id,amount,period_start,period_end,paid_at) VALUES ($1,$2,$3,$4,$5,$4)`, [t.id, c.txId, prop.rent_per_period, now, periodEnd]);
     await tx.query(`UPDATE properties SET status='occupied' WHERE id=$1`, [propertyId]);
+    await awardAchievement(ctx, tx, characterId, 'first_home');
     const response: RentResult = { txId: c.txId, tenancyId: t.id, propertyId, rentPaid: prop.rent_per_period, paidUntil: periodEnd.toISOString(), replayed: false };
     await finish(tx, c.txId, response);
     return response;

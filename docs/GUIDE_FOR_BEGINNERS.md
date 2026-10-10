@@ -80,6 +80,14 @@ Now try things and watch the green and red lines in "What just happened":
 | Click **Create my character** again with the same name | **"That name is taken."** |
 | Open the page in a second browser window and make a second player | They can't take the room you rented. |
 
+### Run your own shop 🏪
+1. Click **Give me 5000 test MVC** in the "Test helpers" box (this button only exists for testing).
+2. Under **Your business**, click **Open "Corner Plus" shop** (costs 3000 MVC).
+3. Click **Put 1000 MVC in the till**, then **Buy 20 sandwiches wholesale**. Your shelf now shows sandwiches at a default price.
+4. Click **Sandwich price → 20**, then click **Make 6 pretend customers shop right now** a few times. (Real pretend customers also arrive by themselves every minute.)
+5. Watch the line **Till / Revenue / Costs / Profit**. Profit starts *negative*, because you paid for the sandwiches before you sold them. That's how real shops work too!
+6. Try **Sandwich price → 40**. It's too expensive and the pretend customers walk past. Prices that are too low earn little, and prices that are too high earn nothing.
+
 The **Money history** box is the game's receipt book. Every coin that moves is written down there.
 
 ---
@@ -88,7 +96,7 @@ The **Money history** box is the game's receipt book. Every coin that moves is w
 
 - **Stop:** click the black window and press **Ctrl + C** (then Y if it asks).
 - **Start again later:** open the `backend` folder, type `cmd` in the address bar, then `npm run dev`. (You don't need `npm install` or `npm run setup` again.) Your characters and money are saved in PostgreSQL, so they're still there.
-- **Run the safety checks** (optional): `npm test`. It takes about 15 seconds and should say **43 passed**.
+- **Run the safety checks** (optional): `npm test`. It takes about 15 seconds and should say **72 passed**.
 
 ## When something goes wrong
 

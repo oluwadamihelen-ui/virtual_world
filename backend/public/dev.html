@@ -44,6 +44,16 @@ progress{width:100%;height:14px}
 <p class="mut">A shift is 5 tasks and each task needs 20 seconds. The server keeps the clock, so you can't hurry it.</p>
 <button id="work">Work a shift (about 100 seconds)</button><progress id="bar" value="0" max="5"></progress></div>
 
+<div class="card"><h2>🏪 Your business</h2>
+<p class="mut">Open a shop, stock it, set prices, and watch pretend customers buy. Real businesses will compete for the same customers.</p>
+<div id="bizinfo" class="mut">No business yet.</div>
+<div id="bizbtns"></div>
+<div id="bizrep" class="mut"></div></div>
+
+<div class="card"><h2>🧪 Test helpers (developer only)</h2>
+<button id="grant" class="alt">Give me 5000 test MVC</button>
+<button id="runc" class="alt">Make 6 pretend customers shop right now</button></div>
+
 <div class="card"><h2>🧾 Money history</h2><div id="ledger" class="mut">…</div></div>
 <div class="card"><h2>What just happened</h2><div id="log"></div></div>
 
@@ -60,7 +70,7 @@ async function api(method,path,body,player){
   const j=await r.json().catch(()=>({}));return{ok:r.ok,status:r.status,j};
 }
 const G=p=>`/v1/game/characters/${cid}${p}`;
-const explain=j=>({insufficient_funds:'Not enough MVC!',out_of_stock:'Sold out!',property_unavailable:'Someone else already has that home.',tenancy_limit:'You already rent a home.',invalid_server_key:'The secret key is wrong or missing (Step 1).',shift_limit_reached:'You worked enough shifts for today.',display_name_taken:'That name is taken.',display_name_reserved:'That name is not allowed.',invalid_display_name:j.message}[j.error]||j.error);
+const explain=j=>({premises_unavailable:'Someone already has that shop unit.',business_limit:'You already own the maximum number of businesses.',price_out_of_range:j.message,item_not_allowed_for_business_type:'This kind of shop cannot sell that.',insufficient_funds:'Not enough MVC!',out_of_stock:'Sold out!',property_unavailable:'Someone else already has that home.',tenancy_limit:'You already rent a home.',invalid_server_key:'The secret key is wrong or missing (Step 1).',shift_limit_reached:'You worked enough shifts for today.',display_name_taken:'That name is taken.',display_name_reserved:'That name is not allowed.',invalid_display_name:j.message}[j.error]||j.error);
 async function load(){
   const [p,s,ph]=await Promise.all([api('GET','/v1/game/world/properties'),api('GET','/v1/game/world/shops/shop_corner_grocery'),null]);
   if(!p.ok){log(explain(p.j),'err');return}
@@ -72,7 +82,29 @@ async function load(){
     const l=(await api('GET',G('/ledger?limit=10'))).j.entries||[];
     $('ledger').innerHTML=l.map(e=>`<div>${e.delta>0?'<span class=ok>+':'<span class=err>'}${e.delta}</span> → balance ${e.balance_after} <span class=mut>(${e.type.replace(/_/g,' ')})</span></div>`).join('')||'nothing yet';}
 }
-function show(s){$('bal').textContent=s.balance;$('who').textContent='Playing as '+s.displayName;
+let myBiz=null;
+async function loadBiz(s){
+  myBiz=s.businesses&&s.businesses[0]||null;const box=$('bizbtns');box.innerHTML='';
+  const add=(t,fn)=>{const b=document.createElement('button');b.textContent=t;b.onclick=fn;box.append(b)};
+  if(!myBiz){$('bizinfo').textContent='No business yet. Opening one costs 3000 MVC.';$('bizrep').textContent='';
+    add('Open "Corner Plus" shop at Unit 1 (3000 MVC)',()=>act(()=>api('POST',G('/businesses'),{premisesId:'prem_market_01',type:'convenience_shop',name:'Corner Plus',idempotencyKey:rk()}),'Business opened'));
+    add('…or Unit 2',()=>act(()=>api('POST',G('/businesses'),{premisesId:'prem_market_02',type:'convenience_shop',name:'Corner Plus 2',idempotencyKey:rk()}),'Business opened'));return}
+  const id=myBiz.businessId,B=p=>G('/businesses/'+id+p);
+  const v=(await api('GET','/v1/game/world/businesses/'+id)).j;
+  $('bizinfo').textContent=myBiz.name+' – shelf: '+(v.stock.map(x=>x.quantity+' × '+x.name+' @ '+x.price+' MVC').join(', ')||'empty');
+  const r=(await api('GET',B('/report'))).j;
+  $('bizrep').textContent=`Till: ${r.cash} MVC | Revenue: ${r.revenue} | Costs: ${r.expenses} | Profit: ${r.netProfit}`;
+  add('Put 1000 MVC in the till',()=>act(()=>api('POST',B('/fund'),{direction:'deposit',amount:1000,idempotencyKey:rk()}),'Deposited'));
+  add('Buy 20 sandwiches wholesale',()=>act(()=>api('POST',B('/restock'),{itemId:'sandwich',quantity:20,idempotencyKey:rk()}),'Restocked'));
+  add('Buy 50 water wholesale',()=>act(()=>api('POST',B('/restock'),{itemId:'bottled_water',quantity:50,idempotencyKey:rk()}),'Restocked'));
+  add('Sandwich price → 20',()=>act(()=>api('PUT',B('/prices'),{itemId:'sandwich',price:20}),'Price set'));
+  add('Sandwich price → 40 (too high for customers)',()=>act(()=>api('PUT',B('/prices'),{itemId:'sandwich',price:40}),'Price set'));
+  add('Take 500 out of the till',()=>act(()=>api('POST',B('/fund'),{direction:'withdraw',amount:500,idempotencyKey:rk()}),'Withdrew'));
+  add('Close business',()=>act(()=>api('POST',B('/close'),{idempotencyKey:rk()}),'Closed'));
+}
+$('grant').onclick=()=>act(()=>api('POST','/v1/dev/grant',{characterId:cid,amount:5000}),'Got 5000 test MVC');
+$('runc').onclick=async()=>{const r=await api('POST','/v1/dev/run-customers');log(r.ok?`${r.j.sales} of ${r.j.customers} pretend customers bought something`:'Oops: '+explain(r.j),r.ok?'ok':'err');await load()};
+function show(s){loadBiz(s);$('bal').textContent=s.balance;$('who').textContent='Playing as '+s.displayName;
   $('home').textContent='Home: '+(s.tenancy?`${s.tenancy.propertyName} (${s.tenancy.status}, paid until ${new Date(s.tenancy.paidUntil).toLocaleDateString()})`:'none yet');
   $('inv').textContent='Backpack: '+(s.inventory.map(i=>i.quantity+' × '+i.itemId.replace(/_/g,' ')).join(', ')||'empty');
   $('skill').textContent='Skills: '+(s.skills.map(k=>k.skillId+' '+k.xp+' xp').join(', ')||'none yet');}

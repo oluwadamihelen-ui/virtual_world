@@ -31,8 +31,20 @@ class MVWBACKEND_API UMVWBackendSubsystem : public UGameInstanceSubsystem
 public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 
-	/** Load wallet/inventory/tenancy/position for a character that is connecting (also use on reconnect). */
+	/**
+	 * Production connection flow: the client sends the join ticket it got from POST /v1/characters/:id/join-ticket.
+	 * The result's Json is the character summary (it includes "characterId"). Never trust a characterId sent by a client.
+	 */
+	void RedeemJoinTicket(const FString& Ticket, FMVWBackendCallback Callback);
+
+	/** Dev/test only (the backend disables this route in production): join by bare character id. */
 	void JoinCharacter(const FString& CharacterId, FMVWBackendCallback Callback);
+
+	void BusinessPurchase(const FString& CharacterId, const FString& BusinessId, const FString& ItemId, int32 Quantity,
+		const FString& IdempotencyKey, FMVWBackendCallback Callback);
+	/** Ask the backend whether a chat line may be broadcast. Json has allowed/text/reason. */
+	void CheckChat(const FString& CharacterId, const FString& Text, FMVWBackendCallback Callback);
+	void IsBlocked(const FString& CharacterA, const FString& CharacterB, FMVWBackendCallback Callback);
 
 	/** Buy from a shop. A fresh idempotency key is generated per player intent; pass the SAME key when retrying. */
 	void Purchase(const FString& CharacterId, const FString& ShopId, const FString& ItemId, int32 Quantity,

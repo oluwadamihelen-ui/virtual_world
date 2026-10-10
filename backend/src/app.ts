@@ -11,6 +11,9 @@ import * as jobs from './modules/employment/jobs.js';
 import * as mod from './modules/moderation/moderation.js';
 import * as ledger from './modules/economy/ledger.js';
 import { characterSummary } from './modules/summary.js';
+import * as biz from './modules/commerce/business.js';
+import * as social from './modules/social/social.js';
+import * as tickets from './modules/identity/tickets.js';
 import { withTx } from './db.js';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -45,6 +48,24 @@ export async function buildApp(ctx: AppContext, opts: { rateLimit?: boolean } = 
   if (ctx.config.NODE_ENV !== 'production') {
     const html = readFileSync(fileURLToPath(new URL('../public/dev.html', import.meta.url)), 'utf8');
     app.get('/dev', async (_req, reply) => reply.type('text/html; charset=utf-8').send(html));
+
+    // Dev-only cheats so a tester can reach business features quickly. Not registered when NODE_ENV=production.
+    app.post('/v1/dev/grant', async (req) => {
+      gs(req);
+      const b = z.object({ characterId: uuid, amount: z.number().int().min(1).max(10_000) }).parse(req.body);
+      return withTx(ctx.pool, async (tx) => {
+        const out = await ledger.transfer(tx, {
+          key: `dev-grant:${crypto.randomUUID()}`, type: 'dev_grant', actorCharacterId: b.characterId,
+          from: ledger.systemAccount('faucet:world'), to: ledger.playerAccount(b.characterId), amount: b.amount, payload: b,
+        }, (txId) => ({ txId }));
+        await mod.audit(tx, null, 'dev.grant', 'character', b.characterId, { amount: b.amount });
+        return { ...out.response, balance: await ledger.balanceOf(tx, b.characterId) };
+      });
+    });
+    app.post('/v1/dev/run-customers', async (req) => {
+      gs(req);
+      return biz.simulateNpcCustomers(ctx, 'dev-' + crypto.randomUUID());
+    });
   }
 
   // ---------- Account & character (player JWT) ----------
@@ -92,6 +113,7 @@ export async function buildApp(ctx: AppContext, opts: { rateLimit?: boolean } = 
     const res = z.discriminatedUnion('action', [
       z.object({ action: z.literal('dismiss') }),
       z.object({ action: z.literal('warn'), note: z.string().min(3).max(500) }),
+      z.object({ action: z.literal('mute'), hours: z.number().positive().max(24 * 30), note: z.string().min(3).max(500) }),
       z.object({ action: z.literal('suspend'), hours: z.number().positive().max(24 * 90), note: z.string().min(3).max(500) }),
       z.object({ action: z.literal('ban'), note: z.string().min(3).max(500) }),
     ]).parse(req.body);
@@ -126,12 +148,29 @@ export async function buildApp(ctx: AppContext, opts: { rateLimit?: boolean } = 
   app.get(`${G}/world/jobs`, async (req) => { gs(req); return { jobs: jobs.listJobs(ctx) }; });
   app.get(`${G}/world/shops/:shopId`, async (req) => { gs(req); return shop.listShop(ctx, (req.params as any).shopId); });
 
-  app.post(`${G}/characters/:id/join`, async (req) => {
-    gs(req);
-    const id = uuid.parse((req.params as any).id);
+  const joinCharacter = async (id: string) => {
     await withTx(ctx.pool, (tx) => identity.assertCanAct(ctx, tx, id));
     await housing.sweepTenancies(ctx, id); // bring rent state up to date on (re)connect
     return characterSummary(ctx, id);
+  };
+  // Join by bare character id: convenience for dev/test only. In production the ONLY way in is a redeemed ticket (below),
+  // so a compromised or buggy game-server path cannot be tricked into trusting a client-supplied characterId.
+  if (ctx.config.NODE_ENV !== 'production') {
+    app.post(`${G}/characters/:id/join`, async (req) => { gs(req); return joinCharacter(uuid.parse((req.params as any).id)); });
+  }
+  // Ticket flow: the client proves character ownership; the server redeems the single-use ticket.
+  app.post('/v1/characters/:id/join-ticket', async (req) => {
+    const u = await player(req);
+    const id = uuid.parse((req.params as any).id);
+    await identity.assertOwnsCharacter(ctx, u.accountId, id);
+    await withTx(ctx.pool, (tx) => identity.assertCanAct(ctx, tx, id));
+    return tickets.issueTicket(ctx, u.accountId, id);
+  });
+  app.post(`${G}/tickets/redeem`, async (req) => {
+    gs(req);
+    const b = z.object({ ticket: z.string().min(20).max(2000) }).parse(req.body);
+    const t = await tickets.redeemTicket(ctx, b.ticket);
+    return joinCharacter(t.characterId);
   });
   app.get(`${G}/characters/:id/summary`, async (req) => { gs(req); return characterSummary(ctx, uuid.parse((req.params as any).id)); });
   app.put(`${G}/characters/:id/position`, async (req) => {
@@ -196,6 +235,66 @@ export async function buildApp(ctx: AppContext, opts: { rateLimit?: boolean } = 
     return jobs.abandonShift(ctx, uuid.parse(p.id), uuid.parse(p.shiftId));
   });
   app.get(`${G}/characters/:id/employment-history`, async (req) => { gs(req); return { shifts: await jobs.employmentHistory(ctx.pool, uuid.parse((req.params as any).id)) }; });
+
+  // ---------- Businesses ----------
+  const bid = (req: any) => uuid.parse(req.params.bid);
+  app.get(`${G}/world/premises`, async (req) => { gs(req); return { premises: await biz.listPremises(ctx) }; });
+  app.get(`${G}/world/businesses`, async (req) => { gs(req); return { businesses: await biz.listBusinesses(ctx, (req.query as any).district) }; });
+  app.get(`${G}/world/businesses/:bid`, async (req) => { gs(req); return biz.viewBusiness(ctx, bid(req)); });
+  app.post(`${G}/characters/:id/businesses`, async (req) => {
+    gs(req);
+    const b = Idem.extend({ premisesId: z.string(), type: z.string(), name: z.string().max(60) }).parse(req.body);
+    return biz.openBusiness(ctx, uuid.parse((req.params as any).id), b);
+  });
+  app.post(`${G}/characters/:id/businesses/:bid/fund`, async (req) => {
+    gs(req);
+    const b = Idem.extend({ direction: z.enum(['deposit', 'withdraw']), amount: z.number().int() }).parse(req.body);
+    return biz.fundBusiness(ctx, uuid.parse((req.params as any).id), bid(req), b.direction, b.amount, b.idempotencyKey);
+  });
+  app.post(`${G}/characters/:id/businesses/:bid/restock`, async (req) => {
+    gs(req);
+    const b = Idem.extend({ itemId: z.string(), quantity: z.number().int() }).parse(req.body);
+    return biz.restock(ctx, uuid.parse((req.params as any).id), bid(req), b.itemId, b.quantity, b.idempotencyKey);
+  });
+  app.put(`${G}/characters/:id/businesses/:bid/prices`, async (req) => {
+    gs(req);
+    const b = z.object({ itemId: z.string(), price: z.number().int() }).parse(req.body);
+    return biz.setPrice(ctx, uuid.parse((req.params as any).id), bid(req), b.itemId, b.price);
+  });
+  app.get(`${G}/characters/:id/businesses/:bid/report`, async (req) => { gs(req); return biz.report(ctx, uuid.parse((req.params as any).id), bid(req)); });
+  app.post(`${G}/characters/:id/businesses/:bid/close`, async (req) => {
+    gs(req);
+    const b = Idem.parse(req.body);
+    return biz.closeBusiness(ctx, uuid.parse((req.params as any).id), bid(req), b.idempotencyKey);
+  });
+  app.post(`${G}/characters/:id/business-purchase/:bid`, async (req) => {
+    gs(req);
+    const b = Idem.extend({ itemId: z.string(), quantity: z.number().int() }).parse(req.body);
+    return biz.purchaseFromBusiness(ctx, uuid.parse((req.params as any).id), bid(req), b);
+  });
+
+  // ---------- Social safety (block / chat check) ----------
+  app.get(`${G}/characters/:id/blocks`, async (req) => { gs(req); return { blocked: await social.listBlocks(ctx, uuid.parse((req.params as any).id)) }; });
+  app.post(`${G}/characters/:id/blocks`, async (req) => {
+    gs(req);
+    const b = z.object({ targetCharacterId: uuid }).parse(req.body);
+    return social.block(ctx, uuid.parse((req.params as any).id), b.targetCharacterId);
+  });
+  app.delete(`${G}/characters/:id/blocks/:targetId`, async (req) => {
+    gs(req);
+    const p = req.params as any;
+    return social.unblock(ctx, uuid.parse(p.id), uuid.parse(p.targetId));
+  });
+  app.get(`${G}/social/blocked/:a/:b`, async (req) => {
+    gs(req);
+    const p = req.params as any;
+    return { blocked: await social.isBlockedEitherWay(ctx, uuid.parse(p.a), uuid.parse(p.b)) };
+  });
+  app.post(`${G}/chat/check`, async (req) => {
+    gs(req);
+    const b = z.object({ characterId: uuid, text: z.string().max(2000) }).parse(req.body);
+    return social.checkChat(ctx, b.characterId, b.text);
+  });
 
   return app;
 }

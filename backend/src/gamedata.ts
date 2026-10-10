@@ -15,7 +15,19 @@ const Economy = z.object({
   }),
 }).passthrough();
 
-const Item = z.object({ id: z.string(), name: z.string(), category: z.string() });
+const Item = z.object({
+  id: z.string(), name: z.string(), category: z.string(),
+  basePrice: z.number().int().positive().optional(), wholesalePrice: z.number().int().positive().optional(), npcDemand: z.number().positive().optional(),
+});
+const Businesses = z.object({
+  maxOpenPerOwner: z.number().int().positive(), maxStockPerItem: z.number().int().positive(), maxRestockPerOrder: z.number().int().positive(),
+  priceMinMultiplier: z.number().positive(), priceMaxMultiplier: z.number().positive(),
+  types: z.record(z.string(), z.object({ name: z.string(), categories: z.array(z.string()) })),
+  premises: z.array(z.object({ id: z.string(), district: z.string(), name: z.string(), setupCost: z.number().int().nonnegative() })),
+  npcDemand: z.object({ customersPerTick: z.number().int().nonnegative(), tickSeconds: z.number().positive(), maxPriceMultiplier: z.number().positive(), priceSensitivity: z.number().nonnegative() }),
+}).passthrough();
+const Chat = z.object({ maxLength: z.number().int().positive(), messagesPerWindow: z.number().int().positive(), windowSeconds: z.number().positive(), blockedWords: z.array(z.string()) }).passthrough();
+const Achievement = z.object({ id: z.string(), name: z.string(), reputation: z.number().int() });
 const Shop = z.object({
   id: z.string(), name: z.string(), district: z.string(),
   stock: z.array(z.object({ itemId: z.string(), price: z.number().int().nonnegative(), quantity: z.number().int().nonnegative().nullable() })),
@@ -45,12 +57,18 @@ function parseAll(read: (f: string) => unknown) {
   const properties = z.array(Property).parse(read('properties.json'));
   const jobs = z.array(Job).parse(read('jobs.json'));
   const appearance = Appearance.parse(read('appearance.json'));
+  const businesses = Businesses.parse(read('businesses.json'));
+  const chat = Chat.parse(read('chat.json'));
+  const achievements = z.array(Achievement).parse(read('achievements.json'));
   // Cross-reference validation: catch typos in data at boot rather than at purchase time.
   const itemIds = new Set(items.map((i) => i.id));
   for (const s of shops) for (const st of s.stock) {
     if (!itemIds.has(st.itemId)) throw new Error(`shops.json: unknown item ${st.itemId} in ${s.id}`);
   }
-  return { economy, items, shops, properties, jobs, appearance, itemIds };
+  for (const [t, def] of Object.entries(businesses.types)) {
+    if (!items.some((i) => def.categories.includes(i.category) && i.wholesalePrice)) throw new Error(`businesses.json: type ${t} has no sellable items`);
+  }
+  return { economy, items, shops, properties, jobs, appearance, businesses, chat, achievements, itemIds };
 }
 
 export function loadGameData(dir: string): GameData {
