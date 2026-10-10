@@ -6,7 +6,7 @@ A persistent 3D multiplayer life-simulation. Players rent homes, work jobs, trad
 
 | Part | State |
 |---|---|
-| Authoritative backend (TypeScript + PostgreSQL) | **Built and tested**: 83 automated tests pass against a real PostgreSQL 16 |
+| Authoritative backend (TypeScript + PostgreSQL) | **Built and tested**: 99 automated tests pass against a real PostgreSQL 16 |
 | Ledger, wallet, idempotency, concurrency safety | **Built and tested** (see `docs/MILESTONES.md`) |
 | Identity, characters, housing/rent lifecycle, jobs (4), shop, moderation (report/mute/suspend/ban), admin audit | **Built and tested** |
 | Single-use join tickets (client → game server identity binding) | **Built and tested** |
@@ -17,7 +17,8 @@ A persistent 3D multiplayer life-simulation. Players rent homes, work jobs, trad
 | Load test script + first measured results on a shared 4-core VM (`docs/LOAD_TESTING.md`) | **Done once, indicative only** |
 | Crash/fault-injection tests (error mid-payment, DB connection killed mid-transaction) | **Built and tested** |
 | Backup / restore procedure | **Drill performed once** on Linux/PostgreSQL 16 (`scripts/`) |
-| Unreal Engine 5 client + dedicated server | **Not built.** UE5 was not available in the build environment. Only a small, **uncompiled** server-side backend bridge exists (`unreal/Source/MVWBackend`). |
+| **Browser 3D game** (Three.js client + real-time game server): login, character creator, walking city, rent/buy/work, chat, emotes, day/night, phone/map UI, mobile touch | **Built; 16 server tests + real-browser checks** (see `docs/WEB_CLIENT.md`). **This is the playable version.** |
+| Unreal Engine 5 client | **Paused** (see below). **Not built.** UE5 was not available in the build environment. Only a small, **uncompiled** server-side backend bridge exists (`unreal/Source/MVWBackend`). |
 | 3D neighborhood, movement, replication, chat, emotes | **Not started** (needs Unreal Engine) |
 | Redis, Windows `.cmd` helper scripts | Not used yet / not written |
 
@@ -38,10 +39,10 @@ docs/           Architecture, setup, milestones, economy tuning, API
 
 ## Quick start
 
-**New to this? Read [docs/SETUP_WINDOWS_FULL.md](docs/SETUP_WINDOWS_FULL.md)** (backend + Unreal, step by step), or the shorter backend-only [docs/GUIDE_FOR_BEGINNERS.md](docs/GUIDE_FOR_BEGINNERS.md): install, run, and click through the engine room in your browser at `http://localhost:3000/dev` (a developer test console, not the game client).
+**New to this? Read [docs/GUIDE_FOR_BEGINNERS.md](docs/GUIDE_FOR_BEGINNERS.md)**: install three things, run three commands, and play at `http://localhost:3000/play`. (The old Unreal route is in [docs/SETUP_WINDOWS_FULL.md](docs/SETUP_WINDOWS_FULL.md); it is paused.): install, run, and click through the engine room in your browser at `http://localhost:3000/dev` (a developer test console, not the game client).
 
 See [docs/SETUP_WINDOWS.md](docs/SETUP_WINDOWS.md) for Windows. In short: install Node 20+ and PostgreSQL 16, create the DB, copy `backend/.env.example` to `backend/.env`, then `npm install`, `npm run setup` (creates `.env` + databases), `npm test`, `npm run dev` inside `backend/`.
 
 ## Documents
 
-- [Load testing](docs/LOAD_TESTING.md) · [Architecture](docs/ARCHITECTURE.md) · [Setup (Windows)](docs/SETUP_WINDOWS.md) · [Milestones](docs/MILESTONES.md) · [Economy tuning](docs/ECONOMY_TUNING.md) · [API](docs/API.md) · [Unreal notes](unreal/README.md)
+- [Web client](docs/WEB_CLIENT.md) · [Load testing](docs/LOAD_TESTING.md) · [Architecture](docs/ARCHITECTURE.md) · [Setup (Windows)](docs/SETUP_WINDOWS.md) · [Milestones](docs/MILESTONES.md) · [Economy tuning](docs/ECONOMY_TUNING.md) · [API](docs/API.md) · [Unreal notes](unreal/README.md)

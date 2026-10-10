@@ -5,6 +5,7 @@ import { createPool } from './db.js';
 import { migrate } from './migrate.js';
 import { syncGameData } from './seed.js';
 import { buildApp } from './app.js';
+import { Gateway } from './realtime/gateway.js';
 import { sweepTenancies } from './modules/housing/housing.js';
 import { simulateNpcCustomers } from './modules/commerce/business.js';
 
@@ -29,6 +30,10 @@ const rateLimitOn = config.NODE_ENV === 'production' || config.RATE_LIMIT_DISABL
 if (!rateLimitOn) console.warn('WARNING: rate limiting is DISABLED (load-test mode)');
 const app = await buildApp(ctx, { rateLimit: rateLimitOn });
 
+const gateway = new Gateway(ctx);
+gateway.attach(app.server);
+gateway.start();
+
 const timer = setInterval(() => {
   sweepTenancies(ctx).catch((err) => app.log.error({ err }, 'tenancy sweep failed'));
 }, 60_000);
@@ -38,8 +43,9 @@ const npcTimer = setInterval(() => {
   simulateNpcCustomers(ctx, tickId).catch((err) => app.log.error({ err }, 'npc customer tick failed'));
 }, data.businesses.npcDemand.tickSeconds * 1000);
 
-const shutdown = async () => { clearInterval(timer); clearInterval(npcTimer); await app.close(); await pool.end(); process.exit(0); };
+const shutdown = async () => { clearInterval(timer); clearInterval(npcTimer); await gateway.close(); await app.close(); await pool.end(); process.exit(0); };
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
 await app.listen({ port: config.PORT, host: '0.0.0.0' });
+console.log(`\nMy Virtual World is running.\n  Play the game:  http://localhost:${config.PORT}/play\n  Moderators:     http://localhost:${config.PORT}/mod\n`);

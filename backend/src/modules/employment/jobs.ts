@@ -10,7 +10,7 @@ const STALE_SHIFT_HOURS = 2;
 
 export const listJobs = (ctx: AppContext) => ctx.data.jobs.map((j) => ({
   jobId: j.id, name: j.name, employer: j.employer, district: j.district, wagePerShift: j.wagePerShift,
-  tasksPerShift: j.tasksPerShift, requirements: j.requirements,
+  tasksPerShift: j.tasksPerShift, minSecondsPerTask: j.minSecondsPerTask, requirements: j.requirements,
 }));
 
 function jobOrThrow(ctx: AppContext, jobId: string) {

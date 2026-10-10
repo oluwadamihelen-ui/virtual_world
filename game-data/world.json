@@ -1,0 +1,491 @@
+{
+ "name": "New Meridian",
+ "district": {
+  "id": "residential",
+  "name": "Residential District",
+  "place": "Maple Court"
+ },
+ "bounds": {
+  "minX": -34,
+  "maxX": 34,
+  "minZ": -26,
+  "maxZ": 26
+ },
+ "spawn": {
+  "x": -26,
+  "z": 0
+ },
+ "road": {
+  "minZ": -4,
+  "maxZ": 4
+ },
+ "buildings": [
+  {
+   "id": "apt",
+   "name": "Maple Court Apartments",
+   "cx": -8,
+   "cz": -14,
+   "sx": 16,
+   "sz": 11,
+   "height": 3.4,
+   "doorSide": "+z",
+   "doorWidth": 1.8,
+   "wall": "#4f7bd6",
+   "floor": "#cdbb9c",
+   "roof": "#3a58a8",
+   "gate": "apartment",
+   "enterable": true
+  },
+  {
+   "id": "grocery",
+   "name": "Corner Grocery",
+   "cx": 10,
+   "cz": 14,
+   "sx": 14,
+   "sz": 10,
+   "height": 3.4,
+   "doorSide": "-z",
+   "doorWidth": 2.8,
+   "wall": "#ec8a3c",
+   "floor": "#e6ddcb",
+   "roof": "#c46a22",
+   "enterable": true
+  },
+  {
+   "id": "cafe",
+   "name": "Meridian Cafe",
+   "cx": -24,
+   "cz": 14,
+   "sx": 9,
+   "sz": 8,
+   "height": 3.2,
+   "wall": "#c75a74",
+   "roof": "#9d3f57",
+   "enterable": false,
+   "sign": "CAFE - coming soon"
+  },
+  {
+   "id": "jobs",
+   "name": "Job Centre",
+   "cx": 24,
+   "cz": -14,
+   "sx": 10,
+   "sz": 9,
+   "height": 3.8,
+   "wall": "#58b38a",
+   "roof": "#3b8a66",
+   "enterable": false,
+   "sign": "JOB CENTRE - coming soon"
+  },
+  {
+   "id": "bank",
+   "name": "Meridian Bank",
+   "cx": 27,
+   "cz": 14,
+   "sx": 8,
+   "sz": 9,
+   "height": 4.4,
+   "wall": "#8e8cc9",
+   "roof": "#6967a6",
+   "enterable": false,
+   "sign": "BANK - coming soon"
+  }
+ ],
+ "furniture": [
+  {
+   "id": "counter",
+   "building": "grocery",
+   "x": 10,
+   "z": 16.4,
+   "sx": 5.2,
+   "sz": 0.9,
+   "h": 1.1,
+   "color": "#8a5a2b"
+  },
+  {
+   "id": "crate",
+   "building": "grocery",
+   "x": 15.2,
+   "z": 16.3,
+   "sx": 1.2,
+   "sz": 1.2,
+   "h": 1.0,
+   "color": "#f2d13a"
+  },
+  {
+   "id": "shelf1",
+   "building": "grocery",
+   "x": 5.2,
+   "z": 17.8,
+   "sx": 3.4,
+   "sz": 0.6,
+   "h": 2.0,
+   "color": "#b9794a"
+  },
+  {
+   "id": "shelf2",
+   "building": "grocery",
+   "x": 10,
+   "z": 18.4,
+   "sx": 4.8,
+   "sz": 0.6,
+   "h": 2.0,
+   "color": "#b9794a"
+  },
+  {
+   "id": "bed",
+   "building": "apt",
+   "x": -12.6,
+   "z": -17.4,
+   "sx": 2.0,
+   "sz": 1.3,
+   "h": 0.6,
+   "color": "#f1f1fb"
+  },
+  {
+   "id": "sofa",
+   "building": "apt",
+   "x": -4.5,
+   "z": -17.0,
+   "sx": 2.3,
+   "sz": 0.95,
+   "h": 0.8,
+   "color": "#a33b3b"
+  },
+  {
+   "id": "table",
+   "building": "apt",
+   "x": -8.5,
+   "z": -16.3,
+   "sx": 1.2,
+   "sz": 1.2,
+   "h": 0.7,
+   "color": "#8a5a2b"
+  }
+ ],
+ "props": [
+  {
+   "type": "tree",
+   "x": -28,
+   "z": -12,
+   "s": 1.03
+  },
+  {
+   "type": "tree",
+   "x": -25,
+   "z": -20,
+   "s": 0.96
+  },
+  {
+   "type": "tree",
+   "x": -20,
+   "z": -23,
+   "s": 1.16
+  },
+  {
+   "type": "tree",
+   "x": -30,
+   "z": -17,
+   "s": 0.93
+  },
+  {
+   "type": "tree",
+   "x": -22,
+   "z": -11,
+   "s": 1.11
+  },
+  {
+   "type": "tree",
+   "x": -28,
+   "z": -23,
+   "s": 1.05
+  },
+  {
+   "type": "tree",
+   "x": 30,
+   "z": -4,
+   "s": 0.93
+  },
+  {
+   "type": "tree",
+   "x": -31,
+   "z": 5,
+   "s": 1.15
+  },
+  {
+   "type": "tree",
+   "x": 31,
+   "z": 5,
+   "s": 0.92
+  },
+  {
+   "type": "tree",
+   "x": 0,
+   "z": -24,
+   "s": 1.12
+  },
+  {
+   "type": "tree",
+   "x": 18,
+   "z": -23,
+   "s": 0.93
+  },
+  {
+   "type": "tree",
+   "x": 32,
+   "z": 24,
+   "s": 0.95
+  },
+  {
+   "type": "tree",
+   "x": -31,
+   "z": 24,
+   "s": 1.11
+  },
+  {
+   "type": "tree",
+   "x": 2,
+   "z": 24,
+   "s": 1.31
+  },
+  {
+   "type": "lamp",
+   "x": -30,
+   "z": -5.2
+  },
+  {
+   "type": "lamp",
+   "x": -25,
+   "z": 5.2
+  },
+  {
+   "type": "lamp",
+   "x": -20,
+   "z": -5.2
+  },
+  {
+   "type": "lamp",
+   "x": -15,
+   "z": 5.2
+  },
+  {
+   "type": "lamp",
+   "x": -10,
+   "z": -5.2
+  },
+  {
+   "type": "lamp",
+   "x": -5,
+   "z": 5.2
+  },
+  {
+   "type": "lamp",
+   "x": 0,
+   "z": -5.2
+  },
+  {
+   "type": "lamp",
+   "x": 5,
+   "z": 5.2
+  },
+  {
+   "type": "lamp",
+   "x": 10,
+   "z": -5.2
+  },
+  {
+   "type": "lamp",
+   "x": 15,
+   "z": 5.2
+  },
+  {
+   "type": "lamp",
+   "x": 20,
+   "z": -5.2
+  },
+  {
+   "type": "lamp",
+   "x": 25,
+   "z": 5.2
+  },
+  {
+   "type": "lamp",
+   "x": 30,
+   "z": -5.2
+  },
+  {
+   "type": "lamp",
+   "x": 35,
+   "z": 5.2
+  },
+  {
+   "type": "bench",
+   "x": -24,
+   "z": -16,
+   "ry": 0
+  },
+  {
+   "type": "bench",
+   "x": -19,
+   "z": -17,
+   "ry": 1.57
+  },
+  {
+   "type": "bench",
+   "x": 2,
+   "z": 7.2,
+   "ry": 0
+  },
+  {
+   "type": "bench",
+   "x": -14,
+   "z": -5.6,
+   "ry": 3.14
+  },
+  {
+   "type": "bin",
+   "x": 6,
+   "z": 6.4
+  },
+  {
+   "type": "bin",
+   "x": -3,
+   "z": -5.8
+  }
+ ],
+ "zones": [
+  {
+   "id": "apt_door",
+   "kind": "door",
+   "building": "apt",
+   "x": -8,
+   "z": -7.0,
+   "radius": 2.6,
+   "label": "Maple Court Apartments"
+  },
+  {
+   "id": "grocery_counter",
+   "kind": "shop",
+   "building": "grocery",
+   "x": 10,
+   "z": 14.9,
+   "radius": 2.6,
+   "label": "Corner Grocery counter",
+   "shopId": "shop_corner_grocery",
+   "items": [
+    {
+     "itemId": "sandwich",
+     "label": "Sandwich"
+    },
+    {
+     "itemId": "bottled_water",
+     "label": "Water"
+    }
+   ]
+  },
+  {
+   "id": "grocery_work",
+   "kind": "work",
+   "building": "grocery",
+   "x": 15.2,
+   "z": 14.9,
+   "radius": 2.4,
+   "label": "Stock room work station",
+   "jobId": "job_grocery_assistant"
+  }
+ ],
+ "npcRoutes": [
+  [
+   {
+    "x": -30,
+    "z": 6
+   },
+   {
+    "x": 30,
+    "z": 6
+   }
+  ],
+  [
+   {
+    "x": 30,
+    "z": -6
+   },
+   {
+    "x": -30,
+    "z": -6
+   }
+  ],
+  [
+   {
+    "x": -24,
+    "z": -22
+   },
+   {
+    "x": -16,
+    "z": -22
+   },
+   {
+    "x": -16,
+    "z": -8
+   },
+   {
+    "x": -24,
+    "z": -8
+   }
+  ],
+  [
+   {
+    "x": 18,
+    "z": 8
+   },
+   {
+    "x": 30,
+    "z": 8
+   },
+   {
+    "x": 30,
+    "z": 22
+   },
+   {
+    "x": 18,
+    "z": 22
+   }
+  ],
+  [
+   {
+    "x": -30,
+    "z": 10
+   },
+   {
+    "x": -14,
+    "z": 10
+   },
+   {
+    "x": -14,
+    "z": 22
+   },
+   {
+    "x": -30,
+    "z": 22
+   }
+  ],
+  [
+   {
+    "x": 4,
+    "z": -8
+   },
+   {
+    "x": 22,
+    "z": -8
+   },
+   {
+    "x": 22,
+    "z": -22
+   },
+   {
+    "x": 4,
+    "z": -22
+   }
+  ]
+ ]
+}

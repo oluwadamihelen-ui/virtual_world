@@ -91,6 +91,17 @@ Legend: ✅ done and verified by automated tests · 🟡 done but unverified/par
 | Multiplayer interactions (server RPCs for clients) | ⬜ | next |
 | Real art, interiors, pedestrians, day/night, audio | ⬜ | |
 
+## Milestone 5: Playable browser game (replaces the Unreal client as the main client)
+
+| Item | State | Evidence |
+|---|---|---|
+| Game server: ticket-only WebSocket entry, authoritative movement on shared physics, tenant-only door, proximity-validated interactions, proximity chat/emotes, block/report, NPC residents, interest-managed snapshots, position persistence | ✅ | `realtime.test.ts` (16) |
+| Browser client: login/register, character creator with live 3D preview, 3D neighborhood with day/night, avatars, name tags, chat bubbles, emotes, goal cards, context cards, Phone (wallet/jobs/goals), Map, touch joystick, reconnect | ✅ (software-rendered Chromium) | screenshots + flows in `docs/WEB_CLIENT.md` |
+| Real-GPU performance, Safari, low-end phones | ⬜ untested | |
+| WebSocket load test (e.g. 40 clients) | ⬜ | next |
+| Per-tenant instanced interiors, more buildings/districts, sound, real art | ⬜ | |
+| Unreal Engine client | ⏸ paused by decision | docs kept |
+
 ## Remaining tasks (sequenced)
 1. **UE5 project + dedicated server + greybox block** (blocks everything player-facing). Compile `MVWBackend`. *Done when:* two clients see each other on a dedicated server.
 2. ~~Join-ticket endpoint~~ done on the backend. *Remaining:* the game server must use it (Unreal).

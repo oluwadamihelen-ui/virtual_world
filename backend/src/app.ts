@@ -17,6 +17,7 @@ import * as social from './modules/social/social.js';
 import * as tickets from './modules/identity/tickets.js';
 import { withTx } from './db.js';
 import { readFileSync } from 'node:fs';
+import fastifyStatic from '@fastify/static';
 import { fileURLToPath } from 'node:url';
 
 const uuid = z.string().uuid();
@@ -30,7 +31,10 @@ export async function buildApp(ctx: AppContext, opts: { rateLimit?: boolean } = 
     // Everyone else (players, attackers, wrong-key guessers) is limited per IP.
     await app.register(rateLimit, {
       global: true, max: 300, timeWindow: '1 minute',
-      allowList: (req) => { try { requireGameServer(ctx.config, req); return true; } catch { return false; } },
+      allowList: (req) => {
+        if (req.method === 'GET' && /^\/(play|vendor|shared|mod)(\/|$)/.test(req.url)) return true; // static game files
+        try { requireGameServer(ctx.config, req); return true; } catch { return false; }
+      },
     });
   }
 
@@ -41,6 +45,15 @@ export async function buildApp(ctx: AppContext, opts: { rateLimit?: boolean } = 
     req.log.error({ err }, 'unhandled error');
     return reply.status(500).send({ error: 'internal_error' }); // never leak internals
   });
+
+  // ---------- Browser game client (static files) ----------
+  const here = (rel: string) => fileURLToPath(new URL(rel, import.meta.url));
+  const staticOpts = { maxAge: ctx.config.NODE_ENV === 'production' ? '5m' : 0, index: ['index.html'] };
+  await app.register(fastifyStatic, { root: here('../public/play'), prefix: '/play/', ...staticOpts });
+  await app.register(fastifyStatic, { root: here('../shared'), prefix: '/shared/', decorateReply: false, maxAge: 0 });
+  await app.register(fastifyStatic, { root: here('../node_modules/three/build'), prefix: '/vendor/three/', decorateReply: false, maxAge: '1d' });
+  app.get('/', async (_req, reply) => reply.redirect('/play/'));
+  app.get('/v1/world', async () => ctx.data.world); // static scenery + zones; contains no secrets
 
   const player = (req: any) => authenticate(ctx.config, req);
   const gs = (req: any) => requireGameServer(ctx.config, req);

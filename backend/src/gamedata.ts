@@ -27,6 +27,16 @@ const Businesses = z.object({
   npcDemand: z.object({ customersPerTick: z.number().int().nonnegative(), tickSeconds: z.number().positive(), maxPriceMultiplier: z.number().positive(), priceSensitivity: z.number().nonnegative() }),
 }).passthrough();
 const Chat = z.object({ maxLength: z.number().int().positive(), messagesPerWindow: z.number().int().positive(), windowSeconds: z.number().positive(), blockedWords: z.array(z.string()) }).passthrough();
+const World = z.object({
+  name: z.string(), district: z.object({ id: z.string(), name: z.string(), place: z.string() }),
+  bounds: z.object({ minX: z.number(), maxX: z.number(), minZ: z.number(), maxZ: z.number() }),
+  spawn: z.object({ x: z.number(), z: z.number() }),
+  buildings: z.array(z.object({ id: z.string(), cx: z.number(), cz: z.number(), sx: z.number(), sz: z.number() }).passthrough()),
+  furniture: z.array(z.object({ x: z.number(), z: z.number(), sx: z.number(), sz: z.number() }).passthrough()),
+  props: z.array(z.object({ type: z.string(), x: z.number(), z: z.number() }).passthrough()),
+  zones: z.array(z.object({ id: z.string(), kind: z.enum(['door', 'shop', 'work']), x: z.number(), z: z.number(), radius: z.number() }).passthrough()),
+  npcRoutes: z.array(z.array(z.object({ x: z.number(), z: z.number() }))),
+}).passthrough();
 const Achievement = z.object({ id: z.string(), name: z.string(), reputation: z.number().int() });
 const Shop = z.object({
   id: z.string(), name: z.string(), district: z.string(),
@@ -60,6 +70,7 @@ function parseAll(read: (f: string) => unknown) {
   const businesses = Businesses.parse(read('businesses.json'));
   const chat = Chat.parse(read('chat.json'));
   const achievements = z.array(Achievement).parse(read('achievements.json'));
+  const world = World.parse(read('world.json'));
   // Cross-reference validation: catch typos in data at boot rather than at purchase time.
   const itemIds = new Set(items.map((i) => i.id));
   for (const s of shops) for (const st of s.stock) {
@@ -68,7 +79,7 @@ function parseAll(read: (f: string) => unknown) {
   for (const [t, def] of Object.entries(businesses.types)) {
     if (!items.some((i) => def.categories.includes(i.category) && i.wholesalePrice)) throw new Error(`businesses.json: type ${t} has no sellable items`);
   }
-  return { economy, items, shops, properties, jobs, appearance, businesses, chat, achievements, itemIds };
+  return { economy, items, shops, properties, jobs, appearance, businesses, chat, achievements, world, itemIds };
 }
 
 export function loadGameData(dir: string): GameData {

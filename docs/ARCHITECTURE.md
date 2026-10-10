@@ -40,6 +40,10 @@ The backend cannot see the 3D world. It enforces what it can see: a shift must b
 
 Amounts are integer MVC stored as `bigint` and read as JS numbers; inputs are bounded to 10¹² (well below 2⁵³).
 
+## Update: browser client + game server (current main client)
+
+The 3D client is now a browser app (`backend/public/play`) talking to an in-process real-time **game server** (`backend/src/realtime`) over WebSocket; see `docs/WEB_CLIENT.md`. Tickets (below) are how the browser proves which character it owns. The earlier plan for an Unreal client and dedicated server is paused; the backend contract is unchanged, so it can be revived.
+
 ## Join tickets (client → server identity)
 
 The game server must never trust a `characterId` sent by a client. Instead: the client (player JWT) requests `POST /v1/characters/:id/join-ticket`; the backend verifies ownership and account standing and returns a 60-second HS256 token (audience `mvw-join-ticket`, key derived separately from login tokens, unique `jti`). The client presents it to the dedicated server, which redeems it via `POST /v1/game/tickets/redeem`; the `jti` is recorded in `join_tickets_used` (primary key = single use, race-safe). In production the bare-id join route does not exist.
