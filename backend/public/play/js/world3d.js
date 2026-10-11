@@ -29,6 +29,54 @@ function emojiTexture(emoji) {
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 
+const CONE = new THREE.ConeGeometry(1, 1, 7), SPH = new THREE.IcosahedronGeometry(1, 1), CYL = new THREE.CylinderGeometry(1, 1, 1, 8);
+const part = (g, m, sx, sy, sz, x, y, z) => { const o = new THREE.Mesh(g, m); o.scale.set(sx, sy, sz); o.position.set(x, y, z); o.castShadow = true; o.receiveShadow = true; return o; };
+const palm = (x, z, h = 6) => { const g = new THREE.Group(); g.add(part(CYL, mat('#8a6a43'), 0.22, h, 0.22, 0, h / 2, 0)); for (let i = 0; i < 6; i++) { const l = part(CONE, mat('#3e9a4d'), 0.35, 3.2, 0.35, Math.cos(i * 1.05) * 1.3, h + 0.1, Math.sin(i * 1.05) * 1.3); l.rotation.set(Math.sin(i * 1.05) * 1.2, 0, -Math.cos(i * 1.05) * 1.2); g.add(l); } g.position.set(x, 0, z); return g; };
+const acacia = (x, z, s = 1) => { const g = new THREE.Group(); g.add(part(CYL, mat('#6b4f35'), 0.18 * s, 3.2 * s, 0.18 * s, 0, 1.6 * s, 0)); g.add(part(SPH, mat('#6f9a3c'), 2.6 * s, 0.7 * s, 2.6 * s, 0, 3.4 * s, 0)); g.position.set(x, 0, z); return g; };
+const bush = (x, z, s = 1.2, c = '#2f8a46') => part(SPH, mat(c), s * 1.4, s * 1.6, s * 1.4, x, s * 0.9, z);
+
+/** Distant, non-collidable scenery that gives each city its own skyline (the street layout itself is shared). */
+function buildLandmark(kind, B, root) {
+  const g = new THREE.Group(); root.add(g);
+  const cx = (B.minX + B.maxX) / 2, cz = (B.minZ + B.maxZ) / 2;
+  const water = (x, z, w, d) => { const m = box(w, 0.1, d, mat('#3a8fc9', { roughness: 0.25, metalness: 0.15 }), x, 0.03, z, false); g.add(m); };
+  if (kind === 'sea' || kind === 'harbour') {
+    g.add(box(10, 0.06, 160, mat('#e8d8a8'), B.maxX + 9, 0.02, cz, false));           // beach
+    water(B.maxX + 55, cz, 90, 200);
+    if (kind === 'sea') for (let i = -3; i <= 3; i++) g.add(palm(B.maxX + 6 + (i % 2) * 1.5, cz + i * 9 + 3));
+    else { // harbour cranes and containers
+      for (let i = 0; i < 3; i++) { const c = new THREE.Group(); c.add(box(1, 14, 1, mat('#e2572f'), 0, 7, 0), box(14, 0.8, 1, mat('#e2572f'), 4, 14, 0), box(0.6, 6, 0.6, mat('#555'), 10, 11, 0)); c.position.set(B.maxX + 12, 0, cz - 30 + i * 28); g.add(c); }
+      ['#c0392b', '#2980b9', '#e0b030', '#27ae60'].forEach((col, i) => g.add(box(6, 2.4, 2.4, mat(col), B.maxX + 20 + (i % 2) * 7, 1.2, cz - 22 + i * 14)));
+    }
+    g.add(bush(B.minX - 8, B.minZ - 10), bush(B.minX - 14, B.maxZ + 8));
+  } else if (kind === 'rock') {
+    const rm = mat('#8c7d6c'); const r = part(SPH, rm, 16, 12, 11, cx + 4, 9, B.minZ - 24); g.add(r);
+    g.add(part(SPH, mat('#7a6c5d'), 9, 8, 7, cx - 14, 5, B.minZ - 22), part(SPH, mat('#9a8b79'), 7, 6, 6, cx + 21, 4, B.minZ - 28));
+    for (let i = 0; i < 9; i++) g.add(bush(B.minX - 8 - i * 4, B.minZ - 8 - (i % 3) * 3, 1.1 + (i % 3) * 0.3, '#4f8a3a'));
+  } else if (kind === 'walls') {
+    const mud = mat('#c58f5b'), mud2 = mat('#b37a46'); const z0 = B.minZ - 7;
+    g.add(box(W2(B) + 30, 5, 1.6, mud, cx, 2.5, z0));
+    for (let x = B.minX - 14; x < B.maxX + 14; x += 3) g.add(box(1.4, 1.1, 1.8, mud2, x, 5.5, z0));
+    g.add(box(6, 9, 3, mud2, cx + 10, 4.5, z0), box(3.4, 5.5, 3.2, mat('#2a1c12'), cx + 10, 2.8, z0 + 0.1));
+    for (const dx of [-4, 4]) g.add(part(CYL, mud2, 1.5, 11, 1.5, cx + 10 + dx, 5.5, z0));
+    for (let i = 0; i < 5; i++) g.add(acacia(B.maxX + 6 + i * 3, B.minZ + i * 9, 0.8));
+  } else if (kind === 'jungle') {
+    for (let i = 0; i < 46; i++) { const side = i % 4, t = (i * 37 % 100) / 100; const x = side < 2 ? B.minX - 5 - (i % 5) * 3 : B.minX + t * (B.maxX - B.minX), z = side < 2 ? B.minZ + t * (B.maxZ - B.minZ) : (side === 2 ? B.minZ - 6 - (i % 4) * 3 : B.maxZ + 6 + (i % 4) * 3); g.add(i % 3 ? palm(x, z, 5 + (i % 4)) : bush(x, z, 1.8 + (i % 3) * 0.5, '#1f6f3a')); }
+  } else if (kind === 'hills') {
+    [['#8aa65a', 26, 9, -34, -34], ['#7b9a4e', 20, 7, 4, -44], ['#a3a35d', 24, 8, 40, -32], ['#6f8f48', 18, 6, 60, -8]].forEach(([c, r, h, x, z]) => g.add(part(SPH, mat(c), r, h, r, cx + x, h * 0.4, cz + z)));
+    for (let i = 0; i < 9; i++) g.add(acacia(B.minX - 6 - (i % 3) * 6, B.minZ + i * 6, 0.9 + (i % 3) * 0.2));
+    g.add(box(2, 18, 2, mat('#cfd3d8'), cx - 30, 9, B.maxZ + 16), box(3.2, 3.2, 3.2, mat('#aeb4bb'), cx - 30, 19.6, B.maxZ + 16));   // skyline tower
+  } else if (kind === 'tower') {
+    const stone = mat('#b9a98a'), tx = B.maxX + 9, tz = B.minZ - 9;
+    g.add(box(5, 22, 5, stone, tx, 11, tz), box(6, 1.2, 6, mat('#9a8a6e'), tx, 22.6, tz), part(CONE, mat('#3f5a4a'), 4.2, 8, 4.2, tx, 27.2, tz));
+    for (const [dx, dz, ry] of [[0, 2.55, 0], [0, -2.55, Math.PI], [2.55, 0, Math.PI / 2], [-2.55, 0, -Math.PI / 2]]) { const f = textSprite('🕰', 3.2, 3.2, '#f6efd9', '#222', 160); f.position.set(tx + dx, 17.5, tz + dz); f.rotation.y = ry; g.add(f); }
+    [['#3d6fb0', 0], ['#c9372c', 1], ['#7a7f87', 2]].forEach(([c, i]) => g.add(box(14, 16 + i * 4, 10, mat(c), B.minX - 14 - i * 16, (16 + i * 4) / 2, B.minZ - 12)));
+    water(B.minX + 40, B.minZ - 16, 140, 10);
+  }
+  return g;
+}
+const W2 = (B) => B.maxX - B.minX;
+
 export function createWorld3D(world, scene) {
   const lamps = [], windows = [], buildings = [], markers = [], doors = [];
   const root = new THREE.Group(); scene.add(root);
@@ -44,7 +92,7 @@ export function createWorld3D(world, scene) {
   // ---- ground, road, sidewalks ----
   const B = world.bounds, W = B.maxX - B.minX, D = B.maxZ - B.minZ;
   const T = { ground: '#8fcf72', road: '#4b505d', sidewalk: '#cdc9bd', park: '#7bbd5f', hedge: '#5e9f4d', ...(world.theme ?? {}) };
-  const ground = box(W + 40, 0.4, D + 40, mat(T.ground), 0, -0.2, 0, false); root.add(ground);
+  const ground = box(W + 320, 0.4, D + 320, mat(T.ground), 0, -0.2, 0, false); root.add(ground);
   const pk = world.park ?? { cx: -23, cz: -16, sx: 22, sz: 20 };
   const parkMat = new THREE.Color(T.ground).lerp(new THREE.Color('#2f7a3a'), 0.25);
   const park = box(pk.sx, 0.05, pk.sz, mat(parkMat), pk.cx, 0.03, pk.cz, false); park.castShadow = false; root.add(park);
@@ -54,6 +102,7 @@ export function createWorld3D(world, scene) {
   const dash = mat('#f4efe0');
   for (let x = B.minX + 2; x < B.maxX; x += 4) root.add(box(2, 0.01, 0.16, dash, x, 0.09, 0, false));
   for (let i = -3; i <= 3; i++) root.add(box(0.6, 0.01, 1.6, dash, 0.5, 0.09, i * 1.1, false));   // zebra crossing
+  if (world.landmark) buildLandmark(world.landmark, B, root);
   const hedge = mat(T.hedge);
   root.add(box(W, 0.9, 0.5, hedge, 0, 0.45, B.minZ - 0.25), box(W, 0.9, 0.5, hedge, 0, 0.45, B.maxZ + 0.25),
     box(0.5, 0.9, D + 1, hedge, B.minX - 0.25, 0.45, 0), box(0.5, 0.9, D + 1, hedge, B.maxX + 0.25, 0.45, 0));

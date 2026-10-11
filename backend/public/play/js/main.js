@@ -243,13 +243,13 @@ canvas.addEventListener('pointerdown', (e) => { pointers.set(e.pointerId, { x: e
 canvas.addEventListener('pointermove', (e) => {
   const p = pointers.get(e.pointerId); if (!p || !G) return;
   if (pointers.size === 2) {
-    const [a, b] = [...pointers.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y); if (pinch) G.dist = Math.min(30, Math.max(7, G.dist * (pinch / d))); pinch = d;
+    const [a, b] = [...pointers.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y); if (pinch) G.dist = Math.min(55, Math.max(7, G.dist * (pinch / d))); pinch = d;
   } else { G.yaw -= (e.clientX - p.x) * 0.006; G.pitch = Math.min(1.25, Math.max(0.45, G.pitch + (e.clientY - p.y) * 0.004)); }
   p.x = e.clientX; p.y = e.clientY;
 });
 const upPtr = (e) => { pointers.delete(e.pointerId); pinch = 0; };
 canvas.addEventListener('pointerup', upPtr); canvas.addEventListener('pointercancel', upPtr);
-canvas.addEventListener('wheel', (e) => { if (G) G.dist = Math.min(30, Math.max(7, G.dist * (1 + e.deltaY * 0.001))); e.preventDefault(); }, { passive: false });
+canvas.addEventListener('wheel', (e) => { if (G) G.dist = Math.min(55, Math.max(7, G.dist * (1 + e.deltaY * 0.001))); e.preventDefault(); }, { passive: false });
 
 function wantedDirection() {
   if (G.traveling) return { dx: 0, dz: 0, run: false };

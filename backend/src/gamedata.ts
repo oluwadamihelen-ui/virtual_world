@@ -45,6 +45,7 @@ const Geo = z.object({
   cities: z.array(z.object({
     id: z.string(), country: z.string(), name: z.string(), lat: z.number(), lon: z.number(), priceIndex: z.number().positive(), blurb: z.string(),
     mirror: z.enum(['none', 'x', 'z', 'xz']).optional(),
+    landmark: z.enum(['sea', 'rock', 'harbour', 'walls', 'jungle', 'hills', 'tower']).optional(),
     theme: z.object({ ground: z.string(), road: z.string(), buildings: z.array(z.string()), roofs: z.array(z.string()) }).optional(),
     names: z.record(z.string(), z.string()).optional(),
   })),
@@ -121,7 +122,7 @@ function parseAll(read: (f: string) => unknown) {
   const allShops = [...shops];
   const allProps = [...properties];
   for (const city of geo.cities) {
-    worlds.set(city.id, city.id === 'lagos' ? { ...world, cityId: 'lagos' } : generateWorld(world, city));
+    worlds.set(city.id, city.id === 'lagos' ? { ...world, cityId: 'lagos', landmark: city.landmark } : { ...generateWorld(world, city), landmark: city.landmark });
     if (city.id === 'lagos') continue;
     allShops.push({ ...baseShop, id: cityShopId(city.id), name: `${city.names?.grocery ?? 'Corner Grocery'}`, district: city.id,
       stock: baseShop.stock.map((st) => ({ ...st, price: Math.max(1, Math.round(st.price * city.priceIndex)) })) });

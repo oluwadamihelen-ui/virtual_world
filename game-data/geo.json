@@ -2,54 +2,362 @@
   "_comment": "Game geography. Rates are fixed placeholder game values (NOT live market rates). 1 MVC is the internal accounting unit; every country shows prices in its own currency using perMVC.",
   "startCity": "lagos",
   "currencies": {
-    "NGN": { "symbol": "₦",   "name": "Nigerian naira",   "perMVC": 100,  "decimals": 0 },
-    "GHS": { "symbol": "GH₵", "name": "Ghanaian cedi",    "perMVC": 0.8,  "decimals": 2 },
-    "KES": { "symbol": "KSh", "name": "Kenyan shilling",  "perMVC": 8.6,  "decimals": 0 },
-    "GBP": { "symbol": "£",   "name": "Pound sterling",   "perMVC": 0.05, "decimals": 2 }
+    "NGN": {
+      "symbol": "₦",
+      "name": "Nigerian naira",
+      "perMVC": 100,
+      "decimals": 0
+    },
+    "GHS": {
+      "symbol": "GH₵",
+      "name": "Ghanaian cedi",
+      "perMVC": 0.8,
+      "decimals": 2
+    },
+    "KES": {
+      "symbol": "KSh",
+      "name": "Kenyan shilling",
+      "perMVC": 8.6,
+      "decimals": 0
+    },
+    "GBP": {
+      "symbol": "£",
+      "name": "Pound sterling",
+      "perMVC": 0.05,
+      "decimals": 2
+    }
   },
   "countries": [
-    { "id": "NG", "name": "Nigeria",        "flag": "🇳🇬", "currency": "NGN" },
-    { "id": "GH", "name": "Ghana",          "flag": "🇬🇭", "currency": "GHS" },
-    { "id": "KE", "name": "Kenya",          "flag": "🇰🇪", "currency": "KES" },
-    { "id": "GB", "name": "United Kingdom", "flag": "🇬🇧", "currency": "GBP" }
+    {
+      "id": "NG",
+      "name": "Nigeria",
+      "flag": "🇳🇬",
+      "currency": "NGN"
+    },
+    {
+      "id": "GH",
+      "name": "Ghana",
+      "flag": "🇬🇭",
+      "currency": "GHS"
+    },
+    {
+      "id": "KE",
+      "name": "Kenya",
+      "flag": "🇰🇪",
+      "currency": "KES"
+    },
+    {
+      "id": "GB",
+      "name": "United Kingdom",
+      "flag": "🇬🇧",
+      "currency": "GBP"
+    }
   ],
   "cities": [
-    { "id": "lagos",  "country": "NG", "name": "Lagos",         "lat": 6.52,  "lon": 3.38,  "priceIndex": 1.0,  "mirror": "none",
-      "blurb": "The big, loud, brilliant coastal city. Maple Court is in Yaba." },
-    { "id": "abuja",  "country": "NG", "name": "Abuja",         "lat": 9.07,  "lon": 7.40,  "priceIndex": 1.15, "mirror": "z",
+    {
+      "id": "lagos",
+      "country": "NG",
+      "name": "Lagos",
+      "lat": 6.52,
+      "lon": 3.38,
+      "priceIndex": 1.0,
+      "mirror": "none",
+      "blurb": "The big, loud, brilliant coastal city. Maple Court is in Yaba.",
+      "landmark": "sea"
+    },
+    {
+      "id": "abuja",
+      "country": "NG",
+      "name": "Abuja",
+      "lat": 9.07,
+      "lon": 7.4,
+      "priceIndex": 1.15,
+      "mirror": "z",
       "blurb": "The planned capital: wide roads and quiet streets.",
-      "theme": { "ground": "#9bd28a", "road": "#4a4f5c", "buildings": ["#6aa6d8", "#e7a15a", "#b983c4", "#5fbf9a", "#d9776b"], "roofs": ["#3f78a8", "#b87a35", "#8b5a99", "#3a9576", "#a8503f"] },
-      "names": { "apt": "Wuse Court Apartments", "grocery": "Garki Corner Store", "cafe": "Capital Cafe", "jobs": "Federal Job Centre", "bank": "Central Bank Branch" } },
-    { "id": "portharcourt", "country": "NG", "name": "Port Harcourt", "lat": 4.82, "lon": 7.03, "priceIndex": 1.1, "mirror": "x",
+      "theme": {
+        "ground": "#9bd28a",
+        "road": "#4a4f5c",
+        "buildings": [
+          "#6aa6d8",
+          "#e7a15a",
+          "#b983c4",
+          "#5fbf9a",
+          "#d9776b"
+        ],
+        "roofs": [
+          "#3f78a8",
+          "#b87a35",
+          "#8b5a99",
+          "#3a9576",
+          "#a8503f"
+        ]
+      },
+      "names": {
+        "apt": "Wuse Court Apartments",
+        "grocery": "Garki Corner Store",
+        "cafe": "Capital Cafe",
+        "jobs": "Federal Job Centre",
+        "bank": "Central Bank Branch"
+      },
+      "landmark": "rock"
+    },
+    {
+      "id": "portharcourt",
+      "country": "NG",
+      "name": "Port Harcourt",
+      "lat": 4.82,
+      "lon": 7.03,
+      "priceIndex": 1.1,
+      "mirror": "x",
       "blurb": "The garden city and oil hub on the Niger Delta.",
-      "theme": { "ground": "#7fc47a", "road": "#454a56", "buildings": ["#4fb3a5", "#e08a4a", "#c9a046", "#6f8fd6", "#c96a8a"], "roofs": ["#2f8479", "#aa5f27", "#957522", "#4a64a8", "#9a4562"] },
-      "names": { "apt": "Rumuola Residences", "grocery": "Garden City Grocery", "cafe": "Delta Cafe", "jobs": "Rivers Job Centre", "bank": "Harbour Bank" } },
-    { "id": "kano",   "country": "NG", "name": "Kano",          "lat": 12.00, "lon": 8.52,  "priceIndex": 0.9,  "mirror": "xz",
+      "theme": {
+        "ground": "#7fc47a",
+        "road": "#454a56",
+        "buildings": [
+          "#4fb3a5",
+          "#e08a4a",
+          "#c9a046",
+          "#6f8fd6",
+          "#c96a8a"
+        ],
+        "roofs": [
+          "#2f8479",
+          "#aa5f27",
+          "#957522",
+          "#4a64a8",
+          "#9a4562"
+        ]
+      },
+      "names": {
+        "apt": "Rumuola Residences",
+        "grocery": "Garden City Grocery",
+        "cafe": "Delta Cafe",
+        "jobs": "Rivers Job Centre",
+        "bank": "Harbour Bank"
+      },
+      "landmark": "harbour"
+    },
+    {
+      "id": "kano",
+      "country": "NG",
+      "name": "Kano",
+      "lat": 12.0,
+      "lon": 8.52,
+      "priceIndex": 0.9,
+      "mirror": "xz",
       "blurb": "The ancient trading city of the north.",
-      "theme": { "ground": "#d7c58a", "road": "#58534f", "buildings": ["#d9a066", "#c4764a", "#e2bf74", "#a8825a", "#cf8f6f"], "roofs": ["#a8723a", "#93482a", "#b8924a", "#7d5a38", "#a45a3f"] },
-      "names": { "apt": "Sabon Gari Flats", "grocery": "Kurmi Market Store", "cafe": "Dala Cafe", "jobs": "Kano Job Centre", "bank": "Trade Bank" } },
-    { "id": "accra",  "country": "GH", "name": "Accra",         "lat": 5.60,  "lon": -0.19, "priceIndex": 1.0,  "mirror": "z",
+      "theme": {
+        "ground": "#d7c58a",
+        "road": "#58534f",
+        "buildings": [
+          "#d9a066",
+          "#c4764a",
+          "#e2bf74",
+          "#a8825a",
+          "#cf8f6f"
+        ],
+        "roofs": [
+          "#a8723a",
+          "#93482a",
+          "#b8924a",
+          "#7d5a38",
+          "#a45a3f"
+        ]
+      },
+      "names": {
+        "apt": "Sabon Gari Flats",
+        "grocery": "Kurmi Market Store",
+        "cafe": "Dala Cafe",
+        "jobs": "Kano Job Centre",
+        "bank": "Trade Bank"
+      },
+      "landmark": "walls"
+    },
+    {
+      "id": "accra",
+      "country": "GH",
+      "name": "Accra",
+      "lat": 5.6,
+      "lon": -0.19,
+      "priceIndex": 1.0,
+      "mirror": "z",
       "blurb": "Ghana's seaside capital, full of music and markets.",
-      "theme": { "ground": "#94cf7c", "road": "#464b57", "buildings": ["#e6b34a", "#4aa3a0", "#d96b5f", "#7aa0e0", "#8cc56b"], "roofs": ["#b68522", "#2f7a77", "#a94a40", "#4f70b0", "#5f9142"] },
-      "names": { "apt": "Osu Court Apartments", "grocery": "Makola Corner Shop", "cafe": "Labadi Cafe", "jobs": "Accra Job Centre", "bank": "Gold Coast Bank" } },
-    { "id": "kumasi", "country": "GH", "name": "Kumasi",        "lat": 6.69,  "lon": -1.62, "priceIndex": 0.85, "mirror": "x",
+      "theme": {
+        "ground": "#94cf7c",
+        "road": "#464b57",
+        "buildings": [
+          "#e6b34a",
+          "#4aa3a0",
+          "#d96b5f",
+          "#7aa0e0",
+          "#8cc56b"
+        ],
+        "roofs": [
+          "#b68522",
+          "#2f7a77",
+          "#a94a40",
+          "#4f70b0",
+          "#5f9142"
+        ]
+      },
+      "names": {
+        "apt": "Osu Court Apartments",
+        "grocery": "Makola Corner Shop",
+        "cafe": "Labadi Cafe",
+        "jobs": "Accra Job Centre",
+        "bank": "Gold Coast Bank"
+      },
+      "landmark": "sea"
+    },
+    {
+      "id": "kumasi",
+      "country": "GH",
+      "name": "Kumasi",
+      "lat": 6.69,
+      "lon": -1.62,
+      "priceIndex": 0.85,
+      "mirror": "x",
       "blurb": "The Garden City of Ghana, home of the Ashanti.",
-      "theme": { "ground": "#86c46f", "road": "#4a4e58", "buildings": ["#d9a43f", "#5f9f6a", "#c4614f", "#6f8fcf", "#b07acb"], "roofs": ["#a8751a", "#3f7a4a", "#943f31", "#4a67a6", "#85529b"] },
-      "names": { "apt": "Adum Residences", "grocery": "Kejetia Corner Store", "cafe": "Ashanti Cafe", "jobs": "Kumasi Job Centre", "bank": "Heritage Bank" } },
-    { "id": "nairobi","country": "KE", "name": "Nairobi",       "lat": -1.29, "lon": 36.82, "priceIndex": 1.1,  "mirror": "xz",
+      "theme": {
+        "ground": "#86c46f",
+        "road": "#4a4e58",
+        "buildings": [
+          "#d9a43f",
+          "#5f9f6a",
+          "#c4614f",
+          "#6f8fcf",
+          "#b07acb"
+        ],
+        "roofs": [
+          "#a8751a",
+          "#3f7a4a",
+          "#943f31",
+          "#4a67a6",
+          "#85529b"
+        ]
+      },
+      "names": {
+        "apt": "Adum Residences",
+        "grocery": "Kejetia Corner Store",
+        "cafe": "Ashanti Cafe",
+        "jobs": "Kumasi Job Centre",
+        "bank": "Heritage Bank"
+      },
+      "landmark": "jungle"
+    },
+    {
+      "id": "nairobi",
+      "country": "KE",
+      "name": "Nairobi",
+      "lat": -1.29,
+      "lon": 36.82,
+      "priceIndex": 1.1,
+      "mirror": "xz",
       "blurb": "The green city in the sun, east Africa's tech capital.",
-      "theme": { "ground": "#8fce72", "road": "#454955", "buildings": ["#59a8d6", "#e69a4a", "#7bc27a", "#d86f8a", "#a98bd6"], "roofs": ["#2f7aa8", "#b0681f", "#4a8f49", "#a94560", "#7358a8"] },
-      "names": { "apt": "Westlands Court", "grocery": "Kilimani Corner Shop", "cafe": "Savannah Cafe", "jobs": "Nairobi Job Centre", "bank": "Rift Bank" } },
-    { "id": "london", "country": "GB", "name": "London",        "lat": 51.51, "lon": -0.13, "priceIndex": 1.8,  "mirror": "none",
+      "theme": {
+        "ground": "#8fce72",
+        "road": "#454955",
+        "buildings": [
+          "#59a8d6",
+          "#e69a4a",
+          "#7bc27a",
+          "#d86f8a",
+          "#a98bd6"
+        ],
+        "roofs": [
+          "#2f7aa8",
+          "#b0681f",
+          "#4a8f49",
+          "#a94560",
+          "#7358a8"
+        ]
+      },
+      "names": {
+        "apt": "Westlands Court",
+        "grocery": "Kilimani Corner Shop",
+        "cafe": "Savannah Cafe",
+        "jobs": "Nairobi Job Centre",
+        "bank": "Rift Bank"
+      },
+      "landmark": "hills"
+    },
+    {
+      "id": "london",
+      "country": "GB",
+      "name": "London",
+      "lat": 51.51,
+      "lon": -0.13,
+      "priceIndex": 1.8,
+      "mirror": "none",
       "blurb": "Old stones, red buses and rain you can set your watch by.",
-      "theme": { "ground": "#7fb56a", "road": "#3f434d", "buildings": ["#b5654f", "#7d8fb0", "#c9b48a", "#8a6f9f", "#6f9a8a"], "roofs": ["#7d3f2f", "#4f5f80", "#8f7c52", "#5f4a70", "#3f6a5a"] },
-      "names": { "apt": "Camden Court Flats", "grocery": "Corner Shop", "cafe": "The Tea Room", "jobs": "Jobcentre Plus", "bank": "High Street Bank" } }
+      "theme": {
+        "ground": "#7fb56a",
+        "road": "#3f434d",
+        "buildings": [
+          "#b5654f",
+          "#7d8fb0",
+          "#c9b48a",
+          "#8a6f9f",
+          "#6f9a8a"
+        ],
+        "roofs": [
+          "#7d3f2f",
+          "#4f5f80",
+          "#8f7c52",
+          "#5f4a70",
+          "#3f6a5a"
+        ]
+      },
+      "names": {
+        "apt": "Camden Court Flats",
+        "grocery": "Corner Shop",
+        "cafe": "The Tea Room",
+        "jobs": "Jobcentre Plus",
+        "bank": "High Street Bank"
+      },
+      "landmark": "tower"
+    }
   ],
   "transport": [
-    { "id": "walk",   "name": "Walk",    "icon": "🚶", "intercity": false },
-    { "id": "bus",    "name": "Bus",     "icon": "🚌", "intercity": true, "domesticOnly": true, "maxKm": 1500, "base": 4,  "perKm": 0.018, "secPerKm": 0.11 },
-    { "id": "car",    "name": "Taxi",    "icon": "🚕", "intercity": true, "domesticOnly": true, "maxKm": 700,  "base": 10, "perKm": 0.07,  "secPerKm": 0.06 },
-    { "id": "flight", "name": "Flight",  "icon": "✈️", "intercity": true, "minKm": 200,     "base": 55, "perKm": 0.11,  "secPerKm": 0.028, "internationalFee": 60 }
+    {
+      "id": "walk",
+      "name": "Walk",
+      "icon": "🚶",
+      "intercity": false
+    },
+    {
+      "id": "bus",
+      "name": "Bus",
+      "icon": "🚌",
+      "intercity": true,
+      "domesticOnly": true,
+      "maxKm": 1500,
+      "base": 4,
+      "perKm": 0.018,
+      "secPerKm": 0.11
+    },
+    {
+      "id": "car",
+      "name": "Taxi",
+      "icon": "🚕",
+      "intercity": true,
+      "domesticOnly": true,
+      "maxKm": 700,
+      "base": 10,
+      "perKm": 0.07,
+      "secPerKm": 0.06
+    },
+    {
+      "id": "flight",
+      "name": "Flight",
+      "icon": "✈️",
+      "intercity": true,
+      "minKm": 200,
+      "base": 55,
+      "perKm": 0.11,
+      "secPerKm": 0.028,
+      "internationalFee": 60
+    }
   ],
   "minTravelSeconds": 6
 }

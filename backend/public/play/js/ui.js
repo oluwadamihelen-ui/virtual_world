@@ -294,7 +294,7 @@ export function renderMapSvg(geo, scope, here, selected) {
   const land = cities.map((c) => { const [x, y] = pts.get(c.id); return `<circle class="land" cx="${x}" cy="${y}" r="${scope === 'world' ? 46 : 78}"/>`; }).join('');
   const grid = Array.from({ length: 9 }, (_, i) => `<line x1="${(i + 1) * 60}" y1="0" x2="${(i + 1) * 60}" y2="${H}" stroke="rgba(255,255,255,.05)"/>`).join('') + Array.from({ length: 6 }, (_, i) => `<line x1="0" y1="${(i + 1) * 57}" x2="${W}" y2="${(i + 1) * 57}" stroke="rgba(255,255,255,.05)"/>`).join('');
   const nodes = cities.map((c) => { const [x, y] = pts.get(c.id); const flag = geo.countries.find((k) => k.id === c.country)?.flag ?? '';
-    return `<g class="city ${selected === c.id ? 'sel' : ''}" data-city="${c.id}">${here === c.id ? `<circle class="you" cx="${x}" cy="${y}" r="8"/>` : ''}<circle class="dot" cx="${x}" cy="${y}" r="9"/><text x="${x}" y="${y + 26}" text-anchor="middle">${flag} ${esc(c.name)}</text><circle cx="${x}" cy="${y}" r="26" fill="transparent"/></g>`; }).join('');
+    return `<g class="city ${selected === c.id ? 'sel' : ''}" data-city="${c.id}">${here === c.id ? `<circle class="you" cx="${x}" cy="${y}" r="8"/>` : ''}<circle class="dot" cx="${x}" cy="${y}" r="9"/><text x="${x}" y="${y + 26}" text-anchor="middle">${flag} ${esc(c.name)}</text><circle cx="${x}" cy="${y}" r="15" fill="transparent"/></g>`; }).join('');
   return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">${grid}${land}${routes}${nodes}</svg>`;
 }
 
