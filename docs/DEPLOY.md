@@ -39,3 +39,16 @@ Generate secrets with: `node -e "console.log(require('crypto').randomBytes(32).t
 
 ## First start
 The server creates its tables itself on boot (migrations), then loads `game-data/`. Make yourself an admin with `npm run set-role -- you@example.com admin` (run it where `DATABASE_URL` is set), then open `/mod`.
+
+## Step by step on Render (written from Render's usual setup; not tested from here, so check the screens against Render's current docs)
+1. Push this repo to GitHub (it is). Create a Render account and connect GitHub.
+2. **New > PostgreSQL** (version 16). Pick the same region you will use for the web service. Copy its **Internal Database URL**.
+3. **New > Web Service**, choose the repo and the branch you deploy.
+   - Root Directory: `backend`
+   - Runtime: Node. Build Command: `npm install && npm run build`. Start Command: `npm start`
+   - Instance type: a **paid** one. Free instances go to sleep after inactivity and would kick everyone out of a live world.
+   - Health Check Path: `/healthz`
+4. Environment variables: `NODE_ENV=production`, `DATABASE_URL` (the internal URL), `JWT_SECRET`, `SERVER_API_KEY`, `MESSAGE_KEY`, `TRUST_PROXY=1`, `GAME_DATA_DIR=/opt/render/project/src/game-data`, then `PUBLIC_BASE_URL` once you know your address (`https://<name>.onrender.com` or your own domain).
+5. Deploy. Open `https://<name>.onrender.com/play/`. Register, then promote yourself (Render dashboard > your service > Shell): `npm run set-role -- you@example.com admin`, and open `/mod`.
+6. Run **one** instance only. The world lives in that process's memory; two instances would be two separate worlds.
+7. Backups: turn on the database provider's backups. The ledger is the money.
