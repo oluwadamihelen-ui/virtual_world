@@ -111,6 +111,7 @@ Close the browser tab any time. When you come back and sign in, your money, home
 |---|---|
 | `'npm' is not recognized` | Restart the computer after installing Node.js. |
 | `Could not log in to PostgreSQL` | Wrong password. Run `npm run setup` again and type your PostgreSQL password. |
+| `EADDRINUSE: address already in use ...:3000`, or `/play` says "Route GET:/play not found" | An **older copy** of the game is still running and holds port 3000 (the 404 comes from the old copy). Close every black window, or open one and run `netstat -ano \| findstr :3000`, then `taskkill /PID <the number at the end> /F`. Then run `npm run dev` again in the **new** folder. Or edit `backend\.env`, set `PORT=3001`, and open `http://localhost:3001/play`. |
 | `ECONNREFUSED` or "Is PostgreSQL running?" | Press the Windows key, type **Services**, find **postgresql-x64-16**, right-click, **Start**. |
 | Page says "Cannot reach the game server" | The black window isn't running. Start it again with `npm run dev`. |
 | The 3D view is black or very slow | Update your browser and graphics driver. Try Chrome or Edge. Close other heavy programs. |

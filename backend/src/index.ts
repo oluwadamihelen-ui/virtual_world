@@ -47,5 +47,13 @@ const shutdown = async () => { clearInterval(timer); clearInterval(npcTimer); aw
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
-await app.listen({ port: config.PORT, host: '0.0.0.0' });
+try {
+  await app.listen({ port: config.PORT, host: '0.0.0.0' });
+} catch (e: any) {
+  if (e?.code === 'EADDRINUSE') {
+    console.error(`\n✘ Port ${config.PORT} is already in use: an older copy of the game server is probably still running.\n  Fix 1: close the other black window (or press Ctrl+C in it), then run  npm run dev  again.\n  Fix 2: use another port. In backend\\.env change PORT=${config.PORT} to PORT=3001, then open http://localhost:3001/play\n  (Windows: to find what uses the port, run  netstat -ano | findstr :${config.PORT}  then  taskkill /PID <number> /F)\n`);
+    process.exit(1);
+  }
+  throw e;
+}
 console.log(`\nMy Virtual World is running.\n  Play the game:  http://localhost:${config.PORT}/play\n  Moderators:     http://localhost:${config.PORT}/mod\n`);
