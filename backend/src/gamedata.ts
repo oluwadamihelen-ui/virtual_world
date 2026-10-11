@@ -167,6 +167,17 @@ function parseAll(read: (f: string) => unknown) {
     for (const [lot, u] of Object.entries(estate.land)) allProps.push({ id: `prop_${city.id}_${lot}`, type: 'land', district: city.id, name: `Plot ${lot.slice(-1).toUpperCase()}, ${city.name}`, rentPerPeriod: 0,
       capacity: 1, furnitureSlots: 0, lot, beds: 0, sizeSqm: u.sizeSqm, blurb: `${u.sizeSqm} sqm of empty land. Build your own home on it.`, salePrice: price(u.price, idx), buildCost: price(estate.build.cost, idx) });
   }
+  // Landmark businesses (cafes, restaurants, markets, malls) sell food and drink: one shop per area and type, priced by the area.
+  const itemById = new Map(items.map((i) => [i.id, i]));
+  for (const mw of metroWorlds.values()) for (const z of mw.zones) {
+    if (!z.itemIds) continue;
+    const city = geo.cities.find((c) => c.id === z.area)!;
+    z.items = z.itemIds.map((id: string) => ({ itemId: id, label: itemById.get(id)?.name ?? id }));
+    if (!allShops.some((sh) => sh.id === z.shopId)) {
+      allShops.push({ id: z.shopId, name: z.label, district: z.area, stock: z.itemIds.map((id: string) => ({ itemId: id, price: Math.max(1, Math.round((itemById.get(id)?.basePrice ?? 10) * city.priceIndex)), quantity: null })) });
+    }
+    delete z.itemIds;
+  }
   const cityById = new Map(geo.cities.map((c) => [c.id, c]));
   const countryById = new Map(geo.countries.map((c) => [c.id, c]));
   return { economy, items, shops: allShops, properties: allProps, jobs, appearance, businesses, chat, achievements, world, geo, phone, estate, worlds, metroWorlds, cityById, countryById, itemIds };

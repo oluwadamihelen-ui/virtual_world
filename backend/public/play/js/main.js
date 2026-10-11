@@ -312,17 +312,21 @@ function doorPoints(b) {
   return { out: { x: b.cx, z: frontZ + s * 1.8 }, inn: { x: b.cx, z: frontZ - s * 1.8 } };
 }
 const rowRoad = (zz) => (S.world.rowZ ?? [0]).reduce((best, r) => (Math.abs(r - zz) < Math.abs(best - zz) ? r : best), (S.world.rowZ ?? [0])[0]);
-/** Walk to another area of the same city: along the street, over a bridge if needed, to that area's spawn point. */
-function walkToArea(areaId) {
-  const d = S.world.districts.find((x) => x.id === areaId); if (!d) return;
+/** Walk anywhere in the city: out of the current building, along the street, over a bridge if the target is on the other side, to the target. */
+function routeTo(tx, tz) {
   const here = S.world.buildings.find((b) => b.enterable && inBuilding(b, G.me.x, G.me.z));
   const path = [];
   if (here) { const dp = doorPoints(here); path.push(dp.inn, dp.out); }
-  const r0 = rowRoad(G.me.z), r1 = rowRoad(d.spawn.z), startX = here ? doorPoints(here).out.x : G.me.x;
+  const r0 = rowRoad(G.me.z), r1 = rowRoad(tz), startX = here ? doorPoints(here).out.x : G.me.x;
   path.push({ x: startX, z: r0 });
   if (r0 !== r1) { const ax = (S.world.avenueX ?? [0]).reduce((best, x) => (Math.abs(x - startX) < Math.abs(best - startX) ? x : best), (S.world.avenueX ?? [0])[0]); path.push({ x: ax, z: r0 }, { x: ax, z: r1 }); }
-  path.push({ x: d.spawn.x, z: r1 }, { x: d.spawn.x, z: d.spawn.z });
-  G.auto = path; U.closePanel(); U.toast('info', `Walking to ${d.name}…`);
+  path.push({ x: tx, z: r1 }, { x: tx, z: tz });
+  G.auto = path; U.closePanel();
+}
+function walkToArea(areaId) { const d = S.world.districts.find((x) => x.id === areaId); if (!d) return; routeTo(d.spawn.x, d.spawn.z); U.toast('info', `Walking to ${d.name}…`); }
+function walkToPlace(areaId, poiId) {
+  const pl = S.geo.places[areaId]?.find((q) => q.id === poiId); if (!pl) return;
+  routeTo(pl.x, pl.z + (pl.face === '+z' ? 1 : -1) * (pl.sz / 2 + 1.6)); U.toast('info', `Walking to ${pl.name}…`);
 }
 function walkTo(zoneId) {
   const z = S.world.zones.find((q) => q.id === zoneId); if (!z) return;
@@ -403,6 +407,11 @@ function openMap(preselect) {
   const geo = S.geo;
   const metroSize = (m) => geo.cities.filter((c) => c.metro === m).length;
   const st = { scope: metroSize(G.city.metro) > 1 ? `metro:${G.city.metro}` : G.city.country, sel: G.city.id, quotes: new Map(), armed: null };
+  const placesHtml = (areaId) => {
+    const list = geo.places?.[areaId] ?? []; if (!list.length) return '';
+    const same = metroOfCity(areaId) === metroOfCity(G.city.id);
+    return `<h4 style="margin:10px 0 6px">Places and businesses</h4><div class="list places">${list.map((p) => `<div class="li"><div><b>${p.emoji} ${U.esc(p.name)}</b><small>${p.type[0].toUpperCase() + p.type.slice(1)}${p.business ? ' · business' : ''}</small></div>${same ? `<button class="btn small ghost" data-walkplace="${areaId}|${p.id}">Walk</button>` : ''}</div>`).join('')}</div>`;
+  };
   const draw = () => {
     const here = G.city.id, sel = geo.cities.find((c) => c.id === st.sel);
     const country = geo.countries.find((k) => k.id === sel.country);
@@ -414,6 +423,7 @@ function openMap(preselect) {
       const places = S.world.buildings.filter((b) => b.area === G.city.id && b.kind !== 'house').map((b) => { const z = S.world.zones.find((q) => q.building === b.id); return { b, z }; });
       side = `<div class="hd"><h3>${country.flag} ${U.esc(sel.name)} <span class="pill">You are here</span></h3><p>${U.esc(sel.blurb)}</p><p><span class="pill">${country.currency.symbol} ${U.esc(country.currency.name)}</span><span class="pill">Prices ×${sel.priceIndex}</span></p></div>
         <p><button class="btn small gold" data-estate="1">🏠 Homes &amp; land here</button></p>
+        ${placesHtml(sel.id)}
         <div class="list">${places.filter(({ b }) => b.enterable !== false || b.sign).map(({ b, z }) => `<div class="li"><div><b>${U.esc(b.name)}</b><small>${z ? 'Walkable from here' : 'Coming soon'}</small></div>${z ? `<button class="btn small mint" data-walk="${z.id}">Walk there</button>` : ''}</div>`).join('')}</div>`;
     } else {
       const opts = st.quotes.get(sel.id);
@@ -421,6 +431,7 @@ function openMap(preselect) {
       side = `<div class="hd"><h3>${country.flag} ${U.esc(sel.name)}</h3><p>${U.esc(sel.blurb)}</p><p><span class="pill">${country.currency.symbol} ${U.esc(country.currency.name)}</span><span class="pill">Prices ×${sel.priceIndex}</span>${country.id !== here_.country ? '<span class="pill">International</span>' : ''}</p>${metroSize(sel.metro) > 1 && !st.scope.startsWith('metro:') ? `<p><button class="btn small ghost" data-metro="${sel.metro}">Explore ${metroSize(sel.metro)} areas of ${U.esc(geo.cities.find((c) => c.id === sel.metro).name)}</button></p>` : ''}</div>
         ${metroOfCity(sel.id) === metroOfCity(here) ? `<p><button class="btn mint" data-walkarea="${sel.id}">🚶 Walk there yourself (free)</button></p>` : ''}
         <div class="list">${!opts ? '<p style="color:var(--mut)">Checking routes…</p>' : opts.filter((o) => !(o.mode === 'walk' && metroOfCity(sel.id) === metroOfCity(here))).map((o) => `<button class="opt" data-mode="${o.mode}" ${o.available ? '' : 'disabled'}><span class="em">${o.icon}</span><span><b>${U.esc(o.name)}</b><small>${o.available ? `${o.km} km · about ${o.seconds}s` : U.esc(o.reason ?? 'Not available')}</small></span><span class="pr">${o.available ? (st.armed === o.mode ? 'Tap to pay ' : '') + o.fareText : ''}${o.available ? `<small style="display:block;color:var(--mut);font-weight:600">${U.mvc(o.fare)}</small>` : ''}</span></button>`).join('')}</div>
+        ${placesHtml(sel.id)}
         <p style="color:var(--mut);font-size:12px">Fares are charged in your wallet (${cur.code}). Arriving in ${country.name} switches your wallet to ${country.currency.name} at the game's fixed rate.</p>`;
     }
     U.openPanel('Map', `<div class="tabs">${tabs.map((t) => `<button data-scope="${t.id}" class="${st.scope === t.id ? 'on' : ''}">${t.label}</button>`).join('')}</div>
@@ -429,6 +440,7 @@ function openMap(preselect) {
       el.querySelectorAll('.city').forEach((g) => g.onclick = () => { st.sel = g.dataset.city; st.armed = null; draw(); if (st.sel !== here && !st.quotes.has(st.sel)) S.conn.send({ t: 'quote', to: st.sel }); });
       el.querySelectorAll('[data-metro]').forEach((b) => b.onclick = () => { st.scope = `metro:${b.dataset.metro}`; draw(); });
       el.querySelectorAll('[data-estate]').forEach((b) => b.onclick = () => { U.closePanel(); openEstateOverview(); });
+      el.querySelectorAll('[data-walkplace]').forEach((b) => b.onclick = () => { const [a, id] = b.dataset.walkplace.split('|'); walkToPlace(a, id); });
       el.querySelectorAll('[data-walkarea]').forEach((b) => b.onclick = () => walkToArea(b.dataset.walkarea));
       el.querySelectorAll('[data-walk]').forEach((b) => b.onclick = () => walkTo(b.dataset.walk));
       el.querySelectorAll('[data-mode]').forEach((b) => b.onclick = () => {

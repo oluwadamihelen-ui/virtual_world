@@ -30,6 +30,12 @@ Top bar (clock, online count, ping, MVC balance + wallet), goal cards from real 
 - 16 automated game-server tests (real WebSockets): ticket-only entry (replay, forgery, wrong origin), speed cap, solid walls, tenant-only door, proximity-validated rent/buy/work, chat range/filter/block/mute, emote range and rate limit, report/block, snapshots and interest management, NPCs, persistence of position, flood and garbage protection, session replacement.
 - Browser checks with a real headless Chromium + WebGL: sign-up, character creator with 3D preview, entering the world, renting (balance 2,000 → 1,500) and walking through the unlocked door, buying (25 and 8 MVC), two players seeing each other with chat bubbles and emotes, day and night, phone and map panels, and a phone-sized touch layout. No JavaScript errors.
 
+## One continuous city (state) with districts
+Each state (Lagos, Abuja, Accra, Nairobi, London, and single-district Port Harcourt, Kano, Kumasi) is **one continuous world**. Lagos has six districts (Ikeja, Yaba/Maple Court, Surulere, Ikoyi, Victoria Island, Lekki) laid out on a grid with avenues between them, a lagoon crossed by two bridges, streetlights, townspeople and about 40 landmark and business buildings (hospital, mosque, church, market, university, stadium, hotels, restaurants, salons, gym, cinema, mall, bank, boat cruise, beach, golf club...). Walk anywhere. The area, place name, prices and listings follow your feet. Press **V** (or the pin button on the right) for **city view**: the camera pulls far back and every building shows a floating name label; the mouse wheel zooms between 7 and 170 m. Zoom in and the labels hide again.
+- Open the Map and pick any area or building: **Walk there yourself** plans a route along the streets and over a bridge. Bus and taxi are quick journeys that cost money. Each area (and each state) lists its **places and businesses**.
+- Cafes, restaurants, markets and malls are open: stand at the door and buy food and drink at that area's prices. The other buildings (hospital, university...) are scenery with labels for now.
+- Other states are other worlds: use the Map to fly or take a bus.
+
 ## Cities, travel and currency
 Eight cities in four countries (`game-data/geo.json`). Only Lagos is hand-laid; the others are **generated variants of the same neighbourhood** (recoloured, mirrored, renamed, price-scaled). The Map lists every city in the chosen country; tap a city, choose bus / taxi / flight (or a walk list inside your own city), and tap twice to pay. The fare is charged in the ledger, you travel (a few seconds to a minute), then arrive in that city's world. **Your wallet shows the currency of the country you are in**, converted at fixed game rates (1 MVC = ₦100 = GH₵0.8 = KSh8.6 = £0.05); the ledger itself is always MVC. The rates are game values, not real exchange rates.
 
@@ -45,5 +51,7 @@ Vault (activity, send money, loans, rates), Chatter (direct messages), Spark (da
 - The 3D client was exercised on software rendering (SwiftShader); real-GPU frame rates, low-end phones and Safari are **untested**.
 - Chat history is not stored; only the last few lines are shown. The chat rate limit and word list are the starter versions described in `docs/ARCHITECTURE.md`.
 - Game-server scale is untested: one process, one world instance. The earlier backend load test does not cover WebSocket traffic.
+- Every district in every state is a recoloured or mirrored copy of the Maple Court layout, and the landmark buildings are generated from simple shapes. Real city maps would need hand-made level design.
+- The browser build is much heavier than before. It uses merged and instanced geometry and 8 pooled streetlights, but it was only tested on software rendering (about 1 frame per second there); real GPU frame rates are unknown. Type `mvwStats()` in the browser console to see draw calls.
 - The other seven cities are template variants of Lagos, not unique maps. Travel by bus/taxi is a loading screen, not a driven route.
 - Click-to-report always files "harassment" for now (a category picker is a small follow-up).

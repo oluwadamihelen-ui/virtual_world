@@ -293,4 +293,33 @@ describe('a metro is one continuous world', () => {
     const ik = world.districts.find((d: any) => d.id === 'ikeja');
     expect(Math.hypot(me(p).x - ik.spawn.x, me(p).z - ik.spawn.z)).toBeLessThan(3);
   });
+  it('landmark businesses are real shops: every shop zone has a shop with stock in the area\'s price level', async () => {
+    const world = w.ctx.data.worlds.get('lagos')!;
+    const poiShops = world.zones.filter((z: any) => z.kind === 'shop' && z.poi);
+    expect(poiShops.length).toBeGreaterThanOrEqual(8);
+    for (const z of poiShops) {
+      expect(w.ctx.data.shops.some((s) => s.id === z.shopId), z.id).toBe(true);
+      expect(z.items.length).toBeGreaterThan(0); expect(z.items[0].label.length).toBeGreaterThan(2);
+      expect((await w.ctx.pool.query('SELECT count(*)::int n FROM shop_stock WHERE shop_id=$1', [z.shopId])).rows[0].n).toBeGreaterThan(0);
+    }
+    const ikoyiCafe = w.ctx.data.shops.find((s) => s.id === 'shop_ikoyi_cafe')!, surulereCafe = w.ctx.data.shops.find((s) => s.id === 'shop_surulere_cafe') ?? w.ctx.data.shops.find((s) => s.id === 'shop_lagos_cafe');
+    expect(ikoyiCafe.stock.find((x: any) => x.itemId === 'coffee')!.price).toBeGreaterThan(surulereCafe ? surulereCafe.stock.find((x: any) => x.itemId === 'coffee')!.price : 0);
+  });
+  it('you can walk up to a cafe in another area of the city and buy a coffee there, priced in the area', async () => {
+    const p = await w.newPlayer('Coffee Fan'); const c = await join(p);
+    const world = w.ctx.data.worlds.get('lagos')!;
+    const z = world.zones.find((q: any) => q.poi && q.shopId === 'shop_ikoyi_cafe') ?? world.zones.find((q: any) => q.poi && q.area === 'ikoyi' && q.shopType === 'cafe');
+    expect(z, 'an Ikoyi cafe exists').toBeTruthy();
+    me(p).x = z.x; me(p).z = z.z; gw.step(0.05);
+    await new Promise((r) => setTimeout(r, 300));
+    const before = (await summary(p)).balance;
+    c.send({ t: 'interact', zone: z.id, item: 'coffee' });
+    await c.until(() => c.of('toast').some((m) => /Bought/.test(m.text)));
+    const paid = before - (await summary(p)).balance;
+    expect(paid).toBe(w.ctx.data.shops.find((s) => s.id === z.shopId)!.stock.find((x: any) => x.itemId === 'coffee')!.price);
+    expect(paid).toBeGreaterThan(15);   // Ikoyi is pricier than the base 15 MVC
+    await new Promise((r) => setTimeout(r, 350));
+    c.send({ t: 'interact', zone: z.id, item: 'diamond' });   // not on the menu
+    await c.until(() => c.of('toast').some((m) => m.kind === 'error'));
+  });
 });

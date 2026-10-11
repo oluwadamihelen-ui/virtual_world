@@ -185,3 +185,4 @@ body.panelopen .stack,body.panelopen .chatlog,body.panelopen .journal{visibility
 #furnbar .chip{padding:6px 11px;border-radius:99px;background:rgba(255,255,255,.12);font-weight:700;font-size:12px;color:var(--sand)}#furnbar .chip.on{background:var(--mint);color:#06301f}
 .vstrip{display:flex;gap:18px;align-items:center;flex-wrap:wrap;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:14px;padding:8px 14px}.vstrip>div{display:grid}.vstrip small{color:var(--mut);font-size:11px}.vstrip b{font-size:17px}
 .pill.up{background:rgba(123,224,180,.2);color:var(--mint)}.pill.down{background:rgba(255,122,89,.2);color:#ff9d85}.pl{font-size:12px!important}.spark{margin-left:auto}
+.sidepanel{max-height:560px;overflow:auto;padding-right:4px}.places .li small{display:block}

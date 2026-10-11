@@ -171,6 +171,8 @@ export class Gateway {
       countries: g.countries.map((c) => ({ ...c, currency: { code: c.currency, ...g.currencies[c.currency]! } })),
       cities: g.cities.map((c) => ({ id: c.id, country: c.country, name: c.name, lat: c.lat, lon: c.lon, blurb: c.blurb, priceIndex: c.priceIndex, metro: c.metro, hub: c.hub })),
       transport: g.transport.map((m) => ({ id: m.id, name: m.name, icon: m.icon })),
+      // landmark and business buildings of every state, grouped by area (for the Map's "places" list and walking directions)
+      places: Object.fromEntries(g.cities.map((c) => [c.id, (this.ctx.data.worlds.get(c.id)?.pois ?? []).filter((p: any) => p.district === c.id).map((p: any) => ({ id: p.id, name: p.name, type: p.type, emoji: p.emoji, business: p.business, x: p.x, z: p.z, face: p.face, sz: p.sz }))])),
     };
   }
 

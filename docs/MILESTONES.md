@@ -132,6 +132,19 @@ Legend: ✅ done and verified by automated tests · 🟡 done but unverified/par
 | The apartment block interior is still one shared room: everybody sees only their own furniture there | ⚠ | |
 | Owners letting their property to other players, auctions, property tax | ⬜ | |
 
+## Milestone 8: continuous cities
+
+| Item | State | Evidence |
+|---|---|---|
+| Each state is one continuous world of districts, avenues, lagoon and bridges; walk between areas; area follows position | ✅ | `travel.test.ts` (metro tests), browser walk Lagos to Surulere |
+| ~40 landmark/business buildings per state with floating labels; city view (V) | ✅ visuals checked on software rendering | screenshots |
+| Cafes, restaurants, pubs, markets and malls sell food at area prices | ✅ | tests |
+| Map lists places and businesses per area; route planning for walking | ✅ | browser |
+| Real-GPU frame rate of the larger world | ⬜ **untested** (about 1 fps on software rendering; 343 to 473 draw calls) | `mvwStats()` |
+| Hospitals, schools, banks, gyms, salons etc. do something | ⬜ scenery only | |
+| Player-run businesses visible and manageable in the world (backend exists, no client) | ⬜ | |
+| 60-player WebSocket test after the change | ✅ 9.9 snapshots/s, 0 errors | `docs/LOAD_TESTING.md` |
+
 ## Remaining tasks (sequenced)
 1. **UE5 project + dedicated server + greybox block** (blocks everything player-facing). Compile `MVWBackend`. *Done when:* two clients see each other on a dedicated server.
 2. ~~Join-ticket endpoint~~ done on the backend. *Remaining:* the game server must use it (Unreal).

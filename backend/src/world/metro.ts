@@ -9,6 +9,12 @@ import { generateWorld, type GeoCity } from './cities.js';
 export interface MetroDef { cols: number; order: string[]; water?: boolean; pois: { type: string; name: string; district?: string }[] }
 export interface MetroFile { gap: number; margin: number; metros: Record<string, MetroDef> }
 
+/** Which landmark types are open for business (you can buy things there) and what they sell. */
+export const POI_SHOPS: Record<string, string[]> = {
+  cafe: ['coffee', 'croissant', 'snack_bar'], restaurant: ['sandwich', 'bottled_water', 'snack_bar'], pub: ['sandwich', 'bottled_water', 'snack_bar'],
+  market: ['bottled_water', 'sandwich', 'snack_bar'], mall: ['bottled_water', 'coffee', 'snack_bar'],
+};
+
 /** Footprint and look of each point-of-interest type. `walk` types are open ground you can walk on (no wall collider). */
 export const POI_TYPES: Record<string, { sx: number; sz: number; h: number; walk?: boolean; business?: boolean; emoji: string }> = {
   church: { sx: 9, sz: 12, h: 5, emoji: '⛪' }, mosque: { sx: 11, sz: 11, h: 5, emoji: '🕌' }, market: { sx: 14, sz: 10, h: 3, business: true, emoji: '🛍️' },
@@ -114,8 +120,13 @@ export function buildMetroWorld(base: any, cities: GeoCity[], metroId: string, f
       const nearRow = w.rowZ.reduce((best: number, z: number) => (Math.abs(z - s.z) < Math.abs(best - s.z) ? z : best), w.rowZ[0]);
       const h = HASH(`${metroId}:${p.name}`);
       const district = w.districts.reduce((best: any, d: any) => (dist(d.center, s) < dist(best.center, s) ? d : best), w.districts[0]);
-      w.pois.push({ id: `poi_${i}`, type: p.type, name: p.name, x: s.x, z: s.z, sx: t.sx, sz: t.sz, h: t.h, walk: !!t.walk, business: !!t.business, emoji: t.emoji,
+      const poiObj = ({ id: `poi_${i}`, type: p.type, name: p.name, x: s.x, z: s.z, sx: t.sx, sz: t.sz, h: t.h, walk: !!t.walk, business: !!t.business, emoji: t.emoji,
         face: nearRow > s.z ? '+z' : '-z', wall: COLORS[h % COLORS.length], roof: ROOFS[h % ROOFS.length], district: district.id });
+      w.pois.push(poiObj);
+      if (POI_SHOPS[p.type]) {
+        const f = poiObj.face === '+z' ? 1 : -1;
+        w.zones.push({ id: `${poiObj.id}_shop`, kind: 'shop', poi: poiObj.id, area: district.id, x: s.x, z: s.z + f * (t.sz / 2 + 1.6), radius: 2.6, label: p.name, shopId: `shop_${district.id}_${p.type}`, shopType: p.type, itemIds: POI_SHOPS[p.type] });
+      }
       break;
     }
   });
