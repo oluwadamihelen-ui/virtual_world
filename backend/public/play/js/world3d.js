@@ -167,7 +167,7 @@ function buildPOI(p, root, labelGroup) {
   }
   mergeStatic(g);
   const lab = makeLabel(p.emoji, p.name, p.business ? 'biz' : 'civic');
-  lab.position.set(p.x, Math.max(p.h, 1.5) + (p.type === 'church' ? 8 : p.type === 'mosque' ? 6 : 2.6), p.z); labelGroup.add(lab);
+  lab.position.set(p.x, Math.max(p.h, 1.5) + (p.type === 'church' ? 8 : p.type === 'mosque' ? 6 : 2.6), p.z); lab.userData.place = { kind: 'poi', id: p.id, area: p.district, name: p.name, emoji: p.emoji, type: p.type, business: p.business, x: p.x, z: p.z, face: p.face, sz: p.sz }; labelGroup.add(lab);
   return g;
 }
 const CYL_T = new THREE.CylinderGeometry(0.14, 0.2, 1, 6), ICO = new THREE.IcosahedronGeometry(1, 0), CONE_P = new THREE.ConeGeometry(1, 1, 7), DOME = new THREE.SphereGeometry(1, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2);
@@ -325,7 +325,7 @@ export function createWorld3D(world, scene) {
   const labelGroup = new THREE.Group(); root.add(labelGroup);
   for (const p of world.pois ?? []) buildPOI(p, root, labelGroup);
   const BUILDING_EMOJI = { apt: '🏢', grocery: '🛒', cafe: '☕', jobs: '💼', bank: '🏦' };
-  for (const b of world.buildings) { if (b.kind === 'house') continue; const lab = makeLabel(BUILDING_EMOJI[b.short ?? b.id] ?? '🏠', b.name, 'biz'); lab.position.set(b.cx, b.height + 2.4, b.cz); labelGroup.add(lab); }
+  for (const b of world.buildings) { if (b.kind === 'house') continue; const lab = makeLabel(BUILDING_EMOJI[b.short ?? b.id] ?? '🏠', b.name, 'biz'); lab.position.set(b.cx, b.height + 2.4, b.cz); lab.userData.place = { kind: 'building', id: b.id, short: b.short ?? b.id, area: b.area ?? world.cityId, name: b.name, emoji: BUILDING_EMOJI[b.short ?? b.id] ?? '🏠', cx: b.cx, cz: b.cz, sz: b.sz, sign: b.sign }; labelGroup.add(lab); }
 
   // ---- lots: clickable houses, apartment block and empty plots with status banners ----
   const lots = new Map(), pickables = []; let bannersOn = true;
@@ -397,6 +397,13 @@ export function createWorld3D(world, scene) {
     },
     /** Floating name labels are shown when the camera is pulled back (city view). */
     setCameraDistance(d) { labelGroup.visible = d > 21; const sh = d < 60; if (sun.castShadow !== sh) sun.castShadow = sh; },
+    /** A floating name label under a screen point (ndc -1..1): returns what it stands for, or null. */
+    pickLabel(ndcX, ndcY, camera) {
+      if (!labelGroup.visible) return null;
+      const hit = ndcRay(ndcX, ndcY, camera).intersectObjects(labelGroup.children, false)[0];
+      return hit ? hit.object.userData.place ?? null : null;
+    },
+    labelList() { return labelGroup.children.map((l) => ({ name: l.userData.place?.name, pos: l.position.clone() })); },
     showBanners(on) { bannersOn = on; for (const o of lots.values()) o.banner.visible = on && !!o.banner.material.map; },
     pickFurniture(ndcX, ndcY, camera) {
       const hit = ndcRay(ndcX, ndcY, camera).intersectObjects(furnRoot.children, true)[0]; if (!hit) return null;

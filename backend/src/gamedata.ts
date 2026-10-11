@@ -59,6 +59,12 @@ const Geo = z.object({
   })),
   minTravelSeconds: z.number().positive(),
   walkMaxKm: z.number().positive().default(4),
+  localTransport: z.object({
+    walk: z.object({ name: z.string(), icon: z.string(), metersPerSecond: z.number().positive() }),
+    bike: z.object({ name: z.string(), icon: z.string(), fee: z.number().int().nonnegative(), speedMult: z.number().min(1).max(3), seconds: z.number().positive(), minMeters: z.number() }),
+    bus: z.object({ name: z.string(), icon: z.string(), base: z.number(), perMeter: z.number(), secPerMeter: z.number(), minSeconds: z.number(), maxSeconds: z.number(), minMeters: z.number() }),
+    car: z.object({ name: z.string(), icon: z.string(), base: z.number(), perMeter: z.number(), secPerMeter: z.number(), minSeconds: z.number(), maxSeconds: z.number(), minMeters: z.number() }),
+  }),
 });
 const Phone = z.object({
   minAgeToMessage: z.number().int(),

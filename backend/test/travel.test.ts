@@ -7,6 +7,7 @@ import * as travel from '../src/modules/travel/travel.js';
 import { formatMoney, currencyOfCity } from '../src/modules/economy/currency.js';
 import { verifyLedgerIntegrity } from '../src/modules/economy/ledger.js';
 import { buildColliders, isBlocked } from '../shared/sim.mjs';
+import { districtAt } from '../src/world/metro.js';
 
 let w: TestWorld; let gw: Gateway; let port: number;
 beforeEach(async () => {
@@ -321,5 +322,47 @@ describe('a metro is one continuous world', () => {
     await new Promise((r) => setTimeout(r, 350));
     c.send({ t: 'interact', zone: z.id, item: 'diamond' });   // not on the menu
     await c.until(() => c.of('toast').some((m) => m.kind === 'error'));
+  });
+  it('city bus and taxi: fare by distance, a short journey, dropped at the door; bad targets and short hops are refused', async () => {
+    const p = await w.newPlayer('Commuter'); const c = await join(p);
+    const world = w.ctx.data.worlds.get('lagos')!;
+    const ik = world.pois.find((q: any) => q.district === 'ikoyi' && q.business)!;
+    const front = { x: ik.x, z: ik.z + (ik.face === '+z' ? 1 : -1) * (ik.sz / 2 + 1.6) };
+    const before = (await summary(p)).balance;
+    c.send({ t: 'transit', mode: 'bus', x: me(p).x + 5, z: me(p).z }); await c.until(() => c.of('toast').some((m) => m.kind === 'error'));   // too close: walk
+    expect((await summary(p)).balance).toBe(before);
+    c.send({ t: 'transit', mode: 'bus', x: 99999, z: 0 }); await new Promise((r) => setTimeout(r, 200));
+    c.send({ t: 'transit', mode: 'bus', x: ik.x, z: ik.z });                                   // inside a solid building
+    await c.until(() => c.of('toast').filter((m) => m.kind === 'error').length > 1);
+    expect((await summary(p)).balance).toBe(before);
+    const meters = Math.hypot(front.x - me(p).x, front.z - me(p).z);
+    c.send({ t: 'transit', mode: 'bus', x: front.x, z: front.z, name: ik.name });
+    await c.until(() => c.of('travel').length > 0);
+    const q = (await import('../src/modules/travel/local.js')).localQuote(w.ctx, meters).find((o) => o.mode === 'bus')!;
+    expect(before - (await summary(p)).balance).toBe(q.fare);
+    expect(c.last('travel').local).toBe(true);
+    c.send({ t: 'transit', mode: 'car', x: front.x, z: front.z }); await c.until(() => c.of('toast').some((m) => /journey/i.test(m.text)));   // one journey at a time
+    await finishTrip(p);
+    await c.until(() => c.of('arrived').length > 0);
+    expect(Math.hypot(me(p).x - front.x, me(p).z - front.z)).toBeLessThan(0.5);
+    expect(me(p).city).toBe(districtAt(world, front.x, front.z) ?? 'lagos');   // landmarks in the gaps keep your current area
+
+    expect((await verifyLedgerIntegrity(w.ctx.pool)).ok).toBe(true);
+  });
+  it('bike: a one-off rental fee then a server-side speed boost that ends on its own; you cannot be charged twice while riding', async () => {
+    const p = await w.newPlayer('Cyclist'); const c = await join(p);
+    const before = (await summary(p)).balance;
+    c.send({ t: 'ride', on: true }); await c.until(() => c.of('ride').length > 0);
+    expect((await summary(p)).balance).toBe(before - w.ctx.data.geo.localTransport.bike.fee);
+    c.send({ t: 'ride', on: true }); await new Promise((r) => setTimeout(r, 300));
+    expect((await summary(p)).balance).toBe(before - w.ctx.data.geo.localTransport.bike.fee);   // not charged again
+    const x0 = me(p).x; me(p).input = { dx: 1, dz: 0, run: false }; me(p).lastInputAt = Date.now();
+    for (let i = 0; i < 20; i++) gw.step(0.05);
+    const fast = me(p).x - x0;
+    c.send({ t: 'ride', on: false }); await c.until(() => c.of('ride').some((m) => m.on === false));
+    me(p).x = x0; me(p).input = { dx: 1, dz: 0, run: false }; me(p).lastInputAt = Date.now();
+    for (let i = 0; i < 20; i++) gw.step(0.05);
+    const slow = me(p).x - x0;
+    expect(fast / slow).toBeGreaterThan(2);
   });
 });

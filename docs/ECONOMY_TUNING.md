@@ -60,3 +60,6 @@ All numbers are **untested guesses**. With the 2,000 MVC starting grant and 250 
 - Buying early in a fast-growing area and selling later is how investors profit; selling costs 5%, so flipping instantly loses 5%. If players leave and NPC growth has stopped at the cap, the index can fall (floor 0.8), so it is a real risk.
 - **Inflation warning:** profit is paid by the market account, i.e. new money. With the numbers above a Lekki investor can roughly double their money in about 11 days. That is probably far too generous for a real economy; lower `valuePerResident`, `settlersPerDay` or `ceiling`, or raise the fee, after watching `faucet:real_estate`. These values are untested guesses.
 - Furniture (Home Store): bed 300, double bed 520, sofa 350, armchair 220, coffee table 120, dining table 260, chair 70, wardrobe 340, bookshelf 180, TV 480, fridge 600, desk 200, lamp 120, rug 150, plant 60 MVC, times the city price index. Furniture is a money sink; it is not worth anything when you sell the home.
+
+### Getting around a city (`geo.json` `localTransport`)
+Walk is free (4 m/s). Bike: 3 MVC flat, 2.2x speed for 240 s. City bus: 2 MVC + 0.012 MVC per metre. Taxi: 8 MVC + 0.045 MVC per metre. Fares go to `sink:transport`. Untested guesses: a cross-city taxi (1 km) costs about 53 MVC, roughly one quarter of a work shift.

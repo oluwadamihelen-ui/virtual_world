@@ -66,13 +66,13 @@ export function isBlocked(x, z, colliders, hasGate, bounds) {
  * Advance one entity. input = {dx, dz, run}: only the DIRECTION matters; speed is fixed here, so a client can never
  * move faster than the rules allow no matter what it sends. Mutates p = {x, z, ry, moving}.
  */
-export function stepPlayer(p, input, dt, colliders, hasGate, bounds) {
+export function stepPlayer(p, input, dt, colliders, hasGate, bounds, speedMult = 1) {
   let dx = Number(input.dx) || 0, dz = Number(input.dz) || 0;
   const len = Math.hypot(dx, dz);
   p.moving = false;
   if (len < 0.01) return p;
   dx /= len; dz /= len;
-  const speed = input.run ? RUN_SPEED : WALK_SPEED;
+  const speed = (input.run ? RUN_SPEED : WALK_SPEED) * Math.min(3, Math.max(1, Number(speedMult) || 1));
   p.ry = Math.atan2(dx, dz);
   // sub-step so a fast mover can never skip over a thin wall
   let remaining = dt;

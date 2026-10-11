@@ -14,6 +14,7 @@ import * as social from '../modules/social/social.js';
 import * as moderation from '../modules/moderation/moderation.js';
 import * as ledger from '../modules/economy/ledger.js';
 import * as travel from '../modules/travel/travel.js';
+import * as localTravel from '../modules/travel/local.js';
 import { handleApp, phoneInfo } from '../modules/phone/index.js';
 import { currencyOfCity, formatMoney } from '../modules/economy/currency.js';
 import { builtHouseSpec } from '../world/cities.js';
@@ -54,12 +55,14 @@ const Msg = z.discriminatedUnion('t', [
   z.object({ t: z.literal('quote'), to: z.string().max(40) }),
   z.object({ t: z.literal('travel'), to: z.string().max(40), mode: z.string().max(20) }),
   z.object({ t: z.literal('app'), rid: z.string().max(40), app: z.string().max(20), a: z.string().max(30), d: z.record(z.string(), z.unknown()).optional() }),
+  z.object({ t: z.literal('transit'), mode: z.enum(['bus', 'car']), x: z.number().min(-2000).max(2000), z: z.number().min(-2000).max(2000), name: z.string().max(60).optional() }),
+  z.object({ t: z.literal('ride'), on: z.boolean() }),
   z.object({ t: z.literal('ping'), c: z.number().optional() }),
 ]);
 
 interface Body { x: number; z: number; ry: number; moving: boolean }
 interface Player extends Body {
-  id: string; city: string; metro: string; travel: { to: string; until: number; mode: string } | null; name: string; appearance: unknown; ws: WebSocket; ip: string;
+  id: string; city: string; metro: string; travel: { to: string; until: number; mode: string; point?: { x: number; z: number } } | null; ride: { until: number; mult: number } | null; name: string; appearance: unknown; ws: WebSocket; ip: string;
   input: { dx: number; dz: number; run: boolean }; seq: number; lastInputAt: number;
   access: Set<string>; busy: boolean; lastActAt: number; lastEmoteAt: number;
   known: Set<string>; budget: number; budgetAt: number; strikes: number; dirty: boolean; lastSave: number;
@@ -204,7 +207,7 @@ export class Gateway {
       const saved = summary.location.posRev >= 2 && !(summary.location.x === 0 && summary.location.z === 0)
         && !isBlocked(summary.location.x, summary.location.z, this.rt(city).colliders, (g) => access.has(g), world.bounds);
       const p: Player = {
-        id, city, metro, travel: summary.travel ? { to: summary.travel.to, until: new Date(summary.travel.arrivesAt).getTime(), mode: 'flight' } : null,
+        id, city, metro, ride: null, travel: summary.travel ? { to: summary.travel.to, until: new Date(summary.travel.arrivesAt).getTime(), mode: 'flight' } : null,
         name: summary.displayName, appearance: summary.appearance, ws, ip,
         x: saved ? summary.location.x : spawn.x, z: saved ? summary.location.z : spawn.z, ry: 0, moving: false,
         input: { dx: 0, dz: 0, run: false }, seq: 0, lastInputAt: Date.now(), access, busy: false, lastActAt: 0, lastEmoteAt: 0,
@@ -233,11 +236,12 @@ export class Gateway {
       t: 'welcome', you: { id: p.id, name: p.name, appearance: p.appearance, x: p.x, z: p.z }, world: this.worldOf(p),
       city: { id: city.id, name: city.name, country: city.country, blurb: city.blurb, metro: city.metro }, currency: currencyOfCity(this.ctx.data, p.city),
       geo: this.publicGeo(), summary, door: await this.doorInfo(p, summary), serverNow: Date.now(), tickHz: TICK_HZ,
-      achievements: this.ctx.data.achievements, jobs: jobs.listJobs(this.ctx), furnitureCatalog: this.ctx.data.items.filter((i) => i.furniture).map((i) => ({ id: i.id, name: i.name, ...i.furniture })), phone: await phoneInfo(this.ctx, p.id), ...extra,
+      achievements: this.ctx.data.achievements, jobs: jobs.listJobs(this.ctx), localTransport: this.ctx.data.geo.localTransport, furnitureCatalog: this.ctx.data.items.filter((i) => i.furniture).map((i) => ({ id: i.id, name: i.name, ...i.furniture })), phone: await phoneInfo(this.ctx, p.id), ...extra,
     });
   }
 
   private async onClose(p: Player) {
+    if (p.travel?.point) { p.x = p.travel.point.x; p.z = p.travel.point.z; p.dirty = true; const d = districtAt(this.rt(p.city).world, p.x, p.z); if (d) p.city = d; p.travel = null; }   // paid for a bus: you arrive even if you left
     this.connsByIp.set(p.ip, Math.max(0, (this.connsByIp.get(p.ip) ?? 1) - 1));
     if (this.players.get(p.id) === p) {
       this.players.delete(p.id);
@@ -272,6 +276,8 @@ export class Gateway {
         case 'ping': this.send(p, { t: 'pong', c: m.c ?? 0, serverNow: now }); return;
         case 'quote': this.send(p, { t: 'quote', to: m.to, options: travel.quote(this.ctx, p.city, m.to) }); return;
         case 'travel': return await this.onTravel(p, m.to, m.mode);
+        case 'transit': return await this.onTransit(p, m);
+        case 'ride': return await this.onRide(p, m.on);
         case 'chat': if (p.travel) return; return await this.onChat(p, m.text);
         case 'emote': return this.onEmote(p, m.e);
         case 'interact': if (p.travel) throw new AppError(409, 'travelling', 'You are on a journey.'); return await this.onInteract(p, m.zone, m.item);
@@ -440,9 +446,45 @@ export class Gateway {
     await this.refresh(p);
   }
 
+  /** City bus or taxi to a point in the same city: pay by distance, a short journey, then you are dropped at the door. */
+  private async onTransit(p: Player, m: { mode: 'bus' | 'car'; x: number; z: number; name?: string }) {
+    if (p.travel) throw new AppError(409, 'already_travelling', 'You are already on a journey.');
+    const rt = this.rt(p.city);
+    const b = rt.world.bounds;
+    if (m.x < b.minX + 1 || m.x > b.maxX - 1 || m.z < b.minZ + 1 || m.z > b.maxZ - 1 || isBlocked(m.x, m.z, rt.colliders, (g) => p.access.has(g), b)) throw new AppError(400, 'bad_destination', 'The bus cannot go there.');
+    const meters = Math.hypot(m.x - p.x, m.z - p.z);
+    const r = await localTravel.chargeTransit(this.ctx, p.id, m.mode, meters, randomUUID());
+    p.ride = null; p.input = { dx: 0, dz: 0, run: false }; p.moving = false;
+    const area = districtAt(rt.world, m.x, m.z) ?? p.city;
+    p.travel = { to: area, until: this.ctx.now().getTime() + r.seconds * 1000, mode: m.mode, point: { x: m.x, z: m.z } };
+    const name = m.name ?? this.ctx.data.cityById.get(area)?.name;
+    this.send(p, { t: 'travel', to: area, toName: name, mode: m.mode === 'car' ? 'car' : 'bus', arrivesAt: p.travel.until, seconds: r.seconds, local: true });
+    this.toast(p, 'ok', `${this.money(p, r.fare)} paid. Heading to ${name}.`);
+    await this.refresh(p);
+  }
+
+  /** Rent a bike: a fee, then a speed boost for a few minutes (the server applies it, so it cannot be faked). */
+  private async onRide(p: Player, on: boolean) {
+    if (!on) { if (p.ride) { p.ride = null; this.send(p, { t: 'ride', on: false }); } return; }
+    if (p.travel) throw new AppError(409, 'travelling', 'You are on a journey.');
+    if (p.ride && p.ride.until > this.ctx.now().getTime()) return;     // already riding: no second charge
+    const r = await localTravel.chargeBike(this.ctx, p.id, randomUUID());
+    p.ride = { until: this.ctx.now().getTime() + r.seconds * 1000, mult: r.speedMult };
+    this.send(p, { t: 'ride', on: true, mult: r.speedMult, seconds: r.seconds });
+    this.toast(p, 'ok', `Bike rented for ${this.money(p, r.fee)}. Ride on!`);
+    await this.refresh(p);
+  }
+
   private async arrive(p: Player) {
     const t = p.travel; if (!t) return;
     p.travel = null; // clear first so the tick doesn't fire this twice
+    if (t.point) {   // a bus or taxi inside the city: nothing in the database changes, you just step out at the destination
+      p.x = t.point.x; p.z = t.point.z; p.moving = false; p.dirty = true; p.known.clear();
+      this.setArea(p, t.to);
+      this.send(p, { t: 'arrived', city: p.city, local: true });
+      this.toast(p, 'ok', 'You have arrived.');
+      return;
+    }
     try {
       const city = await travel.completeArrival(this.ctx, p.id);
       if (!city || this.players.get(p.id) !== p) return;
@@ -516,7 +558,8 @@ export class Gateway {
       const rt = this.rt(p.city);
       const input = now - p.lastInputAt > INPUT_STALE_MS ? { dx: 0, dz: 0, run: false } : p.input;
       const before = p.x * 1e3 + p.z;
-      stepPlayer(p, input, dt, rt.colliders, (g) => p.access.has(g), rt.world.bounds);
+      if (p.ride && this.ctx.now().getTime() > p.ride.until) { p.ride = null; this.send(p, { t: 'ride', on: false }); }
+      stepPlayer(p, input, dt, rt.colliders, (g) => p.access.has(g), rt.world.bounds, p.ride?.mult ?? 1);
       if (p.x * 1e3 + p.z !== before) p.dirty = true;
       const d = districtAt(rt.world, p.x, p.z); if (d && d !== p.city) this.setArea(p, d);   // walking across a district border changes the area
       if (p.emote && now > p.emoteUntil) p.emote = null;

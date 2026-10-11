@@ -827,5 +827,40 @@
     }
   ],
   "minTravelSeconds": 6,
-  "walkMaxKm": 4
+  "walkMaxKm": 4,
+  "localTransport": {
+    "walk": {
+      "name": "Walk",
+      "icon": "🚶",
+      "metersPerSecond": 4
+    },
+    "bike": {
+      "name": "Bike",
+      "icon": "🚴",
+      "fee": 3,
+      "speedMult": 2.2,
+      "seconds": 240,
+      "minMeters": 40
+    },
+    "bus": {
+      "name": "City bus",
+      "icon": "🚌",
+      "base": 2,
+      "perMeter": 0.012,
+      "secPerMeter": 0.035,
+      "minSeconds": 4,
+      "maxSeconds": 45,
+      "minMeters": 25
+    },
+    "car": {
+      "name": "Taxi",
+      "icon": "🚕",
+      "base": 8,
+      "perMeter": 0.045,
+      "secPerMeter": 0.018,
+      "minSeconds": 4,
+      "maxSeconds": 30,
+      "minMeters": 25
+    }
+  }
 }

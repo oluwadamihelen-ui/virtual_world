@@ -118,6 +118,7 @@ function onServer(m) {
     case 'pong': if (G) G.ping = Math.round(performance.now() - m.c); return;
     case 'app': { const f = G?.pending.get(m.rid); if (f) { G.pending.delete(m.rid); f(m); } return; }
     case 'notify': return G && onNotify(m);
+    case 'ride': if (G) G.ride = m.on ? { mult: m.mult, until: performance.now() + m.seconds * 1000 } : null; return;
     case 'area': if (G) onArea(m); return;
     case 'arrived': if (G) { G.traveling = false; G.hideTravel?.(); G.hideTravel = null; G.auto = null; } return;
     case 'world': if (G) { G.w.world = m.world; setWorld(m.world, true); paintLots(); syncFurniture(); } return;
@@ -137,7 +138,7 @@ function enterWorld(w) {
   U.setCurrency(w.currency);
   const me = { x: w.you.x, z: w.you.z, ry: 0, moving: false, av: createAvatar(w.you.appearance, { me: true }), tag: makeTag(w.you.name, { me: true }), name: w.you.name };
   scene.add(me.av.group);
-  G = { w, me, ents: new Map(), summary: w.summary, door: w.door, city: w.city, currency: w.currency, access: gatesFor(w.summary, w.city.id), catalog: new Map((w.furnitureCatalog ?? []).map((c) => [c.id, c])), jobs: w.jobs ?? [],
+  G = { w, me, ents: new Map(), summary: w.summary, door: w.door, city: w.city, currency: w.currency, access: gatesFor(w.summary, w.city.id), catalog: new Map((w.furnitureCatalog ?? []).map((c) => [c.id, c])), jobs: w.jobs ?? [], local: w.localTransport,
     yaw: -0.75, pitch: 0.8, dist: 19, camT: new THREE.Vector3(me.x, 1, me.z), seq: 0, lastSent: { dx: 0, dz: 0, run: false, t: 0 }, ctxKey: null, shop: {},
     pending: new Map(), phone: w.phone ?? { adult: false, unread: 0 }, auto: null, nextTaskAt: 0, ping: 0, online: 1, minSeconds: 20, achievements: w.achievements };
   const gj = G.jobs.find((j) => j.jobId === 'job_grocery_assistant'); if (gj) G.minSeconds = gj.minSecondsPerTask;
@@ -274,7 +275,10 @@ const upPtr = (e) => {
     const r = canvas.getBoundingClientRect();
     const lot = S.w3d.pickLot(((e.clientX - r.left) / r.width) * 2 - 1, -(((e.clientY - r.top) / r.height) * 2 - 1), camera);
     const lo = G.w.world.lots?.find((l) => l.id === lot); const inside = lo && Math.abs(G.me.x - lo.cx) < lo.sx / 2 && Math.abs(G.me.z - lo.cz) < lo.sz / 2;
+    const nx = ((e.clientX - r.left) / r.width) * 2 - 1, ny = -(((e.clientY - r.top) / r.height) * 2 - 1);
+    const label = G.furn ? null : S.w3d.pickLabel(nx, ny, camera);
     if (G.furn) onFurnTap(e, r);
+    else if (label) openPlaceSheet(label);
     else if (lot && !inside) openEstateSheet(lot);
   }
 };
@@ -289,7 +293,7 @@ function wantedDirection() {
   if (joy.active) { f += -joy.dz; r += joy.dx; }
   if (!f && !r && G.auto?.length) {
     const t = G.auto[0], dx = t.x - G.me.x, dz = t.z - G.me.z, d = Math.hypot(dx, dz);
-    if (d < 0.7) { G.auto.shift(); return { dx: 0, dz: 0, run: false }; }
+    if (d < 0.7) { G.auto.shift(); if (!G.auto.length && G.ride) S.conn.send({ t: 'ride', on: false }); return { dx: 0, dz: 0, run: false }; }
     return { dx: dx / d, dz: dz / d, run: d > 6 };
   }
   const l = Math.hypot(f, r); if (l > 1) { f /= l; r /= l; }
@@ -410,7 +414,7 @@ function openMap(preselect) {
   const placesHtml = (areaId) => {
     const list = geo.places?.[areaId] ?? []; if (!list.length) return '';
     const same = metroOfCity(areaId) === metroOfCity(G.city.id);
-    return `<h4 style="margin:10px 0 6px">Places and businesses</h4><div class="list places">${list.map((p) => `<div class="li"><div><b>${p.emoji} ${U.esc(p.name)}</b><small>${p.type[0].toUpperCase() + p.type.slice(1)}${p.business ? ' · business' : ''}</small></div>${same ? `<button class="btn small ghost" data-walkplace="${areaId}|${p.id}">Walk</button>` : ''}</div>`).join('')}</div>`;
+    return `<h4 style="margin:10px 0 6px">Places and businesses</h4><div class="list places">${list.map((p) => `<div class="li"><div><b>${p.emoji} ${U.esc(p.name)}</b><small>${p.type[0].toUpperCase() + p.type.slice(1)}${p.business ? ' · business' : ''}</small></div>${same ? `<button class="btn small ghost" data-walkplace="${areaId}|${p.id}">Go</button>` : ''}</div>`).join('')}</div>`;
   };
   const draw = () => {
     const here = G.city.id, sel = geo.cities.find((c) => c.id === st.sel);
@@ -440,7 +444,7 @@ function openMap(preselect) {
       el.querySelectorAll('.city').forEach((g) => g.onclick = () => { st.sel = g.dataset.city; st.armed = null; draw(); if (st.sel !== here && !st.quotes.has(st.sel)) S.conn.send({ t: 'quote', to: st.sel }); });
       el.querySelectorAll('[data-metro]').forEach((b) => b.onclick = () => { st.scope = `metro:${b.dataset.metro}`; draw(); });
       el.querySelectorAll('[data-estate]').forEach((b) => b.onclick = () => { U.closePanel(); openEstateOverview(); });
-      el.querySelectorAll('[data-walkplace]').forEach((b) => b.onclick = () => { const [a, id] = b.dataset.walkplace.split('|'); walkToPlace(a, id); });
+      el.querySelectorAll('[data-walkplace]').forEach((b) => b.onclick = () => { const [a, id] = b.dataset.walkplace.split('|'); const pl = S.geo.places[a]?.find((q) => q.id === id); if (pl) openPlaceSheet({ kind: 'poi', id: pl.id, area: a, name: pl.name, emoji: pl.emoji, type: pl.type, business: pl.business, x: pl.x, z: pl.z, face: pl.face, sz: pl.sz }); });
       el.querySelectorAll('[data-walkarea]').forEach((b) => b.onclick = () => walkToArea(b.dataset.walkarea));
       el.querySelectorAll('[data-walk]').forEach((b) => b.onclick = () => walkTo(b.dataset.walk));
       el.querySelectorAll('[data-mode]').forEach((b) => b.onclick = () => {
@@ -465,7 +469,8 @@ function frame(t) {
   if (G && S.mode === 'game') {
     const hasGate = (g) => G.access.has(g);
     const dir = G.cur ?? { dx: 0, dz: 0, run: false };
-    stepPlayer(G.me, dir, dt, S.colliders, hasGate, S.world.bounds);
+    if (G.ride && performance.now() > G.ride.until) G.ride = null;
+    stepPlayer(G.me, dir, dt, S.colliders, hasGate, S.world.bounds, G.ride?.mult ?? 1);
     G.me.av.group.position.set(G.me.x, 0, G.me.z);
     let dy = G.me.ry - G.me.av.group.rotation.y; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); G.me.av.group.rotation.y += dy * Math.min(1, dt * 14);
     G.me.av.update(dt, G.me.moving);
@@ -493,6 +498,7 @@ function frame(t) {
 /** Diagnostics for testers: open the browser console and type mvwStats(). */
 let fpsN = 0, fpsT = performance.now(), fps = 0;
 window.mvwStats = () => ({ fps, drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures });
+window.mvwLabels = () => S.w3d.labelList().map((l) => { const v = l.pos.clone().project(camera); return { name: l.name, x: Math.round((v.x * 0.5 + 0.5) * innerWidth), y: Math.round((-v.y * 0.5 + 0.5) * innerHeight), front: v.z < 1 }; });
 const v3 = new THREE.Vector3(); let hudT = 0;
 function project(x, y, z) { v3.set(x, y, z).project(camera); return v3.z > 1 ? null : { x: (v3.x * 0.5 + 0.5) * innerWidth, y: (-v3.y * 0.5 + 0.5) * innerHeight }; }
 function placeTag(tag, x, z, show) {
@@ -703,4 +709,48 @@ async function onFurnTap(e, r) {
     const fid = S.w3d.pickFurniture(nx, ny, camera);
     G.furn.picked = fid; drawFurnBar();
   }
+}
+
+
+// ============================================================================ place sheet: tap a floating label, choose how to get there
+const TYPE_BLURB = {
+  hospital: 'A public hospital. Treatment is not part of the game yet.', clinic: 'A neighbourhood clinic. Not open for visits yet.', police: 'The local police station.', church: 'A place of worship.', mosque: 'A place of worship.',
+  school: 'A local school.', university: 'A university campus.', stadium: 'The city stadium. Matches are not simulated yet.', park: 'Open green space. Walk right in.', beach: 'An open beach. Walk right in.', golf: 'A golf course. Walk right in.',
+  hotel: 'A hotel. Rooms to visit are not in the game yet.', cinema: 'A cinema. Films are not in the game yet.', library: 'The city library.', bank: 'A bank branch. Use the Vault app on your phone for banking.', gym: 'A gym. Training is not in the game yet.',
+  salon: 'A hair salon. Not open for visits yet.', garage: 'A car garage.', office: 'An office tower.', studio: 'A radio studio.', dock: 'A harbour and boat dock.', museum: 'A museum.', gov: 'A government building.', tech: 'A technology hub.',
+};
+function localQuoteClient(m) {
+  const t = G.local, d = Math.round(m);
+  const out = [{ mode: 'walk', name: t.walk.name, icon: t.walk.icon, fare: 0, seconds: Math.round(d / t.walk.metersPerSecond), ok: true }];
+  out.push({ mode: 'bike', name: t.bike.name, icon: t.bike.icon, fare: t.bike.fee, seconds: Math.round(d / (t.walk.metersPerSecond * t.bike.speedMult)), ok: d >= t.bike.minMeters, why: 'Too close: just walk' });
+  for (const k of ['bus', 'car']) { const x = t[k]; out.push({ mode: k, name: x.name, icon: x.icon, fare: Math.max(1, Math.round(x.base + x.perMeter * d)), seconds: Math.round(Math.min(x.maxSeconds, Math.max(x.minSeconds, d * x.secPerMeter))), ok: d >= x.minMeters, why: 'Too close: just walk' }); }
+  return out;
+}
+const fmtSecs = (s) => (s < 90 ? `about ${s}s` : `about ${Math.round(s / 60)} min`);
+/** place = {kind:'poi'|'building', name, emoji, area, x, z, face?, sz?, cx?, cz?, type?, business?} (the object a floating label carries) */
+function openPlaceSheet(place) {
+  let tx, tz;
+  if (place.kind === 'poi') { tx = place.x; tz = place.z + (place.face === '+z' ? 1 : -1) * (place.sz / 2 + 1.6); }
+  else { const rz = rowRoad(place.cz); tx = place.cx; tz = place.cz + (rz > place.cz ? 1 : -1) * (place.sz / 2 + 1.6); }
+  const meters = Math.hypot(G.me.x - tx, G.me.z - tz);
+  const areaName = S.geo.cities.find((c) => c.id === place.area)?.name ?? '';
+  const zone = S.world.zones.find((z) => (z.poi && z.poi === place.id) || (place.kind === 'building' && z.building === place.id && z.kind !== 'door'));
+  const sells = zone?.kind === 'shop' && zone.items ? `<p><b>Sells:</b> ${zone.items.map((i) => U.esc(i.label)).join(', ')}. Walk up to the door to buy.</p>` : '';
+  const type = place.kind === 'poi' ? place.type : place.id.split(':')[1];
+  const blurb = place.kind === 'building' && place.sign ? 'Coming soon.' : sells ? '' : TYPE_BLURB[type] ?? '';
+  const home = place.kind === 'building' && place.id.endsWith(':apt');
+  const opts = localQuoteClient(meters);
+  const row = (o) => `<button class="opt" data-go="${o.mode}" ${o.ok && G.summary.balance >= o.fare ? '' : 'disabled'}><span class="em">${o.icon}</span><span><b>${U.esc(o.name)}</b><small>${o.ok ? fmtSecs(o.seconds) : o.why}${o.mode === 'bike' ? ' · faster than walking, for a few minutes' : ''}</small></span><span class="pr">${o.fare ? U.fmt(o.fare) : 'Free'}${o.ok && G.summary.balance < o.fare ? '<small style="display:block;color:var(--mut)">Not enough money</small>' : ''}</span></button>`;
+  U.openPanel(`${place.emoji} ${U.esc(place.name)}`, `<div class="hd"><p style="margin:0">${U.esc(areaName)} · ${Math.round(meters)} m from you${place.business ? ' · business' : ''}</p>${blurb ? `<p>${U.esc(blurb)}</p>` : ''}${sells}</div>
+    <h4 style="margin:12px 0 6px">How do you want to get there?</h4><div class="list">${opts.map(row).join('')}</div>
+    ${home ? '<p style="margin-top:10px"><button class="btn small gold" id="plHomes">🏠 Rooms and apartments here</button></p>' : ''}
+    <p class="hint" style="margin-top:8px">Bus and taxi take you to the door. Walking and cycling follow the streets; press any movement key to take over.</p>`, (el) => {
+    el.querySelectorAll('[data-go]').forEach((b) => b.onclick = () => {
+      const m = b.dataset.go;
+      if (m === 'walk') { routeTo(tx, tz); U.toast('info', `Walking to ${place.name}…`); }
+      else if (m === 'bike') { S.conn.send({ t: 'ride', on: true }); routeTo(tx, tz); }
+      else { S.conn.send({ t: 'transit', mode: m, x: tx, z: tz, name: place.name }); U.closePanel(); }
+    });
+    el.querySelector('#plHomes')?.addEventListener('click', () => openEstateSheet(`${place.area}:apt`));
+  }, { width: '520px' });
 }

@@ -11,6 +11,6 @@ export const WALL: number;
 export function buildingBoxes(b: any): { walls: Box[]; gate: Box | null; frontZ?: number };
 export function buildColliders(world: any): Colliders;
 export function isBlocked(x: number, z: number, c: Colliders, hasGate: ((g: string) => boolean) | undefined, bounds: Bounds): boolean;
-export function stepPlayer<T extends Body>(p: T, input: MoveInput, dt: number, c: Colliders, hasGate: ((g: string) => boolean) | undefined, bounds: Bounds): T;
+export function stepPlayer<T extends Body>(p: T, input: MoveInput, dt: number, c: Colliders, hasGate: ((g: string) => boolean) | undefined, bounds: Bounds, speedMult?: number): T;
 export function dist2(ax: number, az: number, bx: number, bz: number): number;
 export function gameClock(nowMs: number): { hour: number; dayIndex: number };
