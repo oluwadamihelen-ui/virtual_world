@@ -39,7 +39,8 @@ const Body = {
     unmatch: z.object({ id: z.string().uuid() }),
   },
   estate: {
-    list: z.object({}),
+    list: z.object({ city: z.string().max(40).optional() }),
+    metro: z.object({}),
     overview: z.object({}),
     rent: z.object({ id: z.string().max(80), key: Key }),
     buy: z.object({ id: z.string().max(80), key: Key }),
@@ -109,12 +110,17 @@ export async function handleApp(ctx: AppContext, who: AppCaller, app: string, ac
       return { data: r, notify: r.matched ? [{ to: b.id, msg: { t: 'notify', kind: 'match', from: who.name } }] : [] };
     }
     case 'love.unmatch': await dating.unmatch(ctx, who.id, b.id); return { data: { ok: true } };
-    case 'estate.list': return { data: await estate.listCity(ctx, who.id, who.city) };
+    case 'estate.list': {
+      const area = b.city ?? who.city;
+      if (ctx.data.cityById.get(area)?.metro !== ctx.data.cityById.get(who.city)?.metro) throw badRequest('wrong_city', 'That area is in another city.');
+      return { data: await estate.listCity(ctx, who.id, area) };
+    }
+    case 'estate.metro': return { data: await estate.listMetro(ctx, who.id, who.city) };
     case 'estate.overview': return { data: { areas: await estate.overview(ctx) } };
     case 'estate.rent': {
       const p = (await ctx.pool.query('SELECT district FROM properties WHERE id=$1', [b.id])).rows[0];
       if (!p) throw badRequest('property_not_found');
-      if (p.district !== who.city) throw badRequest('wrong_city', 'That property is in another city.');
+      if (ctx.data.cityById.get(p.district)?.metro !== ctx.data.cityById.get(who.city)?.metro) throw badRequest('wrong_city', 'That property is in another city.');
       await updateAreaValues(ctx);
       const r = await housing.rent(ctx, who.id, b.id, b.key);
       return { data: r, goHome: !r.replayed };

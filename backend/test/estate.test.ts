@@ -210,13 +210,13 @@ describe('interiors and furniture', () => {
 
   it('houses have walls, a locked door gate for outsiders and an open one for the owner', () => {
     const world = w.ctx.data.worlds.get('lagos')!;
-    const col = buildColliders(world); const b = world.buildings.find((x: any) => x.id === 'house_a');
+    const col = buildColliders(world); const b = world.buildings.find((x: any) => x.id === 'lagos:house_a');
     const door = { x: b.cx, z: b.cz + b.sz / 2 - 0.15 };
     expect(isBlocked(door.x, door.z, col, () => false, world.bounds)).toBe(true);               // stranger: blocked at the door
-    expect(isBlocked(door.x, door.z, col, (g: string) => g === 'house_a', world.bounds)).toBe(false);   // owner's gate opens
-    expect(isBlocked(door.x, door.z, col, (g: string) => g === 'house_b', world.bounds)).toBe(true);    // someone else's key does not
+    expect(isBlocked(door.x, door.z, col, (g: string) => g === 'lagos:house_a', world.bounds)).toBe(false);   // owner's gate opens
+    expect(isBlocked(door.x, door.z, col, (g: string) => g === 'lagos:house_b', world.bounds)).toBe(true);    // someone else's key does not
     expect(isBlocked(b.cx, b.cz, col, () => true, world.bounds)).toBe(false);                   // inside is empty floor
-    expect(world.furniture.filter((f: any) => f.building === 'apt')).toHaveLength(0);           // homes start empty
+    expect(world.furniture.filter((f: any) => f.building === 'lagos:apt')).toHaveLength(0);           // homes start empty
   });
   it('a new home is empty; furniture is bought, placed, kept inside the walls, and returned when you leave', async () => {
     const a = await w.newPlayer('Decorator'); await fund(a, 100000);
@@ -262,11 +262,11 @@ describe('interiors and furniture', () => {
     await estateApp(a, 'build', { id: 'prop_lagos_land_a', key: key() });
     const info: any = (await app(a, 'home', 'info')).data;
     expect(info.home.lotId).toBe('land_a'); expect(info.rect.maxX - info.rect.minX).toBeGreaterThan(4);
-    const spec = builtHouseSpec(w.ctx.data.worlds.get('lagos')!.lots.find((l: any) => l.id === 'land_a'));
+    const spec = builtHouseSpec(w.ctx.data.worlds.get('lagos')!.lots.find((l: any) => l.id === 'lagos:land_a'));
     const world = { ...w.ctx.data.worlds.get('lagos')!, buildings: [...w.ctx.data.worlds.get('lagos')!.buildings, spec.building] };
     const col = buildColliders(world); const front = spec.building.doorSide === '+z' ? spec.building.cz + spec.building.sz / 2 - 0.15 : spec.building.cz - spec.building.sz / 2 + 0.15;
     expect(isBlocked(spec.building.cx, front, col, () => false, world.bounds)).toBe(true);
-    expect(isBlocked(spec.building.cx, front, col, (g: string) => g === 'land_a', world.bounds)).toBe(false);
+    expect(isBlocked(spec.building.cx, front, col, (g: string) => g === 'lagos:land_a', world.bounds)).toBe(false);
   });
   it('a rented room in the apartment block can be furnished too, inside the block', async () => {
     const a = await w.newPlayer('Roomie'); await fund(a, 5000);

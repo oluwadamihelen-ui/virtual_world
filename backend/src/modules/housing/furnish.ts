@@ -16,7 +16,7 @@ export const homeShopId = (cityId: string) => (cityId === 'lagos' ? 'shop_home_s
 /** Interior rectangle (world coordinates) of the building that belongs to a lot, plus its door. */
 export function interiorOf(ctx: AppContext, cityId: string, lotId: string) {
   const world = ctx.data.worlds.get(cityId);
-  const lot = world?.lots?.find((l: any) => l.id === lotId);
+  const lot = world?.lots?.find((l: any) => l.id === `${cityId}:${lotId}`);
   if (!world || !lot) return null;
   const b = lot.kind === 'land' ? builtHouseSpec(lot).building : world.buildings.find((x: any) => x.id === lot.building);
   if (!b) return null;
@@ -53,7 +53,7 @@ export async function place(ctx: AppContext, characterId: string, cityId: string
   if (![x, z, yaw].every(Number.isFinite)) throw badRequest('invalid_position');
   const t = await currentTenancy(ctx.pool, characterId);
   if (!t) throw conflict('no_home', 'You do not live anywhere yet.');
-  if (t.district !== cityId) throw conflict('home_elsewhere', 'Your home is in another city.');
+  if (ctx.data.cityById.get(t.district)?.metro !== ctx.data.cityById.get(cityId)?.metro) throw conflict('home_elsewhere', 'Your home is in another city.');
   const interior = t.lotId ? interiorOf(ctx, t.district, t.lotId) : null;
   if (!interior) throw conflict('no_interior', 'This home cannot be furnished.');
   const f = footprint(def.furniture, yaw), me = { x, z, w: f.w, d: f.d };

@@ -104,7 +104,7 @@ describe('taking a trip', () => {
     const wel = c.last('welcome');
     expect(wel).toMatchObject({ arrived: true, city: { id: 'abuja', name: 'Abuja' }, currency: { code: 'NGN' } });
     expect(wel.world.cityId).toBe('abuja');
-    expect(wel.world.zones.find((z: any) => z.kind === 'door').label).toBe('Wuse Court Apartments');
+    expect(wel.world.zones.find((z: any) => z.kind === 'door' && z.area === 'abuja').label).toBe('Wuse Court Apartments');
     expect((await summary(p)).city).toBe('abuja');
     expect((await summary(p)).travel).toBeNull();
     expect((await w.ctx.pool.query('SELECT count(*)::int n FROM trips')).rows[0].n).toBe(1);
@@ -213,7 +213,7 @@ describe('each city is its own place', () => {
     for (const [id, world] of w.ctx.data.worlds) {
       const col = buildColliders(world);
       expect(isBlocked(world.spawn.x, world.spawn.z, col, () => false, world.bounds), `${id} spawn`).toBe(false);
-      for (const z of world.zones) expect(isBlocked(z.x, z.z, col, (g: string) => g === 'apartment', world.bounds), `${id} zone ${z.id}`).toBe(false);
+      for (const z of world.zones) expect(isBlocked(z.x, z.z, col, () => true, world.bounds), `${id} zone ${z.id}`).toBe(false);
       const shopZone = world.zones.find((z: any) => z.kind === 'shop');
       expect(w.ctx.data.shops.some((s) => s.id === shopZone.shopId), `${id} shop`).toBe(true);
       expect((await w.ctx.pool.query(`SELECT count(*)::int n FROM properties WHERE district=$1 AND type='room'`, [id])).rows[0].n, `${id} rooms`).toBeGreaterThanOrEqual(8);
@@ -234,12 +234,12 @@ describe('each city is its own place', () => {
     await w.ctx.pool.query(`UPDATE characters SET city='accra' WHERE id=$1`, [p.characterId]);
     const c = await join(p);
     expect(c.last('welcome').door.state).toBe('free');
-    const apt = c.last('welcome').world.zones.find((z: any) => z.kind === 'door');
+    const apt = c.last('welcome').world.zones.find((z: any) => z.kind === 'door' && z.area === 'accra');
     me(p).x = apt.x; me(p).z = apt.z;
     c.send({ t: 'interact', zone: apt.id });
     await c.until(() => c.of('toast').some((m) => /rented/.test(m.text)));
     expect(c.of('toast').find((m) => /rented/.test(m.text)).text).toMatch(/GH₵/);   // priced in cedis
-    const shopZone = c.last('welcome').world.zones.find((z: any) => z.kind === 'shop');
+    const shopZone = c.last('welcome').world.zones.find((z: any) => z.kind === 'shop' && z.area === 'accra');
     me(p).x = shopZone.x; me(p).z = shopZone.z;
     await new Promise((r) => setTimeout(r, 300));
     c.send({ t: 'interact', zone: shopZone.id, item: 'sandwich' });
@@ -247,12 +247,50 @@ describe('each city is its own place', () => {
     expect(c.of('toast').find((m) => /Bought/.test(m.text)).text).toMatch(/GH₵\d+\.\d\d/);
     expect((await w.ctx.pool.query(`SELECT count(*)::int n FROM ledger_transactions WHERE type='shop_purchase'`)).rows[0].n).toBe(1);
     // go back to Lagos: the Accra tenancy is not a Lagos door
-    await w.ctx.pool.query(`UPDATE characters SET city='lagos' WHERE id=$1`, [p.characterId]);
     c.close(); await new Promise((r) => setTimeout(r, 200));
+    await w.ctx.pool.query(`UPDATE characters SET city='lagos', pos_rev=1 WHERE id=$1`, [p.characterId]); await new Promise((r) => setTimeout(r, 200));
     const c2 = await join(p);
     expect(c2.last('welcome').door.state).toBe('away');
     c2.send({ t: 'home' });
     await c2.until(() => c2.of('toast').some((m) => /home is in Accra/.test(m.text)));
     c2.close();
+  });
+});
+
+describe('a metro is one continuous world', () => {
+  it('Lagos has six districts you can walk between: roads and bridges connect them, water blocks, and the area follows your feet', async () => {
+    const world = w.ctx.data.worlds.get('lagos')!;
+    expect(world.districts.map((d: any) => d.id).sort()).toEqual(['ikeja', 'ikoyi', 'lagos', 'lekki', 'surulere', 'victoriaisland']);
+    expect(world.pois.length).toBeGreaterThanOrEqual(30);
+    const col = buildColliders(world);
+    // water blocks everywhere except on the bridges
+    const lagoon = world.water[0]; const zMid = (lagoon.minZ + lagoon.maxZ) / 2;
+    expect(isBlocked(world.avenueX[0] + 20, zMid, col, () => true, world.bounds)).toBe(true);
+    expect(isBlocked(world.avenueX[0], zMid, col, () => true, world.bounds)).toBe(false);
+    // every district spawn is on solid ground and every area is reachable along its street
+    for (const d of world.districts) expect(isBlocked(d.spawn.x, d.spawn.z, col, () => true, world.bounds), `${d.id} spawn`).toBe(false);
+    // points of interest are solid buildings except open ground (parks, beaches)
+    const b = world.pois.find((q: any) => !q.walk)!; expect(isBlocked(b.x, b.z, col, () => true, world.bounds)).toBe(true);
+    // no two areas overlap, no landmark sits inside a district
+    for (const p of world.pois) for (const d of world.districts) expect(p.x + p.sx / 2 < d.bounds.minX || p.x - p.sx / 2 > d.bounds.maxX || p.z + p.sz / 2 < d.bounds.minZ || p.z - p.sz / 2 > d.bounds.maxZ, `${p.name} in ${d.id}`).toBe(true);
+  });
+  it('walking from one area into another changes your area, prices and place name; vehicles teleport within the metro', async () => {
+    const p = await w.newPlayer('Wanderer'); const c = await join(p);
+    const world = w.ctx.data.worlds.get('lagos')!;
+    const lekki = world.districts.find((d: any) => d.id === 'lekki');
+    me(p).x = lekki.spawn.x; me(p).z = lekki.spawn.z; gw.step(0.05);
+    await c.until(() => c.of('area').length > 0);
+    expect(c.last('area').city.id).toBe('lekki'); expect(c.last('area').currency.code).toBe('NGN');
+    expect(me(p).city).toBe('lekki');
+    await new Promise((r) => setTimeout(r, 300));
+    expect((await w.ctx.pool.query('SELECT city FROM characters WHERE id=$1', [p.characterId])).rows[0].city).toBe('lagos');   // saved on the next autosave, not every step
+    await give(p, 500);
+    c.send({ t: 'travel', to: 'ikeja', mode: 'car' });
+    await c.until(() => c.of('travel').length > 0);
+    await finishTrip(p);
+    await c.until(() => c.of('arrived').length > 0);
+    expect(me(p).city).toBe('ikeja'); expect(c.of('welcome').length).toBe(1);   // no world reload inside the same metro
+    const ik = world.districts.find((d: any) => d.id === 'ikeja');
+    expect(Math.hypot(me(p).x - ik.spawn.x, me(p).z - ik.spawn.z)).toBeLessThan(3);
   });
 });

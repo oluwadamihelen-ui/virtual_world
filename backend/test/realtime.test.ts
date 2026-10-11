@@ -51,7 +51,7 @@ describe('connection & identity', () => {
     const wel = c.last('welcome');
     expect(wel.you).toMatchObject({ id: p.characterId, name: 'Walker One' });
     expect(wel.summary.balance).toBe(2000);
-    expect(wel.world.zones.map((z: any) => z.id)).toContain('apt_door');
+    expect(wel.world.zones.map((z: any) => z.id)).toContain('lagos:apt_door');
     expect(wel.door.state).toBe('free');
     c.close();
   });
@@ -125,7 +125,7 @@ describe('authoritative movement', () => {
     const tenant = await w.newPlayer('Tenant Tim'); const other = await w.newPlayer('Other Olly');
     const ct = await join(tenant); const co = await join(other);
     me(tenant).x = -8; me(tenant).z = -7;
-    ct.send({ t: 'interact', zone: 'apt_door' });
+    ct.send({ t: 'interact', zone: 'lagos:apt_door' });
     await ct.until(() => ct.of('toast').some((m) => /rented/.test(m.text)));
     expect((await summary(tenant)).tenancy).not.toBeNull();
     expect((await summary(tenant)).balance).toBe(1500);
@@ -142,18 +142,18 @@ describe('authoritative movement', () => {
 describe('server-validated interactions', () => {
   it('refuses to trade from far away; sells at the counter; the backend charges the right price', async () => {
     const p = await w.newPlayer(); const c = await join(p);
-    c.send({ t: 'interact', zone: 'grocery_counter', item: 'sandwich' });
+    c.send({ t: 'interact', zone: 'lagos:grocery_counter', item: 'sandwich' });
     await c.until(() => c.of('toast').length > 0);
     expect(c.last('toast')).toMatchObject({ kind: 'error' });
     expect((await summary(p)).balance).toBe(2000);
     me(p).x = 10; me(p).z = 14.9;
     await new Promise((r) => setTimeout(r, 300));              // the server throttles interactions to one per 250 ms
-    c.send({ t: 'interact', zone: 'grocery_counter', item: 'sandwich' });
+    c.send({ t: 'interact', zone: 'lagos:grocery_counter', item: 'sandwich' });
     await c.until(() => c.of('summary').length > 0);
     expect(c.last('summary').summary.balance).toBe(1975);
     expect(c.last('summary').summary.inventory).toEqual([{ itemId: 'sandwich', quantity: 1 }]);
     await new Promise((r) => setTimeout(r, 300));
-    c.send({ t: 'interact', zone: 'grocery_counter', item: 'diamond' }); // not on the menu
+    c.send({ t: 'interact', zone: 'lagos:grocery_counter', item: 'diamond' }); // not on the menu
     await c.until(() => c.of('toast').some((m) => /sell/.test(m.text)));
     c.close();
   });
@@ -161,11 +161,11 @@ describe('server-validated interactions', () => {
   it('runs a whole shift through the work station and pays the wage; pacing is still enforced by the backend', async () => {
     const p = await w.newPlayer(); const c = await join(p);
     me(p).x = 15.2; me(p).z = 14.9;
-    const act = async () => { const n = c.of('summary').length; c.send({ t: 'interact', zone: 'grocery_work' }); await c.until(() => c.of('summary').length > n); };
+    const act = async () => { const n = c.of('summary').length; c.send({ t: 'interact', zone: 'lagos:grocery_work' }); await c.until(() => c.of('summary').length > n); };
     await act();                                   // start
     expect(c.last('summary').summary.activeShift).not.toBeNull();
     await new Promise((r) => setTimeout(r, 300));
-    c.send({ t: 'interact', zone: 'grocery_work' });
+    c.send({ t: 'interact', zone: 'lagos:grocery_work' });
     await c.until(() => c.of('toast').some((m) => m.kind === 'error' && /remaining|yet/i.test(m.text)));  // too fast
     for (let i = 0; i < 5; i++) {                  // use the injected clock to jump 21s between tasks
       w.clock.t = new Date(w.clock.t.getTime() + 21_000); await new Promise((r) => setTimeout(r, 300)); await act();
@@ -176,7 +176,7 @@ describe('server-validated interactions', () => {
 
   it('the door interaction needs you to be at the door', async () => {
     const p = await w.newPlayer(); const c = await join(p);
-    c.send({ t: 'interact', zone: 'apt_door' });
+    c.send({ t: 'interact', zone: 'lagos:apt_door' });
     await c.until(() => c.of('toast').length > 0);
     expect(c.last('toast').kind).toBe('error');
     expect((await summary(p)).tenancy).toBeNull();
@@ -187,7 +187,7 @@ describe('server-validated interactions', () => {
     const p = await w.newPlayer(); const c = await join(p);
     me(p).x = 10; me(p).z = 14.9;
     await w.ctx.pool.query(`UPDATE accounts SET status='suspended', suspended_until=$2 WHERE id=$1`, [p.accountId, new Date(w.clock.t.getTime() + 3600_000)]);
-    c.send({ t: 'interact', zone: 'grocery_counter', item: 'sandwich' });
+    c.send({ t: 'interact', zone: 'lagos:grocery_counter', item: 'sandwich' });
     await c.until(() => c.of('toast').length > 0);
     expect(c.last('toast').kind).toBe('error');
     expect((await summary(p)).balance).toBe(2000);

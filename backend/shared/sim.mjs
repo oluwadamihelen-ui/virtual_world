@@ -37,6 +37,8 @@ export function buildColliders(world) {
     else if (gate) { /* open doorway: nothing to add */ }
   }
   for (const f of world.furniture) boxes.push(box(f.x, f.z, f.sx, f.sz));
+  for (const q of world.blockers ?? []) boxes.push(q);                                   // water between districts
+  for (const p of world.pois ?? []) if (!p.walk) boxes.push(box(p.x, p.z, p.sx, p.sz));  // landmark and business buildings
   for (const p of world.props) {
     if (p.type === 'tree') boxes.push(box(p.x, p.z, 0.7, 0.7));
     else if (p.type === 'lamp') boxes.push(box(p.x, p.z, 0.4, 0.4));

@@ -1,0 +1,1051 @@
+{
+ "gap": 44,
+ "margin": 36,
+ "metros": {
+  "lagos": {
+   "cols": 3,
+   "order": [
+    "ikeja",
+    "lagos",
+    "surulere",
+    "ikoyi",
+    "victoriaisland",
+    "lekki"
+   ],
+   "water": true,
+   "pois": [
+    {
+     "type": "market",
+     "name": "Grand Bazaar",
+     "district": "lagos"
+    },
+    {
+     "type": "hospital",
+     "name": "General Hospital",
+     "district": "ikeja"
+    },
+    {
+     "type": "police",
+     "name": "Police Station",
+     "district": "surulere"
+    },
+    {
+     "type": "church",
+     "name": "Hope Cathedral",
+     "district": "ikeja"
+    },
+    {
+     "type": "mosque",
+     "name": "Central Mosque",
+     "district": "lagos"
+    },
+    {
+     "type": "stadium",
+     "name": "Surulere Arena",
+     "district": "surulere"
+    },
+    {
+     "type": "university",
+     "name": "Lagoon University",
+     "district": "lagos"
+    },
+    {
+     "type": "hotel",
+     "name": "Marina Towers",
+     "district": "victoriaisland"
+    },
+    {
+     "type": "hotel",
+     "name": "Island Hotel",
+     "district": "ikoyi"
+    },
+    {
+     "type": "golf",
+     "name": "Ikoyi Greens Club",
+     "district": "ikoyi"
+    },
+    {
+     "type": "mall",
+     "name": "Palm Mall",
+     "district": "lekki"
+    },
+    {
+     "type": "beach",
+     "name": "Palm Beach",
+     "district": "lekki"
+    },
+    {
+     "type": "dock",
+     "name": "Boat Cruise",
+     "district": "victoriaisland"
+    },
+    {
+     "type": "park",
+     "name": "Unity Park",
+     "district": "lagos"
+    },
+    {
+     "type": "park",
+     "name": "Canopy Walk",
+     "district": "lekki"
+    },
+    {
+     "type": "restaurant",
+     "name": "Mama Bisi's Kitchen",
+     "district": "lagos"
+    },
+    {
+     "type": "restaurant",
+     "name": "Suya Spot",
+     "district": "surulere"
+    },
+    {
+     "type": "cafe",
+     "name": "Bean There Cafe",
+     "district": "ikoyi"
+    },
+    {
+     "type": "salon",
+     "name": "Glow Salon",
+     "district": "lagos"
+    },
+    {
+     "type": "gym",
+     "name": "Iron House Gym",
+     "district": "lekki"
+    },
+    {
+     "type": "cinema",
+     "name": "Grand Cinema",
+     "district": "ikeja"
+    },
+    {
+     "type": "library",
+     "name": "City Library",
+     "district": "lagos"
+    },
+    {
+     "type": "bank",
+     "name": "Union Trust Bank",
+     "district": "victoriaisland"
+    },
+    {
+     "type": "garage",
+     "name": "Speedy Motors",
+     "district": "ikeja"
+    },
+    {
+     "type": "office",
+     "name": "Harbour Offices",
+     "district": "victoriaisland"
+    },
+    {
+     "type": "studio",
+     "name": "Wave Radio",
+     "district": "ikeja"
+    },
+    {
+     "type": "tech",
+     "name": "Innovation Hub",
+     "district": "lagos"
+    },
+    {
+     "type": "museum",
+     "name": "Heritage Museum",
+     "district": "lagos"
+    },
+    {
+     "type": "school",
+     "name": "Bright Future School",
+     "district": "surulere"
+    },
+    {
+     "type": "church",
+     "name": "Redeemer Chapel",
+     "district": "lekki"
+    },
+    {
+     "type": "mosque",
+     "name": "Lekki Mosque",
+     "district": "lekki"
+    },
+    {
+     "type": "market",
+     "name": "Ikeja Night Market",
+     "district": "ikeja"
+    },
+    {
+     "type": "restaurant",
+     "name": "Rooftop Grill",
+     "district": "ikoyi"
+    },
+    {
+     "type": "cafe",
+     "name": "Lagoon Cafe",
+     "district": "lekki"
+    },
+    {
+     "type": "gym",
+     "name": "Pulse Fitness",
+     "district": "ikoyi"
+    },
+    {
+     "type": "gov",
+     "name": "State House",
+     "district": "ikeja"
+    },
+    {
+     "type": "office",
+     "name": "Eko Business Centre",
+     "district": "victoriaisland"
+    },
+    {
+     "type": "salon",
+     "name": "Crown Barbers",
+     "district": "surulere"
+    },
+    {
+     "type": "clinic",
+     "name": "Family Clinic",
+     "district": "lekki"
+    }
+   ]
+  },
+  "abuja": {
+   "cols": 3,
+   "order": [
+    "maitama",
+    "abuja",
+    "gwarinpa"
+   ],
+   "water": false,
+   "pois": [
+    {
+     "type": "gov",
+     "name": "National Assembly",
+     "district": "abuja"
+    },
+    {
+     "type": "gov",
+     "name": "State House",
+     "district": "maitama"
+    },
+    {
+     "type": "mosque",
+     "name": "National Mosque",
+     "district": "abuja"
+    },
+    {
+     "type": "church",
+     "name": "Ecumenical Centre",
+     "district": "maitama"
+    },
+    {
+     "type": "stadium",
+     "name": "Capital Stadium",
+     "district": "gwarinpa"
+    },
+    {
+     "type": "hospital",
+     "name": "District Hospital",
+     "district": "abuja"
+    },
+    {
+     "type": "university",
+     "name": "Capital University",
+     "district": "gwarinpa"
+    },
+    {
+     "type": "hotel",
+     "name": "Diplomat Hotel",
+     "district": "maitama"
+    },
+    {
+     "type": "mall",
+     "name": "Jabi Lake Mall",
+     "district": "maitama"
+    },
+    {
+     "type": "park",
+     "name": "Millennium Park",
+     "district": "abuja"
+    },
+    {
+     "type": "market",
+     "name": "Wuse Market",
+     "district": "abuja"
+    },
+    {
+     "type": "police",
+     "name": "Police Station",
+     "district": "abuja"
+    },
+    {
+     "type": "bank",
+     "name": "Central Trust Bank",
+     "district": "maitama"
+    },
+    {
+     "type": "restaurant",
+     "name": "Chop House",
+     "district": "gwarinpa"
+    },
+    {
+     "type": "cafe",
+     "name": "Zuma Cafe",
+     "district": "maitama"
+    },
+    {
+     "type": "golf",
+     "name": "Capital Golf Club",
+     "district": "maitama"
+    },
+    {
+     "type": "school",
+     "name": "Estate School",
+     "district": "gwarinpa"
+    },
+    {
+     "type": "gym",
+     "name": "Peak Fitness",
+     "district": "abuja"
+    },
+    {
+     "type": "cinema",
+     "name": "Cine Capital",
+     "district": "maitama"
+    },
+    {
+     "type": "library",
+     "name": "National Library",
+     "district": "abuja"
+    },
+    {
+     "type": "office",
+     "name": "Federal Offices",
+     "district": "abuja"
+    },
+    {
+     "type": "tech",
+     "name": "Innovation Hub",
+     "district": "gwarinpa"
+    },
+    {
+     "type": "museum",
+     "name": "Heritage Museum",
+     "district": "abuja"
+    },
+    {
+     "type": "salon",
+     "name": "Style Lounge",
+     "district": "gwarinpa"
+    },
+    {
+     "type": "garage",
+     "name": "Auto Centre",
+     "district": "gwarinpa"
+    },
+    {
+     "type": "clinic",
+     "name": "Family Clinic",
+     "district": "gwarinpa"
+    }
+   ]
+  },
+  "portharcourt": {
+   "cols": 1,
+   "order": [
+    "portharcourt"
+   ],
+   "water": false,
+   "pois": [
+    {
+     "type": "dock",
+     "name": "Harbour Terminal"
+    },
+    {
+     "type": "market",
+     "name": "Mile One Market"
+    },
+    {
+     "type": "hospital",
+     "name": "Teaching Hospital"
+    },
+    {
+     "type": "church",
+     "name": "Cathedral of Grace"
+    },
+    {
+     "type": "mosque",
+     "name": "Central Mosque"
+    },
+    {
+     "type": "stadium",
+     "name": "Garden City Stadium"
+    },
+    {
+     "type": "university",
+     "name": "Delta University"
+    },
+    {
+     "type": "hotel",
+     "name": "Riverside Hotel"
+    },
+    {
+     "type": "mall",
+     "name": "Garden Mall"
+    },
+    {
+     "type": "park",
+     "name": "Pleasure Park"
+    },
+    {
+     "type": "police",
+     "name": "Police Station"
+    },
+    {
+     "type": "bank",
+     "name": "Harbour Bank"
+    },
+    {
+     "type": "restaurant",
+     "name": "Fish Pepper Soup Place"
+    },
+    {
+     "type": "cafe",
+     "name": "Delta Cafe"
+    },
+    {
+     "type": "gym",
+     "name": "Rivers Fitness"
+    },
+    {
+     "type": "cinema",
+     "name": "Port Cinema"
+    },
+    {
+     "type": "library",
+     "name": "City Library"
+    },
+    {
+     "type": "office",
+     "name": "Oil and Gas Offices"
+    },
+    {
+     "type": "school",
+     "name": "Unity School"
+    },
+    {
+     "type": "garage",
+     "name": "Port Motors"
+    },
+    {
+     "type": "salon",
+     "name": "Glam Studio"
+    },
+    {
+     "type": "gov",
+     "name": "State Secretariat"
+    },
+    {
+     "type": "clinic",
+     "name": "Family Clinic"
+    },
+    {
+     "type": "beach",
+     "name": "River Beach"
+    }
+   ]
+  },
+  "kano": {
+   "cols": 1,
+   "order": [
+    "kano"
+   ],
+   "water": false,
+   "pois": [
+    {
+     "type": "market",
+     "name": "Grand Trade Market"
+    },
+    {
+     "type": "mosque",
+     "name": "Grand Mosque"
+    },
+    {
+     "type": "museum",
+     "name": "Heritage Museum"
+    },
+    {
+     "type": "hospital",
+     "name": "General Hospital"
+    },
+    {
+     "type": "university",
+     "name": "Kano University"
+    },
+    {
+     "type": "stadium",
+     "name": "Sports Complex"
+    },
+    {
+     "type": "hotel",
+     "name": "Trade Hotel"
+    },
+    {
+     "type": "mall",
+     "name": "Central Mall"
+    },
+    {
+     "type": "park",
+     "name": "City Park"
+    },
+    {
+     "type": "police",
+     "name": "Police Station"
+    },
+    {
+     "type": "bank",
+     "name": "Trade Bank"
+    },
+    {
+     "type": "restaurant",
+     "name": "Tuwo Kitchen"
+    },
+    {
+     "type": "cafe",
+     "name": "Dala Cafe"
+    },
+    {
+     "type": "gym",
+     "name": "Strong Gym"
+    },
+    {
+     "type": "cinema",
+     "name": "Arewa Cinema"
+    },
+    {
+     "type": "library",
+     "name": "City Library"
+    },
+    {
+     "type": "office",
+     "name": "Commerce House"
+    },
+    {
+     "type": "school",
+     "name": "Model School"
+    },
+    {
+     "type": "garage",
+     "name": "Auto Market"
+    },
+    {
+     "type": "gov",
+     "name": "State House"
+    },
+    {
+     "type": "church",
+     "name": "Evangel Church"
+    },
+    {
+     "type": "clinic",
+     "name": "Family Clinic"
+    }
+   ]
+  },
+  "accra": {
+   "cols": 2,
+   "order": [
+    "accra",
+    "eastlegon"
+   ],
+   "water": false,
+   "pois": [
+    {
+     "type": "market",
+     "name": "Makola Bazaar",
+     "district": "accra"
+    },
+    {
+     "type": "beach",
+     "name": "Labadi Beach",
+     "district": "accra"
+    },
+    {
+     "type": "stadium",
+     "name": "Independence Arena",
+     "district": "accra"
+    },
+    {
+     "type": "hospital",
+     "name": "Teaching Hospital",
+     "district": "accra"
+    },
+    {
+     "type": "church",
+     "name": "Cathedral",
+     "district": "accra"
+    },
+    {
+     "type": "mosque",
+     "name": "Central Mosque",
+     "district": "accra"
+    },
+    {
+     "type": "university",
+     "name": "Legon University",
+     "district": "eastlegon"
+    },
+    {
+     "type": "hotel",
+     "name": "Gold Coast Hotel",
+     "district": "accra"
+    },
+    {
+     "type": "mall",
+     "name": "Accra Mall",
+     "district": "eastlegon"
+    },
+    {
+     "type": "park",
+     "name": "Independence Park",
+     "district": "accra"
+    },
+    {
+     "type": "police",
+     "name": "Police Station",
+     "district": "accra"
+    },
+    {
+     "type": "bank",
+     "name": "Cedi Bank",
+     "district": "accra"
+    },
+    {
+     "type": "restaurant",
+     "name": "Waakye Corner",
+     "district": "accra"
+    },
+    {
+     "type": "cafe",
+     "name": "Osu Cafe",
+     "district": "accra"
+    },
+    {
+     "type": "gym",
+     "name": "Coast Fitness",
+     "district": "eastlegon"
+    },
+    {
+     "type": "cinema",
+     "name": "Grand Cinema"
+    },
+    {
+     "type": "library",
+     "name": "City Library",
+     "district": "accra"
+    },
+    {
+     "type": "office",
+     "name": "Ridge Offices",
+     "district": "accra"
+    },
+    {
+     "type": "school",
+     "name": "Aburi School",
+     "district": "eastlegon"
+    },
+    {
+     "type": "garage",
+     "name": "Tema Motors",
+     "district": "eastlegon"
+    },
+    {
+     "type": "gov",
+     "name": "Government House",
+     "district": "accra"
+    },
+    {
+     "type": "dock",
+     "name": "Fishing Harbour",
+     "district": "accra"
+    },
+    {
+     "type": "tech",
+     "name": "Innovation Hub",
+     "district": "eastlegon"
+    },
+    {
+     "type": "clinic",
+     "name": "Family Clinic",
+     "district": "eastlegon"
+    }
+   ]
+  },
+  "kumasi": {
+   "cols": 1,
+   "order": [
+    "kumasi"
+   ],
+   "water": false,
+   "pois": [
+    {
+     "type": "market",
+     "name": "Kejetia Bazaar"
+    },
+    {
+     "type": "museum",
+     "name": "Palace Museum"
+    },
+    {
+     "type": "hospital",
+     "name": "Teaching Hospital"
+    },
+    {
+     "type": "church",
+     "name": "Cathedral"
+    },
+    {
+     "type": "mosque",
+     "name": "Central Mosque"
+    },
+    {
+     "type": "stadium",
+     "name": "Kumasi Arena"
+    },
+    {
+     "type": "university",
+     "name": "Science University"
+    },
+    {
+     "type": "hotel",
+     "name": "Ashanti Hotel"
+    },
+    {
+     "type": "mall",
+     "name": "Adum Mall"
+    },
+    {
+     "type": "park",
+     "name": "Fort Park"
+    },
+    {
+     "type": "police",
+     "name": "Police Station"
+    },
+    {
+     "type": "bank",
+     "name": "Heritage Bank"
+    },
+    {
+     "type": "restaurant",
+     "name": "Fufu Kitchen"
+    },
+    {
+     "type": "cafe",
+     "name": "Gold Cafe"
+    },
+    {
+     "type": "gym",
+     "name": "Kente Fitness"
+    },
+    {
+     "type": "cinema",
+     "name": "Grand Cinema"
+    },
+    {
+     "type": "library",
+     "name": "City Library"
+    },
+    {
+     "type": "office",
+     "name": "Regional Offices"
+    },
+    {
+     "type": "school",
+     "name": "Model School"
+    },
+    {
+     "type": "garage",
+     "name": "Auto Centre"
+    },
+    {
+     "type": "gov",
+     "name": "Regional House"
+    },
+    {
+     "type": "clinic",
+     "name": "Family Clinic"
+    }
+   ]
+  },
+  "nairobi": {
+   "cols": 3,
+   "order": [
+    "westlands",
+    "nairobi",
+    "karen"
+   ],
+   "water": false,
+   "pois": [
+    {
+     "type": "park",
+     "name": "National Park Gate",
+     "district": "karen"
+    },
+    {
+     "type": "market",
+     "name": "Maasai Market",
+     "district": "nairobi"
+    },
+    {
+     "type": "stadium",
+     "name": "City Stadium",
+     "district": "nairobi"
+    },
+    {
+     "type": "hospital",
+     "name": "General Hospital",
+     "district": "nairobi"
+    },
+    {
+     "type": "church",
+     "name": "Cathedral",
+     "district": "nairobi"
+    },
+    {
+     "type": "mosque",
+     "name": "Jamia Mosque",
+     "district": "nairobi"
+    },
+    {
+     "type": "university",
+     "name": "Nairobi University",
+     "district": "nairobi"
+    },
+    {
+     "type": "hotel",
+     "name": "Savanna Hotel",
+     "district": "westlands"
+    },
+    {
+     "type": "mall",
+     "name": "Westlands Mall",
+     "district": "westlands"
+    },
+    {
+     "type": "golf",
+     "name": "Karen Golf Club",
+     "district": "karen"
+    },
+    {
+     "type": "police",
+     "name": "Police Station",
+     "district": "nairobi"
+    },
+    {
+     "type": "bank",
+     "name": "Rift Bank",
+     "district": "nairobi"
+    },
+    {
+     "type": "restaurant",
+     "name": "Nyama Choma Grill",
+     "district": "westlands"
+    },
+    {
+     "type": "cafe",
+     "name": "Brew Cafe",
+     "district": "westlands"
+    },
+    {
+     "type": "gym",
+     "name": "Kilimani Fitness",
+     "district": "nairobi"
+    },
+    {
+     "type": "cinema",
+     "name": "Grand Cinema",
+     "district": "westlands"
+    },
+    {
+     "type": "library",
+     "name": "City Library",
+     "district": "nairobi"
+    },
+    {
+     "type": "office",
+     "name": "Upper Hill Offices",
+     "district": "nairobi"
+    },
+    {
+     "type": "school",
+     "name": "Model School",
+     "district": "karen"
+    },
+    {
+     "type": "garage",
+     "name": "Auto Centre",
+     "district": "karen"
+    },
+    {
+     "type": "gov",
+     "name": "County House",
+     "district": "nairobi"
+    },
+    {
+     "type": "museum",
+     "name": "National Museum",
+     "district": "nairobi"
+    },
+    {
+     "type": "tech",
+     "name": "Silicon Savannah Hub",
+     "district": "westlands"
+    },
+    {
+     "type": "clinic",
+     "name": "Family Clinic",
+     "district": "karen"
+    }
+   ]
+  },
+  "london": {
+   "cols": 3,
+   "order": [
+    "camden",
+    "london",
+    "canarywharf"
+   ],
+   "water": false,
+   "pois": [
+    {
+     "type": "market",
+     "name": "Camden Market",
+     "district": "camden"
+    },
+    {
+     "type": "museum",
+     "name": "City Museum",
+     "district": "london"
+    },
+    {
+     "type": "hospital",
+     "name": "General Hospital",
+     "district": "london"
+    },
+    {
+     "type": "church",
+     "name": "Abbey",
+     "district": "london"
+    },
+    {
+     "type": "mosque",
+     "name": "Central Mosque",
+     "district": "london"
+    },
+    {
+     "type": "stadium",
+     "name": "Football Ground",
+     "district": "camden"
+    },
+    {
+     "type": "university",
+     "name": "City University",
+     "district": "london"
+    },
+    {
+     "type": "hotel",
+     "name": "Riverside Hotel",
+     "district": "canarywharf"
+    },
+    {
+     "type": "mall",
+     "name": "Shopping Centre",
+     "district": "canarywharf"
+    },
+    {
+     "type": "park",
+     "name": "Royal Park",
+     "district": "london"
+    },
+    {
+     "type": "police",
+     "name": "Police Station",
+     "district": "london"
+    },
+    {
+     "type": "bank",
+     "name": "High Street Bank",
+     "district": "canarywharf"
+    },
+    {
+     "type": "restaurant",
+     "name": "Fish and Chips Shop",
+     "district": "camden"
+    },
+    {
+     "type": "cafe",
+     "name": "The Tea Room",
+     "district": "london"
+    },
+    {
+     "type": "gym",
+     "name": "City Gym",
+     "district": "canarywharf"
+    },
+    {
+     "type": "cinema",
+     "name": "Picture House",
+     "district": "camden"
+    },
+    {
+     "type": "library",
+     "name": "City Library",
+     "district": "london"
+    },
+    {
+     "type": "office",
+     "name": "Financial Offices",
+     "district": "canarywharf"
+    },
+    {
+     "type": "school",
+     "name": "Primary School",
+     "district": "camden"
+    },
+    {
+     "type": "garage",
+     "name": "Motor Works",
+     "district": "camden"
+    },
+    {
+     "type": "gov",
+     "name": "Town Hall",
+     "district": "london"
+    },
+    {
+     "type": "dock",
+     "name": "River Cruise",
+     "district": "canarywharf"
+    },
+    {
+     "type": "tech",
+     "name": "Tech City Hub",
+     "district": "canarywharf"
+    },
+    {
+     "type": "clinic",
+     "name": "Family Clinic",
+     "district": "camden"
+    },
+    {
+     "type": "pub",
+     "name": "The Crown Pub",
+     "district": "camden"
+    }
+   ]
+  }
+ }
+}

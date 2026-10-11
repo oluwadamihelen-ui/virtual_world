@@ -17,6 +17,7 @@ import * as travel from '../modules/travel/travel.js';
 import { handleApp, phoneInfo } from '../modules/phone/index.js';
 import { currencyOfCity, formatMoney } from '../modules/economy/currency.js';
 import { builtHouseSpec } from '../world/cities.js';
+import { districtAt } from '../world/metro.js';
 import { buildColliders, stepPlayer, dist2, isBlocked, type Colliders } from '../../shared/sim.mjs';
 
 /**
@@ -58,7 +59,7 @@ const Msg = z.discriminatedUnion('t', [
 
 interface Body { x: number; z: number; ry: number; moving: boolean }
 interface Player extends Body {
-  id: string; city: string; travel: { to: string; until: number; mode: string } | null; name: string; appearance: unknown; ws: WebSocket; ip: string;
+  id: string; city: string; metro: string; travel: { to: string; until: number; mode: string } | null; name: string; appearance: unknown; ws: WebSocket; ip: string;
   input: { dx: number; dz: number; run: boolean }; seq: number; lastInputAt: number;
   access: Set<string>; busy: boolean; lastActAt: number; lastEmoteAt: number;
   known: Set<string>; budget: number; budgetAt: number; strikes: number; dirty: boolean; lastSave: number;
@@ -91,7 +92,7 @@ export class Gateway {
   private connsByIp = new Map<string, number>();
 
   constructor(private ctx: AppContext) {
-    for (const [id, world] of ctx.data.worlds) {
+    for (const [id, world] of ctx.data.metroWorlds) {
       const rt: CityRuntime = { id, world, colliders: buildColliders(world), npcs: [], builtLoaded: false };
       world.npcRoutes.forEach((route: { x: number; z: number }[], i: number) => {
         const a = route[0]!;
@@ -105,12 +106,15 @@ export class Gateway {
   }
   /** Back-compat for tests: the start city's NPC list. */
   get npcs(): Npc[] { return this.rt(this.ctx.data.geo.startCity).npcs; }
-  private rt(cityId: string): CityRuntime { return this.cities.get(cityId) ?? this.cities.get(this.ctx.data.geo.startCity)!; }
+  private metroOf(cityId: string) { return this.ctx.data.cityById.get(cityId)?.metro ?? cityId; }
+  /** Runtime (continuous world) for an area id or a metro id. */
+  private rt(cityOrMetro: string): CityRuntime { return this.cities.get(this.metroOf(cityOrMetro)) ?? this.cities.get(this.metroOf(this.ctx.data.geo.startCity))!; }
   private worldOf(p: { city: string }) { return this.rt(p.city).world; }
+  private spawnOf(cityId: string) { const w = this.rt(cityId).world; return (w.districts.find((d: any) => d.id === cityId) ?? w.districts[0]).spawn as { x: number; z: number }; }
 
   /** Homes that players built on land appear as real buildings (with walls, a door and a gate) for everyone in that city. */
-  private addBuilt(cityId: string, lotId: string): boolean {
-    const rt = this.rt(cityId); const lot = (rt.world.lots ?? []).find((l: any) => l.id === lotId && l.kind === 'land');
+  private addBuilt(cityId: string, lotShort: string): boolean {
+    const rt = this.rt(cityId); const lotId = `${cityId}:${lotShort}`; const lot = (rt.world.lots ?? []).find((l: any) => l.id === lotId && l.kind === 'land');
     if (!lot || rt.world.buildings.some((b: any) => b.builtOn === lotId)) return false;
     const { building, zone } = builtHouseSpec(lot);
     rt.world = { ...rt.world, buildings: [...rt.world.buildings, building], zones: [...rt.world.zones, zone] };   // copy: never mutate the shared template
@@ -119,12 +123,12 @@ export class Gateway {
   }
   private async ensureBuilt(cityId: string) {
     const rt = this.rt(cityId); if (rt.builtLoaded) return; rt.builtLoaded = true;
-    const rows = await this.ctx.pool.query(`SELECT lot_id FROM properties WHERE district=$1 AND built`, [cityId]);
-    for (const r of rows.rows) this.addBuilt(cityId, r.lot_id);
+    const rows = await this.ctx.pool.query(`SELECT district, lot_id FROM properties WHERE built AND district = ANY($1)`, [rt.world.districts.map((d: any) => d.id)]);
+    for (const r of rows.rows) this.addBuilt(r.district, r.lot_id);
   }
   private broadcastWorld(cityId: string) {
     const rt = this.rt(cityId);
-    for (const o of this.players.values()) if (o.city === cityId && !o.travel) this.send(o, { t: 'world', world: rt.world });
+    for (const o of this.players.values()) if (o.metro === this.metroOf(cityId) && !o.travel) this.send(o, { t: 'world', world: rt.world });
   }
 
   // ------------------------------------------------------------------ lifecycle
@@ -171,9 +175,10 @@ export class Gateway {
   }
 
   /** Door gate that opens for this tenant/owner: the apartment block shares one gate, every house has its own. */
-  private gateOf(lotId: string | null | undefined) { return !lotId || lotId === 'apt' ? 'apartment' : lotId; }
-  private accessFor(summary: { tenancy: { district: string; lotId?: string | null } | null }, city: string) {
-    return new Set<string>(summary.tenancy && summary.tenancy.district === city ? [this.gateOf(summary.tenancy.lotId)] : []);
+  private gateOf(area: string, lotId: string | null | undefined) { return `${area}:${!lotId || lotId === 'apt' ? 'apartment' : lotId}`; }
+  private accessFor(summary: { tenancy: { district: string; lotId?: string | null } | null }, metroOrCity: string) {
+    const m = this.metroOf(metroOrCity);
+    return new Set<string>(summary.tenancy && this.metroOf(summary.tenancy.district) === m ? [this.gateOf(summary.tenancy.district, summary.tenancy.lotId)] : []);
   }
 
   private async onConnection(ws: WebSocket, id: string, ip: string) {
@@ -188,18 +193,22 @@ export class Gateway {
         await travel.completeArrival(this.ctx, id);
         summary = await characterSummary(this.ctx, id);
       }
-      const city = this.cities.has(summary.city) ? summary.city : this.ctx.data.geo.startCity;
+      const city = this.ctx.data.cityById.has(summary.city) ? summary.city : this.ctx.data.geo.startCity;
+      const metro = this.metroOf(city);
+      await this.ensureBuilt(city);
       const world = this.rt(city).world;
       const access = this.accessFor(summary, city);
-      const saved = !(summary.location.x === 0 && summary.location.z === 0)
+      const spawn = this.spawnOf(city);
+      const saved = summary.location.posRev >= 2 && !(summary.location.x === 0 && summary.location.z === 0)
         && !isBlocked(summary.location.x, summary.location.z, this.rt(city).colliders, (g) => access.has(g), world.bounds);
       const p: Player = {
-        id, city, travel: summary.travel ? { to: summary.travel.to, until: new Date(summary.travel.arrivesAt).getTime(), mode: 'flight' } : null,
+        id, city, metro, travel: summary.travel ? { to: summary.travel.to, until: new Date(summary.travel.arrivesAt).getTime(), mode: 'flight' } : null,
         name: summary.displayName, appearance: summary.appearance, ws, ip,
-        x: saved ? summary.location.x : world.spawn.x, z: saved ? summary.location.z : world.spawn.z, ry: 0, moving: false,
+        x: saved ? summary.location.x : spawn.x, z: saved ? summary.location.z : spawn.z, ry: 0, moving: false,
         input: { dx: 0, dz: 0, run: false }, seq: 0, lastInputAt: Date.now(), access, busy: false, lastActAt: 0, lastEmoteAt: 0,
         known: new Set(), budget: 120, budgetAt: Date.now(), strikes: 0, dirty: false, lastSave: Date.now(), emote: null, emoteUntil: 0,
       };
+      { const d = districtAt(world, p.x, p.z); if (d) p.city = d; }
       this.players.set(id, p);
       this.connsByIp.set(ip, (this.connsByIp.get(ip) ?? 0) + 1);
 
@@ -237,7 +246,7 @@ export class Gateway {
   private async save(p: Player) {
     p.dirty = false; p.lastSave = Date.now();
     if (p.travel) return; // position is meaningless mid-journey
-    await this.ctx.pool.query('UPDATE characters SET district=$2,pos_x=$3,pos_y=0,pos_z=$4 WHERE id=$1 AND travel_to IS NULL', [p.id, p.city, p.x, p.z]);
+    await this.ctx.pool.query('UPDATE characters SET district=$2,city=$2,pos_x=$3,pos_y=0,pos_z=$4,pos_rev=2 WHERE id=$1 AND travel_to IS NULL', [p.id, p.city, p.x, p.z]);
   }
 
   // ------------------------------------------------------------------ messages
@@ -288,7 +297,7 @@ export class Gateway {
   }
 
   private nearby(p: Player, radius: number): Player[] {
-    return [...this.players.values()].filter((o) => o.city === p.city && !o.travel && dist2(p.x, p.z, o.x, o.z) <= radius);
+    return [...this.players.values()].filter((o) => o.metro === p.metro && !o.travel && dist2(p.x, p.z, o.x, o.z) <= radius);
   }
 
   private async onChat(p: Player, text: string) {
@@ -322,17 +331,17 @@ export class Gateway {
 
   private async refresh(p: Player) {
     const summary = await characterSummary(this.ctx, p.id);
-    p.access = this.accessFor(summary, p.city);
+    p.access = this.accessFor(summary, p.metro);
     this.send(p, { t: 'summary', summary, door: await this.doorInfo(p, summary) });
     return summary;
   }
 
-  private async doorInfo(p: Pick<Player, 'city'>, summary: { tenancy: { propertyName: string; district: string; lotId?: string | null } | null }) {
+  private async doorInfo(p: Pick<Player, 'city' | 'metro'>, summary: { tenancy: { propertyName: string; district: string; lotId?: string | null } | null }, area = p.city) {
     if (summary.tenancy) {
-      if (summary.tenancy.district === p.city) return summary.tenancy.lotId && summary.tenancy.lotId !== 'apt' ? { state: 'house', name: summary.tenancy.propertyName } : { state: 'tenant', name: summary.tenancy.propertyName };
+      if (this.metroOf(summary.tenancy.district) === p.metro) return summary.tenancy.lotId && summary.tenancy.lotId !== 'apt' ? { state: 'house', name: summary.tenancy.propertyName } : { state: 'tenant', name: summary.tenancy.propertyName };
       return { state: 'away', name: summary.tenancy.propertyName, city: this.ctx.data.cityById.get(summary.tenancy.district)?.name ?? '' };
     }
-    const free = (await housing.listProperties(this.ctx)).find((x) => x.available && x.type === 'room' && x.district === p.city);
+    const free = (await housing.listProperties(this.ctx)).find((x) => x.available && x.type === 'room' && x.district === area);
     return free ? { state: 'free', propertyId: free.propertyId, name: free.name, rent: free.rentPerPeriod } : { state: 'full' };
   }
 
@@ -344,17 +353,18 @@ export class Gateway {
       const zone = this.zoneFor(p, zoneId);
       if (zone.kind === 'door' && zone.lot && zone.lot !== 'apt') {
         const summary = await characterSummary(this.ctx, p.id);
-        if (summary.tenancy && summary.tenancy.lotId === zone.lot && summary.tenancy.district === p.city) { p.access.add(this.gateOf(zone.lot)); this.toast(p, 'ok', `Welcome home! ${summary.tenancy.propertyName} is unlocked for you.`); }
+        if (summary.tenancy && summary.tenancy.lotId === zone.lot && summary.tenancy.district === zone.area) { p.access.add(this.gateOf(zone.area, zone.lot)); this.toast(p, 'ok', `Welcome home! ${summary.tenancy.propertyName} is unlocked for you.`); }
         else throw new AppError(409, 'locked', 'This house is locked. Tap it to see if it is for sale or rent.');
       } else if (zone.kind === 'door') {
         const summary = await characterSummary(this.ctx, p.id);
         if (summary.tenancy && summary.tenancy.lotId && summary.tenancy.lotId !== 'apt') throw new AppError(409, 'wrong_door', 'Your home is a house, not this building.');
-        if (summary.tenancy) { p.access.add('apartment'); this.toast(p, 'ok', `Welcome home! ${summary.tenancy.propertyName} is unlocked for you.`); }
+        if (summary.tenancy && summary.tenancy.district === zone.area) { p.access.add(this.gateOf(zone.area, 'apt')); this.toast(p, 'ok', `Welcome home! ${summary.tenancy.propertyName} is unlocked for you.`); }
         else {
-          const info = await this.doorInfo(p, summary);
+          if (summary.tenancy) throw new AppError(409, 'tenancy_limit', 'You already have a home. Move out first.');
+          const info = await this.doorInfo(p, summary, zone.area);
           if (info.state !== 'free') throw new AppError(409, 'no_rooms', 'No rooms are free right now.');
           const r = await housing.rent(this.ctx, p.id, info.propertyId!, randomUUID());
-          p.access.add('apartment');
+          p.access.add(this.gateOf(zone.area, 'apt'));
           this.toast(p, 'ok', `You rented ${info.name} for ${this.money(p, r.rentPaid)}. The door is unlocked.`);
         }
       } else if (zone.kind === 'shop') {
@@ -391,18 +401,29 @@ export class Gateway {
   private async onHome(p: Player) {
     const summary = await characterSummary(this.ctx, p.id);
     if (!summary.tenancy) throw new AppError(409, 'no_home', 'You do not rent a home yet. Visit the apartments.');
-    if (summary.tenancy.district !== p.city) {
-      throw new AppError(409, 'home_elsewhere', `Your home is in ${this.ctx.data.cityById.get(summary.tenancy.district)?.name}. Open the map to travel there.`);
+    const area = summary.tenancy.district;
+    if (this.metroOf(area) !== p.metro) {
+      throw new AppError(409, 'home_elsewhere', `Your home is in ${this.ctx.data.cityById.get(area)?.name}. Open the map to travel there.`);
     }
-    await this.ensureBuilt(p.city);
-    const world = this.worldOf(p);
-    const lotId = summary.tenancy.lotId ?? 'apt';
-    const lot = (world.lots ?? []).find((l: any) => l.id === lotId);
-    const b = world.buildings.find((x: any) => x.id === (lot?.kind === 'land' ? `home_${lot.id}` : lot?.building ?? 'apt'));
+    await this.ensureBuilt(area);
+    const world = this.worldOf({ city: area });
+    const lotShort = summary.tenancy.lotId ?? 'apt';
+    const lot = (world.lots ?? []).find((l: any) => l.id === `${area}:${lotShort}`);
+    const b = world.buildings.find((x: any) => x.id === (lot?.kind === 'land' ? `home_${lot.id}` : lot?.building ?? `${area}:apt`));
     if (!b) throw new AppError(409, 'no_interior', 'Your home is not ready yet.');
-    p.access.add(this.gateOf(lotId));
+    p.access.add(this.gateOf(area, lotShort));
     p.x = b.cx; p.z = b.cz + (b.doorSide === '+z' ? 1 : -1) * Math.max(0.8, b.sz / 2 - 1.8); p.moving = false; p.dirty = true;
+    this.setArea(p, area);
     this.toast(p, 'ok', `Welcome home to ${summary.tenancy.propertyName}.`);
+  }
+
+  /** The player crossed into (or was moved to) another area of the same metro: tell the client so the place name and prices follow. */
+  private setArea(p: Player, area: string) {
+    if (p.city === area) return;
+    p.city = area; p.dirty = true;
+    const c = this.ctx.data.cityById.get(area)!;
+    this.send(p, { t: 'area', city: { id: c.id, name: c.name, country: c.country, blurb: c.blurb, metro: c.metro }, currency: currencyOfCity(this.ctx.data, area) });
+    void this.refresh(p).catch(() => {});
   }
 
   // ------------------------------------------------------------------ travel
@@ -423,11 +444,22 @@ export class Gateway {
     try {
       const city = await travel.completeArrival(this.ctx, p.id);
       if (!city || this.players.get(p.id) !== p) return;
-      p.city = this.cities.has(city) ? city : this.ctx.data.geo.startCity;
-      const w = this.worldOf(p);
-      p.x = w.spawn.x; p.z = w.spawn.z; p.known.clear(); p.moving = false; p.dirty = false;
+      const dest = this.ctx.data.cityById.has(city) ? city : this.ctx.data.geo.startCity;
+      const sp = this.spawnOf(dest);
+      if (this.metroOf(dest) === p.metro) {
+        // Same metro (state): the world is already loaded, we just move to the other area.
+        p.x = sp.x; p.z = sp.z; p.moving = false; p.dirty = true;
+        const before = p.city; p.city = before;
+        this.setArea(p, dest);
+        this.toast(p, 'ok', `You arrived in ${this.ctx.data.cityById.get(dest)?.name}.`);
+        await this.refresh(p);
+        this.send(p, { t: 'arrived', city: dest });
+        return;
+      }
+      p.city = dest; p.metro = this.metroOf(dest);
+      p.x = sp.x; p.z = sp.z; p.known.clear(); p.moving = false; p.dirty = false;
       const summary = await characterSummary(this.ctx, p.id);
-      p.access = this.accessFor(summary, p.city);
+      p.access = this.accessFor(summary, p.metro);
       await this.sendWelcome(p, summary, { arrived: true });
       this.toast(p, 'ok', `Welcome to ${this.ctx.data.cityById.get(p.city)?.name}! Prices here are in ${currencyOfCity(this.ctx.data, p.city).name}.`);
     } catch { p.travel = t; /* retry next tick */ }
@@ -448,7 +480,7 @@ export class Gateway {
         if (msg.kind === 'money') void this.refresh(o).catch(() => {});
       }
       if (m.app === 'estate') {
-        if (m.a === 'build' && (r.data as any)?.builtOn && !(r.data as any).replayed && this.addBuilt(p.city, (r.data as any).builtOn)) this.broadcastWorld(p.city);
+        if (m.a === 'build' && (r.data as any)?.builtOn && !(r.data as any).replayed && this.addBuilt((r.data as any).area ?? p.city, (r.data as any).builtOn)) this.broadcastWorld(p.city);
         await this.refresh(p);
         if (r.goHome) await this.onHome(p).catch(() => {});   // move in immediately: walk straight into the new home
       } else if (m.app === 'store' || m.app === 'home') {
@@ -484,6 +516,7 @@ export class Gateway {
       const before = p.x * 1e3 + p.z;
       stepPlayer(p, input, dt, rt.colliders, (g) => p.access.has(g), rt.world.bounds);
       if (p.x * 1e3 + p.z !== before) p.dirty = true;
+      const d = districtAt(rt.world, p.x, p.z); if (d && d !== p.city) this.setArea(p, d);   // walking across a district border changes the area
       if (p.emote && now > p.emoteUntil) p.emote = null;
       if (p.dirty && now - p.lastSave > SAVE_EVERY_MS) void this.save(p).catch(() => {});
     }
@@ -515,7 +548,7 @@ export class Gateway {
     };
     let online = 0;
     for (const o of this.players.values()) {
-      if (o.city !== p.city || o.travel) continue;
+      if (o.metro !== p.metro || o.travel) continue;
       online++; consider(o, false, o.emote);
     }
     for (const n of this.rt(p.city).npcs) consider(n, true, null);

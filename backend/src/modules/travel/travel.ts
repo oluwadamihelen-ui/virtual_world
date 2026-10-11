@@ -81,8 +81,9 @@ async function arriveTx(ctx: AppContext, tx: Tx, characterId: string, now: Date)
       WHERE id=$1 AND travel_to IS NOT NULL AND travel_until <= $2 RETURNING city`, [characterId, now]);
   if (r.rowCount === 0) return null;
   const city = r.rows[0].city as string;
-  const spawn = (ctx.data.worlds.get(city) ?? ctx.data.world).spawn;
-  await tx.query('UPDATE characters SET pos_x=$2, pos_z=$3 WHERE id=$1', [characterId, spawn.x, spawn.z]);
+  const mw = ctx.data.worlds.get(city);
+  const spawn = (mw?.districts.find((d: any) => d.id === city) ?? mw?.districts[0] ?? ctx.data.world).spawn;
+  await tx.query('UPDATE characters SET pos_x=$2, pos_z=$3, pos_rev=2 WHERE id=$1', [characterId, spawn.x, spawn.z]);
   return city;
 }
 

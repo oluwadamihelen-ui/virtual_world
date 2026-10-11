@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { generateWorld, cityShopId } from './world/cities.js';
+import { buildMetroWorld, type MetroFile } from './world/metro.js';
 
 const Economy = z.object({
   currency: z.object({ code: z.string(), name: z.string() }),
@@ -119,6 +120,7 @@ function parseAll(read: (f: string) => unknown) {
   const world = World.parse(read('world.json'));
   const geo = Geo.parse(read('geo.json'));
   const phone = Phone.parse(read('phone.json'));
+  const metroFile = read('metros.json') as MetroFile;
   const estate = Estate.parse(read('estate.json'));
   // Cross-reference validation: catch typos in data at boot rather than at purchase time.
   const itemIds = new Set(items.map((i) => i.id));
@@ -134,14 +136,19 @@ function parseAll(read: (f: string) => unknown) {
   for (const c of geo.cities) if (!countryIds.has(c.country)) throw new Error(`geo.json: city ${c.id} has unknown country ${c.country}`);
   if (!geo.cities.some((c) => c.id === geo.startCity)) throw new Error('geo.json: startCity not found');
   const price = (n: number, idx: number) => Math.max(50, Math.round((n * idx) / 50) * 50);
-  const worlds = new Map<string, any>();
+  const metroWorlds = new Map<string, any>();   // one continuous world per metro (state)
+  const worlds = new Map<string, any>();        // lookup by any area id -> its metro's world
+  for (const metro of new Set(geo.cities.map((c) => c.metro))) {
+    const mw = buildMetroWorld(world, geo.cities as any, metro, metroFile);
+    metroWorlds.set(metro, mw);
+    for (const c of geo.cities) if (c.metro === metro) worlds.set(c.id, mw);
+  }
   const baseShop = shops.find((s) => s.id === 'shop_corner_grocery')!;
   const homeShop = shops.find((s) => s.id === 'shop_home_store')!;
   const allShops = [...shops];
   const allProps = [...properties];
   for (const city of geo.cities) {
     if (city.id !== 'lagos') allShops.push({ ...homeShop, id: `shop_${city.id}_home`, name: 'Home Store', district: city.id, stock: homeShop.stock.map((st) => ({ ...st, price: Math.max(1, Math.round(st.price * city.priceIndex)) })) });
-    worlds.set(city.id, city.id === 'lagos' ? { ...world, cityId: 'lagos', landmark: city.landmark } : { ...generateWorld(world, city), landmark: city.landmark });
     if (city.id === 'lagos') continue;
     allShops.push({ ...baseShop, id: cityShopId(city.id), name: `${city.names?.grocery ?? 'Corner Grocery'}`, district: city.id,
       stock: baseShop.stock.map((st) => ({ ...st, price: Math.max(1, Math.round(st.price * city.priceIndex)) })) });
@@ -162,7 +169,7 @@ function parseAll(read: (f: string) => unknown) {
   }
   const cityById = new Map(geo.cities.map((c) => [c.id, c]));
   const countryById = new Map(geo.countries.map((c) => [c.id, c]));
-  return { economy, items, shops: allShops, properties: allProps, jobs, appearance, businesses, chat, achievements, world, geo, phone, estate, worlds, cityById, countryById, itemIds };
+  return { economy, items, shops: allShops, properties: allProps, jobs, appearance, businesses, chat, achievements, world, geo, phone, estate, worlds, metroWorlds, cityById, countryById, itemIds };
 }
 
 export function loadGameData(dir: string): GameData {
