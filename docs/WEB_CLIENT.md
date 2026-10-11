@@ -20,8 +20,8 @@ The playable game: a 3D stylized city in the browser (Three.js), a real-time gam
 - **Persistence:** position is saved every 15 s while moving and on disconnect; money, home, items, shift state and progress come from the backend as always.
 
 ## WebSocket messages (JSON)
-Client → server: `input{seq,dx,dz,run}` · `chat{text}` · `emote{e}` · `interact{zone,item?}` · `shopinfo{zone}` · `phone{tab}` · `home` · `report{targetId,category,detail?}` · `block/unblock{targetId}` · `ping{c}`
-Server → client: `welcome{you,world,summary,door,jobs,achievements,serverNow}` · `snap{ack,you,ps,spawns,gone,online}` · `chat` · `emote` · `toast{kind,text}` · `summary{summary,door}` · `shopinfo` · `phone{tab,data}` · `pong`
+Client → server: `input{seq,dx,dz,run}` · `chat{text}` · `emote{e}` · `interact{zone,item?}` · `shopinfo{zone}` · `phone{tab}` · `app{rid,app,a,d}` · `quote{to}` · `travel{to,mode}` · `home` · `report{targetId,category,detail?}` · `block/unblock{targetId}` · `ping{c}`
+Server → client: `welcome{you,world,summary,door,jobs,achievements,serverNow}` · `snap{ack,you,ps,spawns,gone,online}` · `chat` · `emote` · `toast{kind,text}` · `summary{summary,door}` · `shopinfo` · `phone{tab,data}` · `app{rid,ok,data|code,message}` · `quote` · `travel` · `notify{kind,...}` · `pong`
 
 ## UI (modelled on the layout idea of your reference screenshots, original artwork)
 Top bar (clock, online count, ping, MVC balance + wallet), goal cards from real achievements, name tags and chat bubbles, location card with chat box, quick-walk chips, emote picker, context card when you stand on an interaction ring, bottom nav (Home, Buy, Map, Phone), Phone (wallet / jobs / goals), live map, "Clean screen" toggle, touch joystick and pinch zoom on phones.
@@ -30,10 +30,17 @@ Top bar (clock, online count, ping, MVC balance + wallet), goal cards from real 
 - 16 automated game-server tests (real WebSockets): ticket-only entry (replay, forgery, wrong origin), speed cap, solid walls, tenant-only door, proximity-validated rent/buy/work, chat range/filter/block/mute, emote range and rate limit, report/block, snapshots and interest management, NPCs, persistence of position, flood and garbage protection, session replacement.
 - Browser checks with a real headless Chromium + WebGL: sign-up, character creator with 3D preview, entering the world, renting (balance 2,000 → 1,500) and walking through the unlocked door, buying (25 and 8 MVC), two players seeing each other with chat bubbles and emotes, day and night, phone and map panels, and a phone-sized touch layout. No JavaScript errors.
 
+## Cities, travel and currency
+Eight cities in four countries (`game-data/geo.json`). Only Lagos is hand-laid; the others are **generated variants of the same neighbourhood** (recoloured, mirrored, renamed, price-scaled). The Map lists every city in the chosen country; tap a city, choose bus / taxi / flight (or a walk list inside your own city), and tap twice to pay. The fare is charged in the ledger, you travel (a few seconds to a minute), then arrive in that city's world. **Your wallet shows the currency of the country you are in**, converted at fixed game rates (1 MVC = ₦100 = GH₵0.8 = KSh8.6 = £0.05); the ledger itself is always MVC. The rates are game values, not real exchange rates.
+
+## Phone apps
+Vault (activity, send money, loans, rates), Chatter (direct messages), Spark (dating, 18+), Odds (play-money betting, 18+), Jobs, Goals, Maps, Settings. All logic is on the server (`backend/src/modules/phone`). Rules and limits are in `docs/SAFETY.md` and `game-data/phone.json`.
+
 ## Known limitations
 - All tenants share the one apartment interior (per-tenant instanced rooms come later).
 - The cafe, job centre and bank are scenery. No sound or music. Art is simple stylized primitives, not final.
 - The 3D client was exercised on software rendering (SwiftShader); real-GPU frame rates, low-end phones and Safari are **untested**.
 - Chat history is not stored; only the last few lines are shown. The chat rate limit and word list are the starter versions described in `docs/ARCHITECTURE.md`.
 - Game-server scale is untested: one process, one world instance. The earlier backend load test does not cover WebSocket traffic.
+- The other seven cities are template variants of Lagos, not unique maps. Travel by bus/taxi is a loading screen, not a driven route.
 - Click-to-report always files "harassment" for now (a category picker is a small follow-up).

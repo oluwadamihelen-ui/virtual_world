@@ -1,0 +1,20 @@
+{
+  "minAgeToMessage": 13,
+  "transfer": { "min": 1, "maxPerTransfer": 5000, "maxPerDay": 20000, "minorMaxPerDay": 2000 },
+  "loans": { "baseLimit": 500, "limitPerReputation": 100, "maxLimit": 5000, "feePercent": 10, "termHours": 72, "garnishPercent": 30, "minAge": 18 },
+  "messages": { "maxLength": 300, "perMinute": 20 },
+  "dating": {
+    "bioMaxLength": 140, "discoverBatch": 8, "likesPerDay": 50,
+    "lookingFor": ["Friendship", "Something casual", "A relationship", "Not sure yet"],
+    "interests": ["Music", "Football", "Cooking", "Travel", "Gaming", "Movies", "Fashion", "Business", "Art", "Fitness"]
+  },
+  "betting": {
+    "roundMinutes": 10, "fixturesPerRound": 4, "marginPercent": 8, "minStake": 10, "maxStake": 500,
+    "dailyLossLimit": 2000, "maxOpenBets": 10, "breakHours": [24, 168, 720],
+    "teams": [
+      { "name": "Harbour Hawks", "strength": 1.4 }, { "name": "Lagoon Lions", "strength": 1.3 }, { "name": "Savannah Stars", "strength": 1.2 },
+      { "name": "Mangrove Mariners", "strength": 1.0 }, { "name": "Delta Dragons", "strength": 1.1 }, { "name": "Highland Herons", "strength": 0.9 },
+      { "name": "Coastal Comets", "strength": 0.8 }, { "name": "Palm City Pirates", "strength": 0.7 }
+    ]
+  }
+}

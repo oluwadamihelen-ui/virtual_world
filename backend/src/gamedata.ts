@@ -55,6 +55,18 @@ const Geo = z.object({
   })),
   minTravelSeconds: z.number().positive(),
 });
+const Phone = z.object({
+  minAgeToMessage: z.number().int(),
+  transfer: z.object({ min: z.number().int().positive(), maxPerTransfer: z.number().int().positive(), maxPerDay: z.number().int().positive(), minorMaxPerDay: z.number().int().positive() }),
+  loans: z.object({ baseLimit: z.number().int().nonnegative(), limitPerReputation: z.number().int().nonnegative(), maxLimit: z.number().int().positive(), feePercent: z.number().nonnegative(), termHours: z.number().positive(), garnishPercent: z.number().min(0).max(100), minAge: z.number().int() }),
+  messages: z.object({ maxLength: z.number().int().positive(), perMinute: z.number().int().positive() }),
+  dating: z.object({ bioMaxLength: z.number().int().positive(), discoverBatch: z.number().int().positive(), likesPerDay: z.number().int().positive(), lookingFor: z.array(z.string()), interests: z.array(z.string()) }),
+  betting: z.object({
+    roundMinutes: z.number().positive(), fixturesPerRound: z.number().int().positive(), marginPercent: z.number().min(0), minStake: z.number().int().positive(), maxStake: z.number().int().positive(),
+    dailyLossLimit: z.number().int().positive(), maxOpenBets: z.number().int().positive(), breakHours: z.array(z.number().positive()),
+    teams: z.array(z.object({ name: z.string(), strength: z.number().positive() })),
+  }),
+});
 const Achievement = z.object({ id: z.string(), name: z.string(), reputation: z.number().int() });
 const Shop = z.object({
   id: z.string(), name: z.string(), district: z.string(),
@@ -90,6 +102,7 @@ function parseAll(read: (f: string) => unknown) {
   const achievements = z.array(Achievement).parse(read('achievements.json'));
   const world = World.parse(read('world.json'));
   const geo = Geo.parse(read('geo.json'));
+  const phone = Phone.parse(read('phone.json'));
   // Cross-reference validation: catch typos in data at boot rather than at purchase time.
   const itemIds = new Set(items.map((i) => i.id));
   for (const s of shops) for (const st of s.stock) {
@@ -119,7 +132,7 @@ function parseAll(read: (f: string) => unknown) {
   }
   const cityById = new Map(geo.cities.map((c) => [c.id, c]));
   const countryById = new Map(geo.countries.map((c) => [c.id, c]));
-  return { economy, items, shops: allShops, properties: allProps, jobs, appearance, businesses, chat, achievements, world, geo, worlds, cityById, countryById, itemIds };
+  return { economy, items, shops: allShops, properties: allProps, jobs, appearance, businesses, chat, achievements, world, geo, phone, worlds, cityById, countryById, itemIds };
 }
 
 export function loadGameData(dir: string): GameData {

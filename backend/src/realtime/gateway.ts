@@ -14,6 +14,7 @@ import * as social from '../modules/social/social.js';
 import * as moderation from '../modules/moderation/moderation.js';
 import * as ledger from '../modules/economy/ledger.js';
 import * as travel from '../modules/travel/travel.js';
+import { handleApp, phoneInfo } from '../modules/phone/index.js';
 import { currencyOfCity, formatMoney } from '../modules/economy/currency.js';
 import { buildColliders, stepPlayer, dist2, isBlocked, type Colliders } from '../../shared/sim.mjs';
 
@@ -50,6 +51,7 @@ const Msg = z.discriminatedUnion('t', [
   z.object({ t: z.literal('unblock'), targetId: z.string().uuid() }),
   z.object({ t: z.literal('quote'), to: z.string().max(40) }),
   z.object({ t: z.literal('travel'), to: z.string().max(40), mode: z.string().max(20) }),
+  z.object({ t: z.literal('app'), rid: z.string().max(40), app: z.string().max(20), a: z.string().max(30), d: z.record(z.string(), z.unknown()).optional() }),
   z.object({ t: z.literal('ping'), c: z.number().optional() }),
 ]);
 
@@ -197,7 +199,7 @@ export class Gateway {
       t: 'welcome', you: { id: p.id, name: p.name, appearance: p.appearance, x: p.x, z: p.z }, world: this.worldOf(p),
       city: { id: city.id, name: city.name, country: city.country, blurb: city.blurb }, currency: currencyOfCity(this.ctx.data, p.city),
       geo: this.publicGeo(), summary, door: await this.doorInfo(p, summary), serverNow: Date.now(), tickHz: TICK_HZ,
-      achievements: this.ctx.data.achievements, jobs: jobs.listJobs(this.ctx), ...extra,
+      achievements: this.ctx.data.achievements, jobs: jobs.listJobs(this.ctx), phone: await phoneInfo(this.ctx, p.id), ...extra,
     });
   }
 
@@ -241,6 +243,7 @@ export class Gateway {
         case 'interact': if (p.travel) throw new AppError(409, 'travelling', 'You are on a journey.'); return await this.onInteract(p, m.zone, m.item);
         case 'shopinfo': return await this.onShopInfo(p, m.zone);
         case 'phone': return await this.onPhone(p, m.tab);
+        case 'app': return await this.onApp(p, m);
         case 'home': return await this.onHome(p);
         case 'report': {
           const r = await moderation.fileReport(this.ctx, p.id, m.targetId, m.category, m.detail);
@@ -395,6 +398,26 @@ export class Gateway {
       await this.sendWelcome(p, summary, { arrived: true });
       this.toast(p, 'ok', `Welcome to ${this.ctx.data.cityById.get(p.city)?.name}! Prices here are in ${currencyOfCity(this.ctx.data, p.city).name}.`);
     } catch { p.travel = t; /* retry next tick */ }
+  }
+
+  /** Generic phone-app request/response. Replies carry the client's rid; errors are returned, not toasted. */
+  private async onApp(p: Player, m: { rid: string; app: string; a: string; d?: Record<string, unknown> }) {
+    if (p.travel) throw new AppError(409, 'travelling', 'You are on a journey.');
+    try {
+      const r = await handleApp(this.ctx, { id: p.id, name: p.name, city: p.city }, m.app, m.a, m.d);
+      this.send(p, { t: 'app', rid: m.rid, ok: true, data: r.data });
+      for (const n of r.notify ?? []) {
+        const o = this.players.get(n.to);
+        if (!o) continue;
+        const msg: any = { ...n.msg };
+        if (msg.kind === 'money') { msg.text = `${msg.from} sent you ${this.money(o, msg.amount)}`; delete msg.amount; }
+        this.send(o, msg);
+        if (msg.kind === 'money') void this.refresh(o).catch(() => {});
+      }
+      if (m.app === 'bank' || m.app === 'odds') void this.refresh(p).catch(() => {});
+    } catch (err) {
+      this.send(p, { t: 'app', rid: m.rid, ok: false, code: err instanceof AppError ? err.code : 'error', message: this.friendly(err) });
+    }
   }
 
   private async onPhone(p: Player, tab: 'wallet' | 'jobs' | 'achievements') {

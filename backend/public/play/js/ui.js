@@ -219,6 +219,10 @@ export function addChatLine(name, text) {
   const el = document.createElement('div'); el.innerHTML = `<b>${esc(name)}</b> ${esc(text)}`;
   const log = $('#chatlog'); log.append(el); while (log.children.length > 6) log.firstChild.remove(); setTimeout(() => el.remove(), 14000);
 }
+export function setPhoneBadge(n) {
+  const b = $('#rPhone'); if (!b) return; let d = b.querySelector('.dot'); if (!n) { d?.remove(); return; }
+  if (!d) { d = document.createElement('span'); d.className = 'dot'; b.append(d); } d.textContent = n > 9 ? '9+' : n;
+}
 export function setPlace(title, sub) { $('#place').textContent = title; $('#placeSub').textContent = sub ? `· ${sub}` : ''; }
 export function setSayPlaceholder(n) { $('#say').placeholder = n > 1 ? `Chat with the ${n - 1} ${n - 1 === 1 ? 'person' : 'people'} nearby…` : 'Nobody close enough to hear you…'; }
 export function showCtx(html, wire) {
@@ -249,7 +253,7 @@ export function openPhone({ apps, hour, cityName, onClose }) {
   $('#ov').addEventListener('pointerdown', (e) => { if (e.target.id === 'ov') close(); });
   const api = {
     home() {
-      body.innerHTML = `<div class="home"><div class="big">${time}</div><div class="date">${esc(cityName)} · tap an app</div><div class="apps">${apps.map((a) => `<button class="app" data-id="${a.id}"><div class="ic" style="background:${a.color}">${icon(a.icon)}</div>${esc(a.name)}${a.isNew ? '<span class="new">NEW</span>' : ''}</button>`).join('')}</div></div>`;
+      body.innerHTML = `<div class="home"><div class="big">${time}</div><div class="date">${esc(cityName)} · tap an app</div><div class="apps">${apps.map((a) => `<button class="app" data-id="${a.id}"><div class="ic" style="background:${a.color}">${icon(a.icon)}</div>${esc(a.name)}${a.isNew ? '<span class="new">NEW</span>' : ''}${a.badge ? `<span class="new bd">${a.badge}</span>` : ''}${a.adult ? '<span class="age">18+</span>' : ''}</button>`).join('')}</div></div>`;
       body.querySelectorAll('.app').forEach((b) => b.onclick = () => apps.find((a) => a.id === b.dataset.id).open(api));
     },
     app(title, html, wire) {

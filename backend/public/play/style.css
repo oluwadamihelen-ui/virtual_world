@@ -156,3 +156,19 @@ body.panelopen .stack,body.panelopen .chatlog,body.panelopen .journal{visibility
   .stack{bottom:calc(var(--safe-b) + 6px)}.chatlog{bottom:calc(var(--safe-b) + 100px)}
 }
 @media(max-height:560px){.journal,.journalTab{display:none}}
+
+/* ---- phone apps ---- */
+.phone .seg{display:flex;gap:4px;background:rgba(0,0,0,.25);padding:3px;border-radius:12px}.phone .seg button{flex:1;padding:7px 4px;border-radius:9px;font-weight:800;font-size:12px;color:rgba(255,255,255,.75)}.phone .seg button.on{background:rgba(255,255,255,.9);color:#10303a}
+.phone .field{display:grid;gap:4px}.phone .field label{font-size:12px;font-weight:700;opacity:.85}.phone .field input,.phone .field textarea,.phone .field select{padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.25);width:100%}
+.phone .field select option{color:#111}.phone .hint{font-size:12px;opacity:.75}.phone .warn{background:rgba(244,185,66,.18);border:1px solid rgba(244,185,66,.45);border-radius:12px;padding:8px 11px;font-size:12px}
+.phone .app .age{position:absolute;bottom:14px;right:4px;background:rgba(0,0,0,.55);border-radius:6px;font-size:9px;padding:1px 4px;font-weight:900}.phone .app .new.bd{background:#ff4d4d;color:#fff}
+.phone .chips{display:flex;flex-wrap:wrap;gap:6px}.phone .chip{padding:5px 10px;border-radius:99px;background:rgba(255,255,255,.14);font-size:12px;font-weight:700;border:1px solid transparent}.phone .chip.on{background:var(--mint);color:#06301f}
+.phone .thread{display:flex;flex-direction:column;gap:6px;max-height:340px;overflow:auto;padding:2px}.phone .bub{max-width:80%;padding:7px 11px;border-radius:15px;background:rgba(255,255,255,.18);font-size:14px;word-break:break-word}.phone .bub.me{align-self:flex-end;background:var(--coral);color:#2a0d05}.phone .bub small{display:block;opacity:.6;font-size:10px}
+.phone .compose{display:flex;gap:6px}.phone .compose input{flex:1;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.25)}
+.phone .pcard{background:linear-gradient(160deg,rgba(255,255,255,.2),rgba(255,255,255,.08));border-radius:22px;padding:16px;text-align:center;display:grid;gap:8px}.phone .pcard .ava{width:84px;height:84px;border-radius:50%;margin:0 auto;display:grid;place-items:center;font:700 34px var(--display);color:#fff;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+.phone .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.phone .fx{background:rgba(255,255,255,.12);border-radius:14px;padding:10px;display:grid;gap:8px}.phone .fx b{font-size:14px}
+.phone .odds{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.phone .odds button{padding:7px 2px;border-radius:10px;background:rgba(0,0,0,.28);color:#fff;font-weight:800;font-size:12px;display:grid;gap:1px}.phone .odds button span{font-size:15px;color:var(--gold)}.phone .odds button.on{background:var(--gold);color:#2a1d00}.phone .odds button.on span{color:#2a1d00}
+.phone .bar{height:7px;border-radius:5px;background:rgba(255,255,255,.18);overflow:hidden}.phone .bar i{display:block;height:100%;background:var(--mint)}.phone .bar.hot i{background:var(--red)}
+.phone .won{color:var(--mint);font-weight:800}.phone .lost{color:#ff8a8a;font-weight:800}
+#rPhone{position:relative}#rPhone .dot{position:absolute;top:-4px;right:-4px;background:#ff4d4d;color:#fff;border-radius:99px;font-size:10px;font-weight:900;min-width:16px;height:16px;display:grid;place-items:center;padding:0 3px}
+.phone .appbody{grid-template-columns:minmax(0,1fr)}.phone .appbody>*{min-width:0}

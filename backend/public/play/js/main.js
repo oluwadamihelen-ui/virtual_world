@@ -115,7 +115,8 @@ function onServer(m) {
     case 'quote': return G && G.onQuote?.(m);
     case 'travel': return G && onTravelStart(m);
     case 'pong': if (G) G.ping = Math.round(performance.now() - m.c); return;
-    case 'app': return G?.appWait?.(m);
+    case 'app': { const f = G?.pending.get(m.rid); if (f) { G.pending.delete(m.rid); f(m); } return; }
+    case 'notify': return G && onNotify(m);
   }
 }
 
@@ -134,17 +135,23 @@ function enterWorld(w) {
   scene.add(me.av.group);
   G = { w, me, ents: new Map(), summary: w.summary, door: w.door, city: w.city, currency: w.currency, access: new Set(w.summary.tenancy?.district === w.city.id ? ['apartment'] : []), jobs: w.jobs ?? [],
     yaw: -0.75, pitch: 0.8, dist: 19, camT: new THREE.Vector3(me.x, 1, me.z), seq: 0, lastSent: { dx: 0, dz: 0, run: false, t: 0 }, ctxKey: null, shop: {},
-    auto: null, nextTaskAt: 0, ping: 0, online: 1, minSeconds: 20, achievements: w.achievements };
+    pending: new Map(), phone: w.phone ?? { adult: false, unread: 0 }, auto: null, nextTaskAt: 0, ping: 0, online: 1, minSeconds: 20, achievements: w.achievements };
   const gj = G.jobs.find((j) => j.jobId === 'job_grocery_assistant'); if (gj) G.minSeconds = gj.minSecondsPerTask;
   U.buildHud({
     openPhone: (app) => openPhone(app), openMap, goHome: () => S.conn.send({ t: 'home' }),
     say: sendChat, emote: (e) => S.conn.send({ t: 'emote', e }),
   });
-  refreshHud();
+  refreshHud(); U.setPhoneBadge(G.phone.unread);
   G.sendTimer = setInterval(sendInput, 50);
   G.pingTimer = setInterval(() => G && S.conn.send({ t: 'ping', c: Math.round(performance.now()) }), 3000);
   if (w.arrived) U.toast('ok', `Welcome to ${w.city.name}!`);
   else U.toast('info', `Welcome, ${w.you.name}!`);
+}
+function onNotify(m) {
+  if (m.kind === 'message') { G.phone.unread++; U.toast('info', `New message from ${m.from}`); }
+  else if (m.kind === 'money') U.toast('ok', m.text);
+  else if (m.kind === 'match') U.toast('ok', `It's a match with ${m.from}!`);
+  G.onNotify?.(m); U.setPhoneBadge?.(G.phone.unread);
 }
 function refreshHud() {
   const s = G.summary;
@@ -332,16 +339,16 @@ function sendChat(input) { const t = input.value.trim(); if (!t) return; S.conn.
 let ridN = 0;
 /** Ask the game server for an app action and wait for the matching reply (matched by request id). */
 const sendWait = (msg) => new Promise((resolve) => {
-  const rid = `${Date.now().toString(36)}${++ridN}`; const prev = G.appWait;
-  const timer = setTimeout(() => { G.appWait = prev; resolve({ ok: false, error: 'The server took too long to answer.' }); }, 8000);
-  G.appWait = (m) => { if (m.rid === rid) { clearTimeout(timer); G.appWait = prev; resolve(m); } else prev?.(m); };
+  const rid = `${Date.now().toString(36)}${++ridN}`;
+  const timer = setTimeout(() => { G?.pending.delete(rid); resolve({ ok: false, message: 'The server took too long to answer.' }); }, 8000);
+  G.pending.set(rid, (m) => { clearTimeout(timer); resolve(m); });
   S.conn.send({ t: 'app', rid, ...msg });
 });
 
 function openPhone(openApp) {
   const c = gameClock(now());
-  const ctx = { G: () => G, S, U, send: (m) => S.conn.send(m), ask: sendWait, fmt: U.fmt, openMap, onSummary: (fn) => { if (G) G.onSummary = fn; } };
-  const phone = U.openPhone({ apps: phoneApps(ctx), hour: c.hour, cityName: `${G.city.name}, ${G.currency.countryName}`, onClose: () => { U.closePanel(); if (G) { G.onSummary = null; G.phoneWait = null; } } });
+  const ctx = { G: () => G, S, U, send: (m) => S.conn.send(m), ask: sendWait, fmt: U.fmt, openMap, openChat: null, onSummary: (fn) => { if (G) G.onSummary = fn; } };
+  const phone = U.openPhone({ apps: phoneApps(ctx), hour: c.hour, cityName: `${G.city.name}, ${G.currency.countryName}`, onClose: () => { U.closePanel(); if (G) { G.onSummary = null; G.onNotify = null; G.phoneWait = null; } } });
   if (openApp) phoneApps(ctx).find((a) => a.id === openApp)?.open(phone);
 }
 

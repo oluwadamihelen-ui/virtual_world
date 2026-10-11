@@ -102,6 +102,21 @@ Legend: ✅ done and verified by automated tests · 🟡 done but unverified/par
 | Per-tenant instanced interiors, more buildings/districts, sound, real art | ⬜ | |
 | Unreal Engine client | ⏸ paused by decision | docs kept |
 
+## Milestone 6: Map, travel, currencies, phone apps
+
+| Item | State | Evidence |
+|---|---|---|
+| 8 cities / 4 countries, generated city worlds, per-city shops/rooms/prices | ✅ | `travel.test.ts` |
+| Travel (bus, taxi, flight, walk) with ledger-charged fares and arrival in the new city | ✅ | `travel.test.ts` (15) + browser flight Lagos to Accra |
+| Wallet shows local currency (₦, GH₵, KSh, £) from fixed game rates | ✅ | tests + screenshots (₦200,000 to GH₵1,472.00 after a ₦16,000 flight) |
+| Date of birth at sign-up, age groups, 18+ gating | ✅ self-declared only | `phone.test.ts`, `identity-moderation.test.ts` |
+| Vault: send money (limits, idempotent), loans (limit by reputation, overdue collection) | ✅ | `phone.test.ts` |
+| Chatter DMs, block/age-group rules | ✅ | `phone.test.ts` |
+| Spark dating (adults only, mutual match, delete data) | ✅ | `phone.test.ts` + 2-browser flow |
+| Odds play-money betting (limits, breaks, settlement) | ✅ | `phone.test.ts` + browser |
+| Legal / safety review of dating, betting, lending | ⬜ **required before real users** | `docs/SAFETY.md` |
+| Real exchange rates, real payments, ID age verification | ⬜ not built | |
+
 ## Remaining tasks (sequenced)
 1. **UE5 project + dedicated server + greybox block** (blocks everything player-facing). Compile `MVWBackend`. *Done when:* two clients see each other on a dedicated server.
 2. ~~Join-ticket endpoint~~ done on the backend. *Remaining:* the game server must use it (Unreal).

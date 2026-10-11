@@ -59,7 +59,7 @@ Open Chrome or Edge and go to:
 
 # http://localhost:3000/play
 
-1. Click **Create account**, type an email and a password (10+ characters), and click the green button.
+1. Click **Create account**, type an email, a password (10+ characters) and your **date of birth**, and click the green button. (Under 13 can't play. Under 18 can't open the dating or betting apps.)
 2. Make your character: type a name (3 to 20 letters/numbers) and pick your look. Click **Enter the city**.
 3. You're in **New Meridian**. 🎉
 
@@ -79,8 +79,9 @@ Open Chrome or Edge and go to:
 - 🏠 **Rent a room:** tap **Apartments** at the bottom to be guided there, stand on the glowing ring by the blue building's door, and tap **Rent & move in**. Then walk through the door. (Nobody without a tenancy can!) The walls drop away so you can see inside.
 - 🛒 **Buy lunch:** tap **Grocery**, walk to the counter, and tap **Sandwich**.
 - 💼 **Earn money:** at the yellow crate (the **Work station**) start a shift, then do 5 tasks, about 20 seconds apart. You earn **250 MVC**.
-- 📱 **Phone** (bottom right): your wallet history, jobs and goals.
-- 🗺️ **Map:** see where everyone is.
+- 📱 **Phone** (right side): **Vault** (send money to a friend by their exact name, take a loan, see exchange rates), **Chatter** (messages), **Spark** (dating, 18+), **Odds** (play-money betting, 18+), Jobs, Goals, Maps.
+- 🗺️ **Map:** pick a country tab, tap a city, choose Bus / Taxi / Flight, and tap again to pay. When you arrive, your money changes to that country's currency (₦ in Nigeria, GH₵ in Ghana, KSh in Kenya, £ in the UK).
+- 💱 Try it: in the Map choose **Accra** and take the flight. Your wallet changes from ₦ to GH₵.
 - 🌙 Wait a few minutes and the sun sets: street lamps and windows light up. (A whole day lasts 24 real minutes.)
 - 👯 **Play with a friend:** open a second browser window (or another computer on the same Wi-Fi, using `http://YOUR-PC-IP:3000/play`), create a second account, and wave at each other. Chat only reaches players close to you.
 

@@ -34,3 +34,9 @@ Notes
 How the NPC economy works: each tick a **fixed pool** of customers shops across the whole city (so more shops = split demand, not more demand). Each customer picks an item by demand weight, then picks among shops that stock it at an acceptable price, favouring cheaper ones. NPC money enters via the `faucet:npc_customers` account and wholesale spending leaves via `sink:supplier_npc`; setup fees leave via `sink:city_fees`, so all three flows are measurable.
 
 Known balance risks (untested with real players): with a wholesale margin of ~50% and a pool of 6 customers/minute, one well-priced shop can earn far more than a job. Measure shop profit/hour against shift income during alpha and adjust `customersPerTick`, wholesale prices or the setup fee.
+
+## Currencies, travel, loans, betting (`geo.json`, `phone.json`)
+- **Display currency** per country: `geo.json` `currencies[].perMVC` (₦100, GH₵0.8, KSh8.6, £0.05 per MVC). Fixed placeholders. The ledger is always MVC.
+- **Prices** scale by city `priceIndex` (Lagos 1.0 ... London 1.8): shop prices, room rents, bus/taxi/flight fares use it where noted in the code.
+- **Fares:** `transport[]`: base + per-km, speed `secPerKm`, flights need 200+ km and add an international fee. Fares go to `sink:transport`.
+- **Loans:** money is created from `faucet:bank` and repaid back to it; the 10% fee is the only net sink. **Betting:** stakes go to `faucet:betting_house`, winnings come from it; with an 8% margin the house account trends positive (a sink). Watch both accounts' balances for inflation.
