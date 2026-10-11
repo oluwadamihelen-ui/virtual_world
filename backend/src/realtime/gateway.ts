@@ -145,7 +145,7 @@ export class Gateway {
     const g = this.ctx.data.geo;
     return {
       countries: g.countries.map((c) => ({ ...c, currency: { code: c.currency, ...g.currencies[c.currency]! } })),
-      cities: g.cities.map((c) => ({ id: c.id, country: c.country, name: c.name, lat: c.lat, lon: c.lon, blurb: c.blurb, priceIndex: c.priceIndex })),
+      cities: g.cities.map((c) => ({ id: c.id, country: c.country, name: c.name, lat: c.lat, lon: c.lon, blurb: c.blurb, priceIndex: c.priceIndex, metro: c.metro, hub: c.hub })),
       transport: g.transport.map((m) => ({ id: m.id, name: m.name, icon: m.icon })),
     };
   }
@@ -197,7 +197,7 @@ export class Gateway {
     const city = this.ctx.data.cityById.get(p.city)!;
     this.send(p, {
       t: 'welcome', you: { id: p.id, name: p.name, appearance: p.appearance, x: p.x, z: p.z }, world: this.worldOf(p),
-      city: { id: city.id, name: city.name, country: city.country, blurb: city.blurb }, currency: currencyOfCity(this.ctx.data, p.city),
+      city: { id: city.id, name: city.name, country: city.country, blurb: city.blurb, metro: city.metro }, currency: currencyOfCity(this.ctx.data, p.city),
       geo: this.publicGeo(), summary, door: await this.doorInfo(p, summary), serverNow: Date.now(), tickHz: TICK_HZ,
       achievements: this.ctx.data.achievements, jobs: jobs.listJobs(this.ctx), phone: await phoneInfo(this.ctx, p.id), ...extra,
     });

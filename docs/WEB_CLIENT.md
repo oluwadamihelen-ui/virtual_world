@@ -33,6 +33,9 @@ Top bar (clock, online count, ping, MVC balance + wallet), goal cards from real 
 ## Cities, travel and currency
 Eight cities in four countries (`game-data/geo.json`). Only Lagos is hand-laid; the others are **generated variants of the same neighbourhood** (recoloured, mirrored, renamed, price-scaled). The Map lists every city in the chosen country; tap a city, choose bus / taxi / flight (or a walk list inside your own city), and tap twice to pay. The fare is charged in the ledger, you travel (a few seconds to a minute), then arrive in that city's world. **Your wallet shows the currency of the country you are in**, converted at fixed game rates (1 MVC = ₦100 = GH₵0.8 = KSh8.6 = £0.05); the ledger itself is always MVC. The rates are game values, not real exchange rates.
 
+## Homes, apartments and land
+Click a house, the apartment block or a fenced plot in the world (or use the phone's **Homes** app, or the Map's "Homes & land here" button). The sheet shows size, beds, rent per week and price; Rent and Buy take two taps (the second confirms). After renting or buying a home you are taken to it at once. Land can be built on. The signs above each lot update every 20 seconds. Server messages: `app{app:'estate', a:'list|overview|rent|buy|build|sell|movein|leave'}`. Limitation: houses have no inside yet.
+
 ## Phone apps
 Vault (activity, send money, loans, rates), Chatter (direct messages), Spark (dating, 18+), Odds (play-money betting, 18+), Jobs, Goals, Maps, Settings. All logic is on the server (`backend/src/modules/phone`). Rules and limits are in `docs/SAFETY.md` and `game-data/phone.json`.
 

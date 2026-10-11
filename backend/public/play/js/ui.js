@@ -269,16 +269,17 @@ export function openPhone({ apps, hour, cityName, onClose }) {
 }
 
 // ---------------------------------------------------------------- map
-const bbox = (cities) => {
+const bbox = (cities, minLon = 4, minLat = 4) => {
   let [a, b, c, d] = [Infinity, -Infinity, Infinity, -Infinity];
   for (const x of cities) { a = Math.min(a, x.lon); b = Math.max(b, x.lon); c = Math.min(c, x.lat); d = Math.max(d, x.lat); }
-  if (b - a < 4) { const m = (a + b) / 2; a = m - 3; b = m + 3; } if (d - c < 4) { const m = (c + d) / 2; c = m - 2.5; d = m + 2.5; }
+  if (b - a < minLon) { const m = (a + b) / 2; a = m - minLon * 0.75; b = m + minLon * 0.75; } if (d - c < minLat) { const m = (c + d) / 2; c = m - minLat * 0.625; d = m + minLat * 0.625; }
   const pl = (b - a) * 0.14, pt = (d - c) * 0.16; return { minLon: a - pl, maxLon: b + pl, minLat: c - pt, maxLat: d + pt };
 };
 export function renderMapSvg(geo, scope, here, selected) {
   const W = 600, H = 400;
-  const cities = scope === 'world' ? geo.cities : geo.cities.filter((c) => c.country === scope);
-  const bb = bbox(cities);
+  const metro = scope.startsWith('metro:');
+  const cities = metro ? geo.cities.filter((c) => c.metro === scope.slice(6)) : scope === 'world' ? geo.cities.filter((c) => c.hub) : geo.cities.filter((c) => c.country === scope && c.hub);
+  const bb = metro ? bbox(cities, 0.18, 0.14) : bbox(cities);
   const px = (c) => [((c.lon - bb.minLon) / (bb.maxLon - bb.minLon)) * W, ((bb.maxLat - c.lat) / (bb.maxLat - bb.minLat)) * H];
   const pts = new Map(cities.map((c) => [c.id, px(c)]));
   let routes = '';
@@ -291,10 +292,10 @@ export function renderMapSvg(geo, scope, here, selected) {
   } else if (here && selected && here !== selected && pts.has(here) && pts.has(selected)) {
     const [x1, y1] = pts.get(here), [x2, y2] = pts.get(selected); routes += `<path class="route" d="M${x1} ${y1} Q${(x1 + x2) / 2} ${Math.min(y1, y2) - 70} ${x2} ${y2}"/>`;
   }
-  const land = cities.map((c) => { const [x, y] = pts.get(c.id); return `<circle class="land" cx="${x}" cy="${y}" r="${scope === 'world' ? 46 : 78}"/>`; }).join('');
+  const land = cities.map((c) => { const [x, y] = pts.get(c.id); return `<circle class="land" cx="${x}" cy="${y}" r="${scope === 'world' ? 46 : metro ? 52 : 78}"/>`; }).join('');
   const grid = Array.from({ length: 9 }, (_, i) => `<line x1="${(i + 1) * 60}" y1="0" x2="${(i + 1) * 60}" y2="${H}" stroke="rgba(255,255,255,.05)"/>`).join('') + Array.from({ length: 6 }, (_, i) => `<line x1="0" y1="${(i + 1) * 57}" x2="${W}" y2="${(i + 1) * 57}" stroke="rgba(255,255,255,.05)"/>`).join('');
   const nodes = cities.map((c) => { const [x, y] = pts.get(c.id); const flag = geo.countries.find((k) => k.id === c.country)?.flag ?? '';
-    return `<g class="city ${selected === c.id ? 'sel' : ''}" data-city="${c.id}">${here === c.id ? `<circle class="you" cx="${x}" cy="${y}" r="8"/>` : ''}<circle class="dot" cx="${x}" cy="${y}" r="9"/><text x="${x}" y="${y + 26}" text-anchor="middle">${flag} ${esc(c.name)}</text><circle cx="${x}" cy="${y}" r="15" fill="transparent"/></g>`; }).join('');
+    return `<g class="city ${selected === c.id ? 'sel' : ''}" data-city="${c.id}">${here === c.id ? `<circle class="you" cx="${x}" cy="${y}" r="8"/>` : ''}<circle class="dot" cx="${x}" cy="${y}" r="9"/><text x="${x}" y="${y + 26}" text-anchor="middle">${flag} ${esc(c.name)}${!metro && geo.cities.filter((o) => o.metro === c.metro).length > 1 ? ' ▸' : ''}</text><circle cx="${x}" cy="${y}" r="15" fill="transparent"/></g>`; }).join('');
   return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">${grid}${land}${routes}${nodes}</svg>`;
 }
 

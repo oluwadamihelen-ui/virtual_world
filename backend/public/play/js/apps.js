@@ -204,6 +204,7 @@ export function phoneApps(ctx) {
       const d = await phoneAsk('achievements');
       ph.setBody(`<div class="card2">⭐ Reputation <b>${d.reputation}</b></div><div class="list">${d.achievements.map((a) => `<div class="li"><div><b>${a.earned ? '✅' : '⬜'} ${esc(a.name)}</b><small>${a.reputation ? `+${a.reputation} reputation` : 'Milestone'}</small></div></div>`).join('')}</div><b>Skills</b><div class="list">${d.skills.map((s) => `<div class="li"><b>${esc(s.skillId)}</b><span>${s.xp} xp</span></div>`).join('') || '<p style="opacity:.8">Work shifts to build skills.</p>'}</div>`);
     } },
+    { id: 'estate', name: 'Homes', icon: 'home', color: 'linear-gradient(135deg,#c2410c,#fb923c)', open: () => ctx.openEstate() },
     { id: 'map', name: 'Maps', icon: 'map', color: GRAD.map, open: () => ctx.openMap() },
     { id: 'settings', name: 'Settings', icon: 'gear', color: GRAD.settings, open: (ph) => {
       const c = cur(), city = G().city;

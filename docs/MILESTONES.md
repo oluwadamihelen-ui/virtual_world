@@ -117,6 +117,18 @@ Legend: ✅ done and verified by automated tests · 🟡 done but unverified/par
 | Legal / safety review of dating, betting, lending | ⬜ **required before real users** | `docs/SAFETY.md` |
 | Real exchange rates, real payments, ID age verification | ⬜ not built | |
 
+## Milestone 7: Real estate and city areas
+
+| Item | State | Evidence |
+|---|---|---|
+| 20 walkable areas (6 in Lagos, others per city) with their own prices, shops, rooms | ✅ (each is a re-coloured/mirrored variant of Maple Court) | `estate.test.ts`, browser |
+| Homes, apartments and land: details, rent or buy, move in at once | ✅ | 9 estate tests + browser purchase of a house |
+| Build on land, sell back (70%), move out, move in to an owned home | ✅ | tests |
+| One home at a time, max 3 plots, exclusive ownership, idempotent, ledger balanced | ✅ | tests |
+| Click a house/plot/apartment block in the 3D world; status signs | ✅ | screenshots |
+| Walk-in interiors for houses | ⬜ (you arrive at the front gate; the apartment block still has the shared interior) | |
+| Owners letting their property to other players, auctions, property tax | ⬜ | |
+
 ## Remaining tasks (sequenced)
 1. **UE5 project + dedicated server + greybox block** (blocks everything player-facing). Compile `MVWBackend`. *Done when:* two clients see each other on a dedicated server.
 2. ~~Join-ticket endpoint~~ done on the backend. *Remaining:* the game server must use it (Unreal).

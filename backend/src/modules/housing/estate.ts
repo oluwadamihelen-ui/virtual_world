@@ -59,7 +59,7 @@ export async function listCity(ctx: AppContext, characterId: string, cityId: str
     return { lotId, listings: [...apartments, ...mine, ...free.slice(0, 6)], rooms: { total: rooms.length, available: free.length, cheapestRent: free.length ? Math.min(...free.map((r) => r.rent ?? 0)) : null } };
   });
   const owned = (await ctx.pool.query(`SELECT id, name, type FROM properties WHERE owner_id=$1 ORDER BY name`, [characterId])).rows;
-  return { cityId, lots: out, owned: owned.map((o) => ({ propertyId: o.id as string, name: o.name as string, type: o.type as string })), home, limits: { maxLandPlots: ctx.data.estate.maxLandPlots, sellBackPercent: ctx.data.estate.sellBackPercent } };
+  return { cityId, rentPeriodHours: ctx.data.economy.rentPeriodHours, lots: out, owned: owned.map((o) => ({ propertyId: o.id as string, name: o.name as string, type: o.type as string })), home, limits: { maxLandPlots: ctx.data.estate.maxLandPlots, sellBackPercent: ctx.data.estate.sellBackPercent } };
 }
 
 /** One row per city/area for the "where should I live?" overview. */

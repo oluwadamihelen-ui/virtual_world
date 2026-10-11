@@ -40,3 +40,15 @@ Known balance risks (untested with real players): with a wholesale margin of ~50
 - **Prices** scale by city `priceIndex` (Lagos 1.0 ... London 1.8): shop prices, room rents, bus/taxi/flight fares use it where noted in the code.
 - **Fares:** `transport[]`: base + per-km, speed `secPerKm`, flights need 200+ km and add an international fee. Fares go to `sink:transport`.
 - **Loans:** money is created from `faucet:bank` and repaid back to it; the 10% fee is the only net sink. **Betting:** stakes go to `faucet:betting_house`, winnings come from it; with an 8% margin the house account trends positive (a sink). Watch both accounts' balances for inflation.
+
+## Real estate (`game-data/estate.json`, scaled by each area's `priceIndex` in `geo.json`)
+| Item | Rent per week | Price | Notes |
+|---|---|---|---|
+| Room (apartment block) | 500 MVC | rent only | 8 per generated area (Lagos has 40) |
+| Apartments A1, A2, B1, Penthouse | 900 / 1,000 / 1,400 / 2,400 | 16,000 / 18,000 / 26,000 / 48,000 | in the apartment block |
+| Houses: Garden, Family, Corner Villa | 2,200 / 3,000 / 4,500 | 42,000 / 60,000 / 95,000 | one per house lot |
+| Land plots A, B / C, D | none | 9,000 / 14,000 | max 3 plots per player |
+| Build a Starter Home on land | | 15,000 | house is then worth price + 15,000, rent 5% of value |
+| Sell back | | 70% of value | back to the market account |
+
+All numbers are **untested guesses**. With the 2,000 MVC starting grant and 250 MVC per shift (max 4 a day), a room is the realistic first home and a house is a long-term goal (about 6 weeks of full-time work at current wages). Use `npm run grant -- "Name" 50000` in development to try buying. The ledger account `faucet:real_estate` receives every purchase and pays every sell-back; a growing positive balance means money is being drained from the economy, negative means sell-backs outpace purchases (the 70% rate keeps it positive). Owners pay no rent, so owning is a one-off money sink.

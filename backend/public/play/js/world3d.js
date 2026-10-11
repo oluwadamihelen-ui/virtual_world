@@ -149,8 +149,8 @@ export function createWorld3D(world, scene) {
       if (y + 0.6 > b.height) continue;
       const w = new THREE.Mesh(winGeo, winMat); w.position.set(b.cx + dx, y, faceZ); if (faceSign < 0) w.rotation.y = Math.PI; g.add(w);
     }
-    const sign = textSprite(b.sign ?? b.name, b.doorSide ? 4.6 : 6.2, b.doorSide ? 0.62 : 0.9, b.doorSide ? b.roof : '#1e2a44', '#fff', b.doorSide ? 40 : 46);
-    sign.position.set(b.cx, b.doorSide ? 3.05 : b.height - 0.7, faceZ + faceSign * 0.03); if (faceSign < 0) sign.rotation.y = Math.PI; g.add(sign);
+    const sign = b.kind === 'house' ? null : textSprite(b.sign ?? b.name, b.doorSide ? 4.6 : 6.2, b.doorSide ? 0.62 : 0.9, b.doorSide ? b.roof : '#1e2a44', '#fff', b.doorSide ? 40 : 46);
+    if (sign) { sign.position.set(b.cx, b.doorSide ? 3.05 : b.height - 0.7, faceZ + faceSign * 0.03); if (faceSign < 0) sign.rotation.y = Math.PI; g.add(sign); }
 
     buildings.push({ b, group: g, wallMeshes, lintel, roof, cut: 0, minX: b.cx - b.sx / 2, maxX: b.cx + b.sx / 2, minZ: b.cz - b.sz / 2, maxZ: b.cz + b.sz / 2 });
   }
@@ -204,6 +204,31 @@ export function createWorld3D(world, scene) {
     markers.push({ z, ring, icon });
   }
 
+  // ---- lots: clickable houses, apartment block and empty plots with status banners ----
+  const lots = new Map(), pickables = [];
+  const bannerTex = (lines, bg, fg) => {
+    const c = document.createElement('canvas'); c.width = 512; c.height = 56 + lines.length * 62;
+    const g = c.getContext('2d'); g.fillStyle = bg; g.beginPath(); g.roundRect(4, 4, c.width - 8, c.height - 8, 30); g.fill();
+    g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle';
+    lines.forEach((t, i) => { let px = i ? 40 : 46; const font = (n) => `${i ? 600 : 800} ${n}px system-ui, "Segoe UI", sans-serif`; g.font = font(px); while (g.measureText(t).width > 470 && px > 18) { px -= 2; g.font = font(px); } g.fillText(t, 256, 52 + i * 62); });
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return { t, w: c.width, h: c.height };
+  };
+  const fenceM = mat('#8a6a43'), padM = new THREE.Color(T.ground).lerp(new THREE.Color('#d8c48a'), 0.35);
+  for (const l of world.lots ?? []) {
+    const g = new THREE.Group(); root.add(g);
+    const top = l.kind === 'land' ? 0.2 : (world.buildings.find((b) => b.id === l.building)?.height ?? 3.4) + 0.6;
+    if (l.kind === 'land') {
+      g.add(box(l.sx, 0.06, l.sz, mat(padM), l.cx, 0.05, l.cz, false));
+      for (const [x, z, w, d] of [[0, -l.sz / 2, l.sx, 0.12], [0, l.sz / 2, l.sx, 0.12], [-l.sx / 2, 0, 0.12, l.sz], [l.sx / 2, 0, 0.12, l.sz]]) g.add(box(w, 0.7, d, fenceM, l.cx + x, 0.35, l.cz + z));
+      for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) g.add(box(0.2, 1.1, 0.2, fenceM, l.cx + x * l.sx / 2, 0.55, l.cz + z * l.sz / 2));
+    }
+    const pick = new THREE.Mesh(BOX, new THREE.MeshBasicMaterial({ visible: false }));
+    pick.scale.set(l.sx, l.kind === 'land' ? 3 : top, l.sz); pick.position.set(l.cx, (l.kind === 'land' ? 3 : top) / 2, l.cz); pick.userData.lotId = l.id; g.add(pick); pickables.push(pick);
+    const banner = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthWrite: false })); banner.position.set(l.cx, top + 1.8, l.cz); banner.visible = false; g.add(banner);
+    lots.set(l.id, { l, g, banner, house: null, top });
+  }
+  const miniHouse = (l) => { const h = new THREE.Group(); h.add(box(l.sx * 0.55, 2.6, l.sz * 0.55, mat('#e8d9b5'), l.cx, 1.3, l.cz), box(l.sx * 0.62, 0.35, l.sz * 0.62, mat('#b4553a'), l.cx, 2.8, l.cz), box(1.0, 1.8, 0.1, mat('#6b4a2b'), l.cx, 0.9, l.cz + (l.cz < 0 ? 1 : -1) * (l.sz * 0.275 + 0.03))); return h; };
+
   const skyDay = new THREE.Color('#8ec9f7'), skyDusk = new THREE.Color('#f4a874'), skyNight = new THREE.Color('#0e1633');
   const sunWarm = new THREE.Color('#ffb877'), sunWhite = new THREE.Color('#fff3d6'), moonBlue = new THREE.Color('#7b93d8');
   const tmp = new THREE.Color();
@@ -211,6 +236,22 @@ export function createWorld3D(world, scene) {
 
   return {
     buildings, markers, cityId: world.cityId,
+    /** states: { lotId: { lines: [..], tone: 'free'|'taken'|'yours', house?: boolean } } */
+    setLotStates(states) {
+      for (const [id, st] of Object.entries(states)) {
+        const o = lots.get(id); if (!o) continue;
+        const col = { free: ['#1f8a5b', '#ffffff'], taken: ['#59606b', '#e6e8ec'], yours: ['#f4b942', '#2a1d00'] }[st.tone] ?? ['#1e2a44', '#fff'];
+        const { t, w, h } = bannerTex(st.lines, col[0], col[1]);
+        o.banner.material.map?.dispose(); o.banner.material.map = t; o.banner.material.needsUpdate = true; o.banner.scale.set(w / 85, h / 85, 1); o.banner.visible = true;
+        if (st.house && !o.house && o.l.kind === 'land') { o.house = miniHouse(o.l); o.g.add(o.house); }
+        if (!st.house && o.house) { o.g.remove(o.house); o.house = null; }
+      }
+    },
+    /** The lot under a screen point (ndc -1..1), or null. */
+    pickLot(ndcX, ndcY, camera) {
+      const ray = new THREE.Raycaster(); ray.setFromCamera({ x: ndcX, y: ndcY }, camera);
+      const hit = ray.intersectObjects(pickables, false)[0]; return hit ? hit.object.userData.lotId : null;
+    },
     dispose() {
       scene.remove(root);
       root.traverse((o) => { if (o.material) { const ms = Array.isArray(o.material) ? o.material : [o.material]; for (const m of ms) { m.map?.dispose(); m.dispose(); } } if (o.geometry && o.geometry !== BOX) o.geometry.dispose(); });

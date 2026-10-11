@@ -172,3 +172,9 @@ body.panelopen .stack,body.panelopen .chatlog,body.panelopen .journal{visibility
 .phone .won{color:var(--mint);font-weight:800}.phone .lost{color:#ff8a8a;font-weight:800}
 #rPhone{position:relative}#rPhone .dot{position:absolute;top:-4px;right:-4px;background:#ff4d4d;color:#fff;border-radius:99px;font-size:10px;font-weight:900;min-width:16px;height:16px;display:grid;place-items:center;padding:0 3px}
 .phone .appbody{grid-template-columns:minmax(0,1fr)}.phone .appbody>*{min-width:0}
+
+/* ---- estate ---- */
+.props{display:grid;gap:12px}.prop{display:grid;grid-template-columns:110px 1fr;gap:12px;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.prop .pic{display:grid;place-items:center;font-size:44px;min-height:110px}.prop .pbody{padding:10px 12px 12px 0;display:grid;gap:3px;align-content:start}.prop .pbody small{color:var(--mut)}.prop .pbody p{margin:2px 0 6px;font-size:13px;opacity:.9}
+.pbtns{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.metro h4{margin:12px 0 6px;font:700 15px var(--display)}.hint{font-size:12px;color:var(--mut)}.pill.dim{opacity:.55}
+@media (max-width:560px){.prop{grid-template-columns:76px 1fr}.prop .pic{font-size:32px}}
