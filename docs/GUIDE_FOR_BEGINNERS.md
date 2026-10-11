@@ -57,7 +57,7 @@ Wait for the message **"My Virtual World is running"**. **Leave this black windo
 
 Open Chrome or Edge and go to:
 
-# http://localhost:3000/play
+# http://localhost:3000/play/
 
 1. Click **Create account**, type an email, a password (10+ characters) and your **date of birth**, and click the green button. (Under 13 can't play. Under 18 can't open the dating or betting apps.)
 2. Make your character: type a name (3 to 20 letters/numbers) and pick your look. Click **Enter the city**.

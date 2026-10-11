@@ -278,3 +278,14 @@ describe('world replication & persistence', () => {
     c.close();
   });
 });
+
+describe('static pages', () => {
+  it('/play without a trailing slash redirects to the game page', async () => {
+    const w = await createWorld();
+    try {
+      const r = await w.app.inject({ method: 'GET', url: '/play' });
+      expect(r.statusCode).toBe(302); expect(r.headers.location).toBe('/play/');
+      expect((await w.app.inject({ method: 'GET', url: '/play/' })).statusCode).toBe(200);
+    } finally { await w.close(); }
+  });
+});
