@@ -52,6 +52,7 @@ export async function buildApp(ctx: AppContext, opts: { rateLimit?: boolean } = 
   await app.register(fastifyStatic, { root: here('../public/play'), prefix: '/play/', ...staticOpts });
   await app.register(fastifyStatic, { root: here('../shared'), prefix: '/shared/', decorateReply: false, maxAge: 0 });
   await app.register(fastifyStatic, { root: here('../node_modules/three/build'), prefix: '/vendor/three/', decorateReply: false, maxAge: '1d' });
+  await app.register(fastifyStatic, { root: here('../node_modules/three/examples/jsm'), prefix: '/vendor/three-addons/', decorateReply: false, maxAge: '1d' });
   app.get('/', async (_req, reply) => reply.redirect('/play/'));
   app.get('/play', async (_req, reply) => reply.redirect('/play/')); // people type it without the final slash
   app.get('/v1/world', async () => ctx.data.world); // static scenery + zones; contains no secrets

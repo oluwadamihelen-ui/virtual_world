@@ -58,9 +58,10 @@ export function generateWorld(base: any, city: GeoCity): any {
 }
 
 /** The building that appears on a plot of land once its owner builds a home. Same rules as the pre-built houses. */
-export function builtHouseSpec(lot: any) {
+export function builtHouseSpec(lot: any, rowZ: number[] = [0]) {
   const h = lot.home ?? { sx: 6, sz: 5, doorWidth: 1.6, height: 3 };
-  const north = lot.cz < 0;   // doors face the road (the road runs along z = 0)
+  const road = rowZ.reduce((best, z) => (Math.abs(z - lot.cz) < Math.abs(best - lot.cz) ? z : best), rowZ[0] ?? 0);
+  const north = lot.cz < road;   // doors face the nearest street
   return {
     building: { id: `home_${lot.id}`, name: 'Home', cx: lot.cx, cz: lot.cz, sx: h.sx, sz: h.sz, height: h.height, doorSide: north ? '+z' : '-z', doorWidth: h.doorWidth,
       gate: lot.id, enterable: true, kind: 'house', wall: '#e8d9b5', roof: '#b4553a', floor: '#d8c8a6', builtOn: lot.id },

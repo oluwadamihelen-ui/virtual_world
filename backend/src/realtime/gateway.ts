@@ -116,7 +116,7 @@ export class Gateway {
   private addBuilt(cityId: string, lotShort: string): boolean {
     const rt = this.rt(cityId); const lotId = `${cityId}:${lotShort}`; const lot = (rt.world.lots ?? []).find((l: any) => l.id === lotId && l.kind === 'land');
     if (!lot || rt.world.buildings.some((b: any) => b.builtOn === lotId)) return false;
-    const { building, zone } = builtHouseSpec(lot);
+    const { building, zone } = builtHouseSpec(lot, rt.world.rowZ);
     rt.world = { ...rt.world, buildings: [...rt.world.buildings, building], zones: [...rt.world.zones, zone] };   // copy: never mutate the shared template
     rt.colliders = buildColliders(rt.world);
     return true;

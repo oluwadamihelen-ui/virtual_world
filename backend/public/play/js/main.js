@@ -13,7 +13,7 @@ renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadow
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 400);
+const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 1000);
 function resize() { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
 addEventListener('resize', resize); resize();
 
@@ -37,9 +37,10 @@ async function boot() {
   showLogin();
 }
 function setWorld(world, force = false) {
-  if (!force && S.w3d && S.w3d.cityId === world.cityId) { S.world = world; S.colliders = buildColliders(world); return; }
+  const key = `${world.metro ?? ''}|${world.cityId}|${world.districts?.length ?? 0}`;
+  if (!force && S.w3d && S.w3d.key === key) { S.world = world; S.colliders = buildColliders(world); return; }
   S.w3d?.dispose();
-  S.world = world; S.colliders = buildColliders(world); S.w3d = createWorld3D(world, scene);
+  S.world = world; S.colliders = buildColliders(world); S.w3d = createWorld3D(world, scene); S.w3d.key = key;
 }
 function showLogin() {
   S.token = null; sessionStorage.removeItem('mvw.token');
@@ -117,6 +118,8 @@ function onServer(m) {
     case 'pong': if (G) G.ping = Math.round(performance.now() - m.c); return;
     case 'app': { const f = G?.pending.get(m.rid); if (f) { G.pending.delete(m.rid); f(m); } return; }
     case 'notify': return G && onNotify(m);
+    case 'area': if (G) onArea(m); return;
+    case 'arrived': if (G) { G.traveling = false; G.hideTravel?.(); G.hideTravel = null; G.auto = null; } return;
     case 'world': if (G) { G.w.world = m.world; setWorld(m.world, true); paintLots(); syncFurniture(); } return;
   }
 }
@@ -139,7 +142,7 @@ function enterWorld(w) {
     pending: new Map(), phone: w.phone ?? { adult: false, unread: 0 }, auto: null, nextTaskAt: 0, ping: 0, online: 1, minSeconds: 20, achievements: w.achievements };
   const gj = G.jobs.find((j) => j.jobId === 'job_grocery_assistant'); if (gj) G.minSeconds = gj.minSecondsPerTask;
   U.buildHud({
-    openPhone: (app) => openPhone(app), openMap, furnish: () => toggleFurnish(), goHome: () => S.conn.send({ t: 'home' }),
+    openPhone: (app) => openPhone(app), openMap, furnish: () => toggleFurnish(), cityView: () => toggleCityView(), goHome: () => S.conn.send({ t: 'home' }),
     say: sendChat, emote: (e) => S.conn.send({ t: 'emote', e }),
   });
   refreshHud(); U.setPhoneBadge(G.phone.unread);
@@ -148,6 +151,12 @@ function enterWorld(w) {
   G.pingTimer = setInterval(() => G && S.conn.send({ t: 'ping', c: Math.round(performance.now()) }), 3000);
   if (w.arrived) U.toast('ok', `Welcome to ${w.city.name}!`);
   else U.toast('info', `Welcome, ${w.you.name}!`);
+}
+/** The player walked (or was carried) into another area of the same city: prices, place name and listings follow. */
+function onArea(m) {
+  G.city = m.city; G.currency = m.currency; U.setCurrency(m.currency); G.ctxKey = null; refreshHud();
+  U.toast('info', `${m.city.name}, ${m.currency.countryName}`);
+  loadEstate();
 }
 function onNotify(m) {
   if (m.kind === 'message') { G.phone.unread++; U.toast('info', `New message from ${m.from}`); }
@@ -162,8 +171,9 @@ function refreshHud() {
   const c = gameClock(now()); U.setClock(c.hour, c.dayIndex, `${G.city.name} · ${G.online} online`);
 }
 
-const gateOf = (lotId) => (!lotId || lotId === 'apt' ? 'apartment' : lotId);
-const gatesFor = (summary, cityId) => new Set(summary.tenancy && summary.tenancy.district === cityId ? [gateOf(summary.tenancy.lotId)] : []);
+const metroOfCity = (id) => S.geo.cities.find((c) => c.id === id)?.metro ?? id;
+const gateOf = (area, lotId) => `${area}:${!lotId || lotId === 'apt' ? 'apartment' : lotId}`;
+const gatesFor = (summary, cityId) => new Set(summary.tenancy && metroOfCity(summary.tenancy.district) === metroOfCity(cityId) ? [gateOf(summary.tenancy.district, summary.tenancy.lotId)] : []);
 function onSummary(summary, door) {
   const prevDone = G.summary.activeShift?.tasksDone ?? -1;
   G.summary = summary; G.door = door; G.access = gatesFor(summary, G.city.id);
@@ -228,6 +238,7 @@ addEventListener('keydown', (e) => {
   if (k === 'r' && G.furn) rotateFurn();
   if (k === 'm') openMap();
   if (k === 'p') openPhone();
+  if (k === 'v') toggleCityView();
 });
 addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 addEventListener('blur', () => keys.clear());
@@ -249,7 +260,7 @@ canvas.addEventListener('pointerdown', (e) => { pointers.set(e.pointerId, { x: e
 canvas.addEventListener('pointermove', (e) => {
   const p = pointers.get(e.pointerId); if (!p || !G) return;
   if (pointers.size === 2) {
-    const [a, b] = [...pointers.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y); if (pinch) G.dist = Math.min(55, Math.max(7, G.dist * (pinch / d))); pinch = d;
+    const [a, b] = [...pointers.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y); if (pinch) G.dist = Math.min(170, Math.max(7, G.dist * (pinch / d))); pinch = d;
   } else { G.yaw -= (e.clientX - p.x) * 0.006; G.pitch = Math.min(1.25, Math.max(0.45, G.pitch + (e.clientY - p.y) * 0.004)); }
   p.x = e.clientX; p.y = e.clientY;
 });
@@ -268,7 +279,7 @@ const upPtr = (e) => {
   }
 };
 canvas.addEventListener('pointerup', upPtr); canvas.addEventListener('pointercancel', upPtr);
-canvas.addEventListener('wheel', (e) => { if (G) G.dist = Math.min(55, Math.max(7, G.dist * (1 + e.deltaY * 0.001))); e.preventDefault(); }, { passive: false });
+canvas.addEventListener('wheel', (e) => { if (G) G.dist = Math.min(170, Math.max(7, G.dist * (1 + e.deltaY * 0.001))); e.preventDefault(); }, { passive: false });
 
 function wantedDirection() {
   if (G.traveling) return { dx: 0, dz: 0, run: false };
@@ -300,13 +311,26 @@ function doorPoints(b) {
   const { frontZ } = buildingBoxes(b); const s = b.doorSide === '+z' ? 1 : -1;
   return { out: { x: b.cx, z: frontZ + s * 1.8 }, inn: { x: b.cx, z: frontZ - s * 1.8 } };
 }
+const rowRoad = (zz) => (S.world.rowZ ?? [0]).reduce((best, r) => (Math.abs(r - zz) < Math.abs(best - zz) ? r : best), (S.world.rowZ ?? [0])[0]);
+/** Walk to another area of the same city: along the street, over a bridge if needed, to that area's spawn point. */
+function walkToArea(areaId) {
+  const d = S.world.districts.find((x) => x.id === areaId); if (!d) return;
+  const here = S.world.buildings.find((b) => b.enterable && inBuilding(b, G.me.x, G.me.z));
+  const path = [];
+  if (here) { const dp = doorPoints(here); path.push(dp.inn, dp.out); }
+  const r0 = rowRoad(G.me.z), r1 = rowRoad(d.spawn.z), startX = here ? doorPoints(here).out.x : G.me.x;
+  path.push({ x: startX, z: r0 });
+  if (r0 !== r1) { const ax = (S.world.avenueX ?? [0]).reduce((best, x) => (Math.abs(x - startX) < Math.abs(best - startX) ? x : best), (S.world.avenueX ?? [0])[0]); path.push({ x: ax, z: r0 }, { x: ax, z: r1 }); }
+  path.push({ x: d.spawn.x, z: r1 }, { x: d.spawn.x, z: d.spawn.z });
+  G.auto = path; U.closePanel(); U.toast('info', `Walking to ${d.name}…`);
+}
 function walkTo(zoneId) {
   const z = S.world.zones.find((q) => q.id === zoneId); if (!z) return;
   const here = S.world.buildings.find((b) => b.enterable && inBuilding(b, G.me.x, G.me.z));
   const target = S.world.buildings.find((b) => b.id === z.building);
   const path = [];
   if (here) { const d = doorPoints(here); path.push(d.inn, d.out); }
-  const roadZ = (S.world.road.minZ + S.world.road.maxZ) / 2;
+  const roadZ = rowRoad(z.z);
   const targetInside = target && inBuilding(target, z.x, z.z);
   const entry = targetInside ? doorPoints(target).out : { x: z.x, z: z.z };
   if (!(here && here === target && targetInside)) { path.push({ x: here ? doorPoints(here).out.x : G.me.x, z: roadZ }); path.push({ x: entry.x, z: roadZ }); path.push(entry); }
@@ -332,7 +356,7 @@ function renderCtx() {
   const btn = (id, label, cls = '', dis = false) => `<button class="btn small ${cls}" data-a="${id}" ${dis ? 'disabled' : ''}>${label}</button>`;
   let body = '';
   if (z.kind === 'door' && z.lot && z.lot !== 'apt') {
-    const mine = s.tenancy && s.tenancy.lotId === z.lot && s.tenancy.district === G.city.id;
+    const mine = s.tenancy && s.tenancy.lotId === z.lot && s.tenancy.district === z.area;
     body = mine ? `<h3>${U.esc(s.tenancy.propertyName)}</h3><p>Your home. The door is unlocked for you.</p><div class="row">${btn('door', 'Unlock door [E]', 'go')}</div>`
       : `<h3>${U.esc(z.label)}</h3><p>The door is locked. See whether it is for sale or rent.</p><div class="row">${btn('details', 'See details', 'go')}</div>`;
   } else if (z.kind === 'door') {
@@ -352,7 +376,7 @@ function renderCtx() {
       : `<h3>${U.esc(job?.name ?? 'Work station')}</h3><p>${job ? `${job.tasksPerShift} tasks · pays ${U.fmt(job.wagePerShift)}` : 'Earn money with a shift.'}</p><div class="row">${btn('work', 'Start a shift [E]', 'go')}</div>`;
   }
   U.showCtx(body, (el) => el.querySelectorAll('button[data-a]').forEach((b) => b.onclick = () => {
-    const a = b.dataset.a; if (a === 'details') openEstateSheet(z.lot); else if (a === 'door' || a === 'work') act(z.id); else if (a.startsWith('buy:')) act(z.id, a.slice(4));
+    const a = b.dataset.a; if (a === 'details') openEstateSheet(`${z.area}:${z.lot}`); else if (a === 'door' || a === 'work') act(z.id); else if (a.startsWith('buy:')) act(z.id, a.slice(4));
   }));
 }
 
@@ -387,7 +411,7 @@ function openMap(preselect) {
     const here_ = geo.cities.find((c) => c.id === here);
     let side = '';
     if (sel.id === here) {
-      const places = S.world.buildings.map((b) => { const z = S.world.zones.find((q) => q.building === b.id); return { b, z }; });
+      const places = S.world.buildings.filter((b) => b.area === G.city.id && b.kind !== 'house').map((b) => { const z = S.world.zones.find((q) => q.building === b.id); return { b, z }; });
       side = `<div class="hd"><h3>${country.flag} ${U.esc(sel.name)} <span class="pill">You are here</span></h3><p>${U.esc(sel.blurb)}</p><p><span class="pill">${country.currency.symbol} ${U.esc(country.currency.name)}</span><span class="pill">Prices ×${sel.priceIndex}</span></p></div>
         <p><button class="btn small gold" data-estate="1">🏠 Homes &amp; land here</button></p>
         <div class="list">${places.filter(({ b }) => b.enterable !== false || b.sign).map(({ b, z }) => `<div class="li"><div><b>${U.esc(b.name)}</b><small>${z ? 'Walkable from here' : 'Coming soon'}</small></div>${z ? `<button class="btn small mint" data-walk="${z.id}">Walk there</button>` : ''}</div>`).join('')}</div>`;
@@ -395,7 +419,8 @@ function openMap(preselect) {
       const opts = st.quotes.get(sel.id);
       const cur = G.currency;
       side = `<div class="hd"><h3>${country.flag} ${U.esc(sel.name)}</h3><p>${U.esc(sel.blurb)}</p><p><span class="pill">${country.currency.symbol} ${U.esc(country.currency.name)}</span><span class="pill">Prices ×${sel.priceIndex}</span>${country.id !== here_.country ? '<span class="pill">International</span>' : ''}</p>${metroSize(sel.metro) > 1 && !st.scope.startsWith('metro:') ? `<p><button class="btn small ghost" data-metro="${sel.metro}">Explore ${metroSize(sel.metro)} areas of ${U.esc(geo.cities.find((c) => c.id === sel.metro).name)}</button></p>` : ''}</div>
-        <div class="list">${!opts ? '<p style="color:var(--mut)">Checking routes…</p>' : opts.map((o) => `<button class="opt" data-mode="${o.mode}" ${o.available ? '' : 'disabled'}><span class="em">${o.icon}</span><span><b>${U.esc(o.name)}</b><small>${o.available ? `${o.km} km · about ${o.seconds}s` : U.esc(o.reason ?? 'Not available')}</small></span><span class="pr">${o.available ? (st.armed === o.mode ? 'Tap to pay ' : '') + o.fareText : ''}${o.available ? `<small style="display:block;color:var(--mut);font-weight:600">${U.mvc(o.fare)}</small>` : ''}</span></button>`).join('')}</div>
+        ${metroOfCity(sel.id) === metroOfCity(here) ? `<p><button class="btn mint" data-walkarea="${sel.id}">🚶 Walk there yourself (free)</button></p>` : ''}
+        <div class="list">${!opts ? '<p style="color:var(--mut)">Checking routes…</p>' : opts.filter((o) => !(o.mode === 'walk' && metroOfCity(sel.id) === metroOfCity(here))).map((o) => `<button class="opt" data-mode="${o.mode}" ${o.available ? '' : 'disabled'}><span class="em">${o.icon}</span><span><b>${U.esc(o.name)}</b><small>${o.available ? `${o.km} km · about ${o.seconds}s` : U.esc(o.reason ?? 'Not available')}</small></span><span class="pr">${o.available ? (st.armed === o.mode ? 'Tap to pay ' : '') + o.fareText : ''}${o.available ? `<small style="display:block;color:var(--mut);font-weight:600">${U.mvc(o.fare)}</small>` : ''}</span></button>`).join('')}</div>
         <p style="color:var(--mut);font-size:12px">Fares are charged in your wallet (${cur.code}). Arriving in ${country.name} switches your wallet to ${country.currency.name} at the game's fixed rate.</p>`;
     }
     U.openPanel('Map', `<div class="tabs">${tabs.map((t) => `<button data-scope="${t.id}" class="${st.scope === t.id ? 'on' : ''}">${t.label}</button>`).join('')}</div>
@@ -404,6 +429,7 @@ function openMap(preselect) {
       el.querySelectorAll('.city').forEach((g) => g.onclick = () => { st.sel = g.dataset.city; st.armed = null; draw(); if (st.sel !== here && !st.quotes.has(st.sel)) S.conn.send({ t: 'quote', to: st.sel }); });
       el.querySelectorAll('[data-metro]').forEach((b) => b.onclick = () => { st.scope = `metro:${b.dataset.metro}`; draw(); });
       el.querySelectorAll('[data-estate]').forEach((b) => b.onclick = () => { U.closePanel(); openEstateOverview(); });
+      el.querySelectorAll('[data-walkarea]').forEach((b) => b.onclick = () => walkToArea(b.dataset.walkarea));
       el.querySelectorAll('[data-walk]').forEach((b) => b.onclick = () => walkTo(b.dataset.walk));
       el.querySelectorAll('[data-mode]').forEach((b) => b.onclick = () => {
         if (st.armed !== b.dataset.mode) { st.armed = b.dataset.mode; draw(); return; }  // second tap confirms and pays
@@ -441,7 +467,7 @@ function frame(t) {
     const cp = Math.cos(G.pitch) * G.dist;
     camera.position.set(G.camT.x + Math.sin(G.yaw) * cp, G.camT.y + Math.sin(G.pitch) * G.dist, G.camT.z + Math.cos(G.yaw) * cp);
     camera.lookAt(G.camT);
-    S.w3d.update(dt, clock.hour, G.me, (g) => G.access.has(g));
+    S.w3d.update(dt, clock.hour, G.me, (g) => G.access.has(g)); S.w3d.setCameraDistance(G.dist);
     updateOverlay(clock);
   } else {
     S.orbit += dt * 0.05;
@@ -449,8 +475,12 @@ function frame(t) {
     if (S.w3d) S.w3d.update(dt, 15.2, { x: 0, z: 0 }, () => false);
   }
   renderer.render(scene, camera);
+  fpsN++; if (performance.now() - fpsT > 1000) { fps = Math.round((fpsN * 1000) / (performance.now() - fpsT)); fpsN = 0; fpsT = performance.now(); }
 }
 
+/** Diagnostics for testers: open the browser console and type mvwStats(). */
+let fpsN = 0, fpsT = performance.now(), fps = 0;
+window.mvwStats = () => ({ fps, drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures });
 const v3 = new THREE.Vector3(); let hudT = 0;
 function project(x, y, z) { v3.set(x, y, z).project(camera); return v3.z > 1 ? null : { x: (v3.x * 0.5 + 0.5) * innerWidth, y: (-v3.y * 0.5 + 0.5) * innerHeight }; }
 function placeTag(tag, x, z, show) {
@@ -471,7 +501,7 @@ function updateOverlay(clock) {
     U.setClock(clock.hour, clock.dayIndex, `${G.city.name} · ${G.online} online`); U.setSayPlaceholder(near);
     const inside = S.world.buildings.find((b) => b.enterable && inBuilding(b, G.me.x, G.me.z));
     const z = zoneNear();
-    U.setPlace(inside ? inside.name : S.world.district.place, inside ? `Inside · ${G.city.name}` : z ? z.label : `${G.city.name}, ${G.currency.countryName}`);
+    const dn = S.world.districts.find((d) => d.id === G.city.id); U.setPlace(inside ? inside.name : (dn?.names.apt ?? '').replace(/ (Apartments|Flats|Residences|Court)$/, '') || G.city.name, inside ? `Inside · ${G.city.name}` : z ? z.label : `${G.city.name}, ${G.currency.countryName}`);
     renderCtx();
   }
 }
@@ -480,30 +510,40 @@ boot();
 window.mvw = { S, get G() { return G; }, scene, camera };
 
 
+// ============================================================================ city view
+function toggleCityView() {
+  if (G.cityView) { G.dist = G.cityView.dist; G.pitch = G.cityView.pitch; G.cityView = null; return; }
+  G.cityView = { dist: G.dist, pitch: G.pitch }; G.dist = 120; G.pitch = 0.95;
+}
+
 // ============================================================================ estate (homes, apartments, land)
 const PIC = { room: ['🛏️', '#5b7fb5'], apartment: ['🏢', '#6a7fd1'], house: ['🏡', '#d98a4a'], land: ['🌱', '#6aa65a'] };
 const periodWord = (h) => (h % 168 === 0 ? (h === 168 ? 'week' : `${h / 168} weeks`) : h % 24 === 0 ? (h === 24 ? 'day' : `${h / 24} days`) : `${h}h`);
+/** Listings for every area of this city (the world shows signs on all of them). G.estate = the area you are standing in. */
 async function loadEstate() {
   if (!G) return null;
-  const r = await sendWait({ app: 'estate', a: 'list', d: {} });
+  const r = await sendWait({ app: 'estate', a: 'metro', d: {} });
   if (!r.ok || !G) return G?.estate ?? null;
-  G.estate = r.data; paintLots(); return G.estate;
+  G.estateAll = r.data;
+  const here = r.data.areas[G.city.id] ?? Object.values(r.data.areas)[0];
+  G.estate = { ...here, portfolio: r.data.portfolio, limits: r.data.limits };
+  paintLots(); return G.estate;
 }
 function paintLots() {
-  const st = {}; const fmt = U.fmt;
-  for (const lot of G.estate.lots) {
-    const L = lot.listings; const mine = L.find((l) => l.state.startsWith('yours'));
+  const st = {}; const fmt = U.fmt; const per = periodWord(G.estateAll.rentPeriodHours);
+  for (const [area, E] of Object.entries(G.estateAll.areas)) for (const lot of E.lots) {
+    const L = lot.listings, id = `${area}:${lot.lotId}`; const mine = L.find((l) => l.state.startsWith('yours'));
     if (lot.lotId === 'apt') {
       const free = L.filter((l) => l.state === 'available'); const cheapest = Math.min(...free.map((l) => l.rent ?? Infinity), lot.rooms?.cheapestRent ?? Infinity);
-      st.apt = { lines: ['APARTMENTS', free.length || lot.rooms?.available ? `from ${fmt(cheapest)} / ${periodWord(G.estate.rentPeriodHours)}` : 'all taken'], tone: mine ? 'yours' : (free.length || lot.rooms?.available) ? 'free' : 'taken' };
+      st[id] = { lines: ['APARTMENTS', free.length || lot.rooms?.available ? `from ${fmt(cheapest)} / ${per}` : 'all taken'], tone: mine ? 'yours' : (free.length || lot.rooms?.available) ? 'free' : 'taken' };
       continue;
     }
     const l = L[0]; if (!l) continue;
     const isHome = l.type === 'house';
-    if (l.state === 'available') st[lot.lotId] = { lines: [isHome ? 'HOUSE' : 'LAND FOR SALE', `${fmt(l.price)}${l.rent ? ` · rent ${fmt(l.rent)}` : ''}`], tone: 'free' };
-    else if (l.state === 'yours_owned') st[lot.lotId] = { lines: [isHome ? 'YOUR HOME' : 'YOUR LAND', 'tap to manage'], tone: 'yours' };
-    else if (l.state === 'yours_renting') st[lot.lotId] = { lines: ['YOU RENT HERE', 'tap to manage'], tone: 'yours' };
-    else st[lot.lotId] = { lines: [isHome ? 'HOUSE · TAKEN' : 'LAND · SOLD'], tone: 'taken' };
+    if (l.state === 'available') st[id] = { lines: [isHome ? 'HOUSE' : 'LAND FOR SALE', `${fmt(l.price)}${l.rent ? ` · rent ${fmt(l.rent)}` : ''}`], tone: 'free' };
+    else if (l.state === 'yours_owned') st[id] = { lines: [isHome ? 'YOUR HOME' : 'YOUR LAND', 'tap to manage'], tone: 'yours' };
+    else if (l.state === 'yours_renting') st[id] = { lines: ['YOU RENT HERE', 'tap to manage'], tone: 'yours' };
+    else st[id] = { lines: [isHome ? 'HOUSE · TAKEN' : 'LAND · SOLD'], tone: 'taken' };
   }
   S.w3d?.setLotStates(st);
 }
@@ -514,12 +554,12 @@ function spark(points, w = 120, h = 28) {
   const pts = points.map((v, i) => `${((i / Math.max(1, points.length - 1)) * w).toFixed(1)},${(h - 3 - ((v - lo) / (hi - lo)) * (h - 6)).toFixed(1)}`).join(' ');
   return `<svg class="spark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><polyline fill="none" stroke="#7be0b4" stroke-width="2" points="${pts}"/></svg>`;
 }
-function valueStrip(a) {
+function valueStrip(a, name) {
   if (!a) return '';
-  return `<div class="vstrip"><div><small>Area value index</small><b>${a.idx.toFixed(2)}</b></div><div><small>This week</small><b class="${a.change7d >= 0 ? 'pos' : 'neg'}">${pctText(a.change7d)}</b></div><div><small>Residents</small><b>${Math.round(a.residents)}</b><small>${a.players} players</small></div>${spark(a.spark)}</div><p class="hint" style="margin:6px 0 8px">Prices and rents follow this index. 1.00 = launch prices. It rises as more people move in.</p>`;
+  return `<div class="vstrip"><div><small>${U.esc(name ?? 'Area')} value index</small><b>${a.idx.toFixed(2)}</b></div><div><small>This week</small><b class="${a.change7d >= 0 ? 'pos' : 'neg'}">${pctText(a.change7d)}</b></div><div><small>Residents</small><b>${Math.round(a.residents)}</b><small>${a.players} players</small></div>${spark(a.spark)}</div><p class="hint" style="margin:6px 0 8px">Prices and rents follow this index. 1.00 = launch prices. It rises as more people move in.</p>`;
 }
 function estateCard(l, armed) {
-  const f = U.fmt, [em, col] = PIC[l.type] ?? PIC.room, per = periodWord(G.estate.rentPeriodHours);
+  const f = U.fmt, [em, col] = PIC[l.type] ?? PIC.room, per = periodWord(G.estateAll.rentPeriodHours);
   const arm = (k, label, price) => `<button class="btn small ${armed === `${k}:${l.propertyId}` ? 'gold' : 'mint'}" data-act="${k}" data-id="${l.propertyId}">${armed === `${k}:${l.propertyId}` ? `Confirm ${label} ${f(price)}` : `${label} ${f(price)}${k === 'rent' ? ` / ${per}` : ''}`}</button>`;
   let btns = '';
   if (l.state === 'available') btns = [l.rent ? arm('rent', 'Rent', l.rent) : '', l.price ? arm('buy', 'Buy', l.price) : ''].join('');
@@ -538,15 +578,19 @@ async function estateAct(act, id, done) {
   U.toast('ok', ESTATE_OK[act](r.data));
   await loadEstate(); done(r.data);
 }
+/** lotId is "area:lot", e.g. "ikeja:house_a" (the id of the lot in the world). */
 function openEstateSheet(lotId) {
-  if (!G?.estate) { loadEstate().then(() => G?.estate && openEstateSheet(lotId)); return; }
+  if (!G?.estateAll) { loadEstate().then(() => G?.estateAll && openEstateSheet(lotId)); return; }
+  const [area, short] = lotId.split(':');
   const st = { armed: null };
-  const lot = () => G.estate.lots.find((l) => l.lotId === lotId);
+  const lot = () => G.estateAll.areas[area]?.lots.find((l) => l.lotId === short);
+  const areaName = S.geo.cities.find((c) => c.id === area)?.name ?? area;
   const draw = () => {
     const lo = lot(); if (!lo) return U.closePanel();
-    const title = lotId === 'apt' ? `${U.esc(S.world.names.apt)}` : lo.listings[0].type === 'land' ? 'Plot of land' : U.esc(lo.listings[0].name);
-    const rooms = lo.rooms ? `<p class="hint" style="margin:0 0 8px">${lo.rooms.available} of ${lo.rooms.total} rooms free${lo.rooms.cheapestRent ? ` · rooms from ${U.fmt(lo.rooms.cheapestRent)} / ${periodWord(G.estate.rentPeriodHours)}` : ''}. Showing the first free ones.</p>` : '';
-    U.openPanel(title, `${valueStrip(G.estate.area)}${rooms}<div class="props">${lo.listings.map((l) => estateCard(l, st.armed)).join('')}</div><p class="hint">Prices are in ${U.esc(G.currency.name)}. Renting is charged every ${periodWord(G.estate.rentPeriodHours)}; owners pay no rent. Property values follow how many people live in the area: buy early, sell later for a profit (or a loss if people leave). Selling costs ${G.estate.limits.sellFeePercent}%. You can live in one home at a time.</p>`, (el) => {
+    const names = S.world.districts.find((d) => d.id === area)?.names ?? {};
+    const title = short === 'apt' ? `${U.esc(names.apt ?? 'Apartments')}` : lo.listings[0].type === 'land' ? `Plot of land · ${U.esc(areaName)}` : U.esc(lo.listings[0].name);
+    const rooms = lo.rooms ? `<p class="hint" style="margin:0 0 8px">${lo.rooms.available} of ${lo.rooms.total} rooms free${lo.rooms.cheapestRent ? ` · rooms from ${U.fmt(lo.rooms.cheapestRent)} / ${periodWord(G.estateAll.rentPeriodHours)}` : ''}. Showing the first free ones.</p>` : '';
+    U.openPanel(title, `${valueStrip(G.estateAll.areas[area].area, areaName)}${rooms}<div class="props">${lo.listings.map((l) => estateCard(l, st.armed)).join('')}</div><p class="hint">Prices are in ${U.esc(G.currency.name)}. Renting is charged every ${periodWord(G.estateAll.rentPeriodHours)}; owners pay no rent. Property values follow how many people live in the area: buy early, sell later for a profit (or a loss if people leave). Selling costs ${G.estateAll.limits.sellFeePercent}%. You can live in one home at a time.</p>`, (el) => {
       el.querySelectorAll('[data-act]').forEach((b) => b.onclick = () => {
         const { act, id } = b.dataset; const k = `${act}:${id}`;
         if (['rent', 'buy', 'build', 'sell'].includes(act) && st.armed !== k) { st.armed = k; draw(); return; }   // second tap confirms
@@ -557,22 +601,24 @@ function openEstateSheet(lotId) {
   draw();
 }
 async function openEstateOverview() {
-  const est = await loadEstate(); const ov = await sendWait({ app: 'estate', a: 'overview', d: {} });
-  if (!est || !ov.ok) return;
+  await loadEstate(); const ov = await sendWait({ app: 'estate', a: 'overview', d: {} });
+  const est = G.estate; if (!est || !ov.ok) return;
   const geo = S.geo; const here = G.city; const cityCur = (id) => geo.countries.find((k) => k.id === geo.cities.find((c) => c.id === id).country).currency;
-  const lotName = (lo) => (lo.lotId === 'apt' ? S.world.names.apt : lo.listings[0].type === 'land' ? `Plot ${lo.lotId.slice(-1).toUpperCase()}` : lo.listings[0].name);
-  const here_ = est.lots.map((lo) => { const l = lo.listings[0]; const free = lo.listings.some((x) => x.state === 'available') || lo.rooms?.available; return `<button class="li" data-lot="${lo.lotId}" style="width:100%;text-align:left"><div><b>${U.esc(lotName(lo))}</b><small>${lo.lotId === 'apt' ? `${lo.rooms.available} rooms and ${lo.listings.filter((x) => x.type === 'apartment').length} apartments` : `${l.type === 'land' ? l.sizeSqm + ' sqm land' : l.beds + ' bed house'}`}</small></div><span class="pill ${free ? '' : 'dim'}">${lo.listings.some((x) => x.state.startsWith('yours')) ? 'Yours' : free ? 'Available' : 'Taken'}</span></button>`; }).join('');
+  const names = S.world.districts.find((d) => d.id === here.id)?.names ?? {};
+  const lotName = (lo) => (lo.lotId === 'apt' ? names.apt ?? 'Apartments' : lo.listings[0].type === 'land' ? `Plot ${lo.lotId.slice(-1).toUpperCase()}` : lo.listings[0].name);
+  const here_ = est.lots.map((lo) => { const l = lo.listings[0]; const free = lo.listings.some((x) => x.state === 'available') || lo.rooms?.available; return `<button class="li" data-lot="${here.id}:${lo.lotId}" style="width:100%;text-align:left"><div><b>${U.esc(lotName(lo))}</b><small>${lo.lotId === 'apt' ? `${lo.rooms.available} rooms and ${lo.listings.filter((x) => x.type === 'apartment').length} apartments` : `${l.type === 'land' ? l.sizeSqm + ' sqm land' : l.beds + ' bed house'}`}</small></div><span class="pill ${free ? '' : 'dim'}">${lo.listings.some((x) => x.state.startsWith('yours')) ? 'Yours' : free ? 'Available' : 'Taken'}</span></button>`; }).join('');
   const byMetro = new Map();
   for (const a of ov.data.areas) { const c = geo.cities.find((x) => x.id === a.cityId); if (!c) continue; const m = c.metro; if (!byMetro.has(m)) byMetro.set(m, []); byMetro.get(m).push({ c, a }); }
-  const rows = [...byMetro.entries()].map(([m, list]) => { const hub = geo.cities.find((c) => c.id === m); return `<div class="metro"><h4>${U.esc(hub.name)}${list.length > 1 ? ' areas' : ''}</h4>${list.sort((x, y) => x.c.priceIndex - y.c.priceIndex).map(({ c, a }) => { const cur = cityCur(c.id); const v = a.value; return `<div class="li"><div><b>${U.esc(c.name)}${c.id === here.id ? ' <span class="pill">you are here</span>' : ''}${v ? ` <span class="pill ${v.change7d >= 0 ? 'up' : 'down'}">${pctText(v.change7d)} 7d · idx ${v.idx.toFixed(2)}</span>` : ''}</b><small>${a.cheapestRoom != null ? `Rooms from ${U.fmt(a.cheapestRoom, cur)}` : 'No rooms free'} · ${a.cheapestHome != null ? `homes from ${U.fmt(a.cheapestHome, cur)}` : 'no homes free'} · ${a.cheapestLand != null ? `land from ${U.fmt(a.cheapestLand, cur)}` : 'no land free'}</small></div>${c.id === here.id ? '' : `<button class="btn small ghost" data-go="${c.id}">Map</button>`}</div>`; }).join('')}</div>`; }).join('');
+  const sameMetro = (id) => metroOfCity(id) === metroOfCity(here.id);
+  const rows = [...byMetro.entries()].map(([m, list]) => { const hub = geo.cities.find((c) => c.id === m); return `<div class="metro"><h4>${U.esc(hub.name)}${list.length > 1 ? ' areas' : ''}</h4>${list.sort((x, y) => x.c.priceIndex - y.c.priceIndex).map(({ c, a }) => { const cur = cityCur(c.id); const v = a.value; return `<div class="li"><div><b>${U.esc(c.name)}${c.id === here.id ? ' <span class="pill">you are here</span>' : ''}${v ? ` <span class="pill ${v.change7d >= 0 ? 'up' : 'down'}">${pctText(v.change7d)} 7d · idx ${v.idx.toFixed(2)}</span>` : ''}</b><small>${a.cheapestRoom != null ? `Rooms from ${U.fmt(a.cheapestRoom, cur)}` : 'No rooms free'} · ${a.cheapestHome != null ? `homes from ${U.fmt(a.cheapestHome, cur)}` : 'no homes free'} · ${a.cheapestLand != null ? `land from ${U.fmt(a.cheapestLand, cur)}` : 'no land free'}</small></div>${c.id === here.id ? '' : sameMetro(c.id) ? `<button class="btn small mint" data-walk="${c.id}">Walk</button>` : `<button class="btn small ghost" data-go="${c.id}">Map</button>`}</div>`; }).join('')}</div>`; }).join('');
   const pf = est.portfolio;
-  const pfHtml = pf.items.length ? `<h3 style="margin:0 0 6px">My properties</h3><div class="list">${pf.items.map((i) => `<div class="li"><div><b>${U.esc(i.name)}</b><small>Paid ${U.fmt(i.paid)} · worth ${U.fmt(i.sellNet)} after fees${i.cityId === here.id ? '' : ` · in ${U.esc(i.cityName)}: travel there to sell`}</small></div><b class="${i.profit >= 0 ? 'pos' : 'neg'}">${i.profit >= 0 ? '+' : ''}${U.fmt(i.profit)} (${(i.profitPct * 100).toFixed(1)}%)</b></div>`).join('')}<div class="li"><b>Total profit if sold today</b><b class="${pf.profit >= 0 ? 'pos' : 'neg'}">${pf.profit >= 0 ? '+' : ''}${U.fmt(pf.profit)}</b></div></div><div style="height:12px"></div>` : '';
-  U.openPanel('Homes & land', `${pfHtml}<h3 style="margin:0 0 6px">In ${U.esc(here.name)} <small style="opacity:.7">(tap one, or tap a building or plot in the world)</small></h3><div class="list">${here_}</div><h3 style="margin:16px 0 6px">Other areas and cities</h3><p class="hint" style="margin:0 0 6px">Each area is its own neighbourhood. Prices are in that country's currency and follow the area's value index: buy where people are moving in, early, and sell when the index has risen. Travel there with the Map.</p>${rows}`, (el) => {
+  const pfHtml = pf.items.length ? `<h3 style="margin:0 0 6px">My properties</h3><div class="list">${pf.items.map((i) => `<div class="li"><div><b>${U.esc(i.name)}</b><small>Paid ${U.fmt(i.paid)} · worth ${U.fmt(i.sellNet)} after fees${i.cityId === here.id || sameMetro(i.cityId) ? '' : ` · in ${U.esc(i.cityName)}: travel there to sell`}</small></div><b class="${i.profit >= 0 ? 'pos' : 'neg'}">${i.profit >= 0 ? '+' : ''}${U.fmt(i.profit)} (${(i.profitPct * 100).toFixed(1)}%)</b></div>`).join('')}<div class="li"><b>Total profit if sold today</b><b class="${pf.profit >= 0 ? 'pos' : 'neg'}">${pf.profit >= 0 ? '+' : ''}${U.fmt(pf.profit)}</b></div></div><div style="height:12px"></div>` : '';
+  U.openPanel('Homes & land', `${pfHtml}${valueStrip(est.area, here.name)}<h3 style="margin:0 0 6px">In ${U.esc(here.name)} <small style="opacity:.7">(tap one, or tap a building or plot in the world)</small></h3><div class="list">${here_}</div><h3 style="margin:16px 0 6px">Other areas and cities</h3><p class="hint" style="margin:0 0 6px">Walk to another area of this city, or use the Map to travel to another city. Prices are in that country's currency and follow the area's value index: buy where people are moving in, early, and sell when the index has risen.</p>${rows}`, (el) => {
     el.querySelectorAll('[data-lot]').forEach((b) => b.onclick = () => openEstateSheet(b.dataset.lot));
     el.querySelectorAll('[data-go]').forEach((b) => b.onclick = () => { U.closePanel(); openMap(b.dataset.go); });
+    el.querySelectorAll('[data-walk]').forEach((b) => b.onclick = () => walkToArea(b.dataset.walk));
   }, { width: '820px' });
 }
-
 
 // ============================================================================ furnishing
 const furnDef = (itemId) => G.catalog.get(itemId);

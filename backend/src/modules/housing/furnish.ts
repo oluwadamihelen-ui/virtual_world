@@ -18,7 +18,7 @@ export function interiorOf(ctx: AppContext, cityId: string, lotId: string) {
   const world = ctx.data.worlds.get(cityId);
   const lot = world?.lots?.find((l: any) => l.id === `${cityId}:${lotId}`);
   if (!world || !lot) return null;
-  const b = lot.kind === 'land' ? builtHouseSpec(lot).building : world.buildings.find((x: any) => x.id === lot.building);
+  const b = lot.kind === 'land' ? builtHouseSpec(lot, world.rowZ).building : world.buildings.find((x: any) => x.id === lot.building);
   if (!b) return null;
   const rect = { minX: b.cx - b.sx / 2 + WALL_INSET, maxX: b.cx + b.sx / 2 - WALL_INSET, minZ: b.cz - b.sz / 2 + WALL_INSET, maxZ: b.cz + b.sz / 2 - WALL_INSET };
   const front = b.doorSide === '+z' ? rect.maxZ : rect.minZ;

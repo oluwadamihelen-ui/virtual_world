@@ -168,6 +168,7 @@ export function buildHud(h) {
     <button id="rPhone" title="Phone">${icon('phone')}<span class="badge hidden" id="phoneBadge">!</span></button>
     <button id="rMap" title="Map & travel">${icon('map')}</button>
     <button id="rHome" title="Go home">${icon('home')}</button>
+    <button id="rView" title="City view [V]">${icon('pin')}</button>
     <button id="rFurn" title="Furnish your home">${icon('sofa')}</button>
     <button id="rEmote" title="Emotes">${icon('smile')}</button>
     <button id="rClean" title="Hide the interface">${icon('eye')}</button>
@@ -185,6 +186,7 @@ export function buildHud(h) {
   q('#rPhone').onclick = () => h.openPhone();
   q('#rMap').onclick = () => h.openMap();
   q('#rHome').onclick = () => h.goHome();
+  q('#rView').onclick = () => h.cityView();
   q('#rFurn').onclick = () => h.furnish();
   q('#rEmote').onclick = () => q('#emotes').classList.toggle('hidden');
   q('#rClean').onclick = () => { document.body.classList.add('cleanui'); toast('info', 'Interface hidden. Tap the screen corner to bring it back.'); addEventListener('pointerdown', function back(e) { if (e.clientX > innerWidth - 90 && e.clientY < 90) { document.body.classList.remove('cleanui'); removeEventListener('pointerdown', back); } }); };

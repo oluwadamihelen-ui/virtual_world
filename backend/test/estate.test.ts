@@ -262,7 +262,7 @@ describe('interiors and furniture', () => {
     await estateApp(a, 'build', { id: 'prop_lagos_land_a', key: key() });
     const info: any = (await app(a, 'home', 'info')).data;
     expect(info.home.lotId).toBe('land_a'); expect(info.rect.maxX - info.rect.minX).toBeGreaterThan(4);
-    const spec = builtHouseSpec(w.ctx.data.worlds.get('lagos')!.lots.find((l: any) => l.id === 'lagos:land_a'));
+    const spec = builtHouseSpec(w.ctx.data.worlds.get('lagos')!.lots.find((l: any) => l.id === 'lagos:land_a'), w.ctx.data.worlds.get('lagos')!.rowZ);
     const world = { ...w.ctx.data.worlds.get('lagos')!, buildings: [...w.ctx.data.worlds.get('lagos')!.buildings, spec.building] };
     const col = buildColliders(world); const front = spec.building.doorSide === '+z' ? spec.building.cz + spec.building.sz / 2 - 0.15 : spec.building.cz - spec.building.sz / 2 + 0.15;
     expect(isBlocked(spec.building.cx, front, col, () => false, world.bounds)).toBe(true);
