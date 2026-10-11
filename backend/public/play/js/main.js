@@ -205,6 +205,7 @@ function onChat(m) {
 }
 function playerMenu(ent, ev) {
   U.showMenu(ev.clientX, ev.clientY, ent.name, [
+    { label: 'Message', run: () => openPhone('chat', { id: ent.id, name: ent.name }) },
     { label: 'Block', run: () => S.conn.send({ t: 'block', targetId: ent.id }) },
     { label: 'Report…', run: () => U.reportDialog(ent.name ?? 'this player', (category, detail) => S.conn.send({ t: 'report', targetId: ent.id, category, detail })) },
   ]);
@@ -345,11 +346,11 @@ const sendWait = (msg) => new Promise((resolve) => {
   S.conn.send({ t: 'app', rid, ...msg });
 });
 
-function openPhone(openApp) {
+function openPhone(openApp, arg) {
   const c = gameClock(now());
   const ctx = { G: () => G, S, U, send: (m) => S.conn.send(m), ask: sendWait, fmt: U.fmt, openMap, openChat: null, onSummary: (fn) => { if (G) G.onSummary = fn; } };
   const phone = U.openPhone({ apps: phoneApps(ctx), hour: c.hour, cityName: `${G.city.name}, ${G.currency.countryName}`, onClose: () => { U.closePanel(); if (G) { G.onSummary = null; G.onNotify = null; G.phoneWait = null; } } });
-  if (openApp) phoneApps(ctx).find((a) => a.id === openApp)?.open(phone);
+  if (openApp) phoneApps(ctx).find((a) => a.id === openApp)?.open(phone, arg);
 }
 
 function openMap() {

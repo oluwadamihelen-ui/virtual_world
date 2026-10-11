@@ -24,6 +24,9 @@
 - Loans: limit grows with reputation (500 + 100 per point, up to 5,000), flat 10% fee, 72 h term, one at a time. If overdue, up to 30% of the **wallet** is collected at most once an hour. Items and homes are never taken. Wallet cannot go below zero.
 - Every movement is a double-entry ledger transaction; `verifyLedgerIntegrity` is asserted in the tests.
 
+## Message privacy
+Direct messages are stored encrypted (AES-256-GCM, key from `MESSAGE_KEY` or derived from `JWT_SECRET`). Only the two participants can fetch a thread; a test confirms a third player gets nothing. It is not end-to-end encrypted: the server can decrypt. Moderators only see messages captured into a report. Real-time notifications carry only the sender's name, never the text. Not built: message deletion/retention limits and disappearing messages.
+
 ## Reports
 The report dialog (player menu, Chatter, Spark) asks for a reason. The report stores a snapshot of context between the two players so a moderator can decide without access to anyone's other private messages.
 

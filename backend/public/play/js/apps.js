@@ -191,7 +191,7 @@ export function phoneApps(ctx) {
 
   return [
     { id: 'bank', name: 'Vault', icon: 'bank', color: GRAD.bank, open: (ph) => bankApp(ph) },
-    { id: 'chat', name: 'Chatter', icon: 'chat', color: GRAD.chat, badge: G().phone?.unread || 0, open: (ph) => messagesApp(ph) },
+    { id: 'chat', name: 'Chatter', icon: 'chat', color: GRAD.chat, badge: G().phone?.unread || 0, open: (ph, arg) => messagesApp(ph, arg) },
     { id: 'love', name: 'Spark', icon: 'heart', color: GRAD.love, adult: true, open: (ph) => loveApp(ph) },
     { id: 'odds', name: 'Odds', icon: 'dice', color: GRAD.odds, adult: true, open: (ph) => oddsApp(ph) },
     { id: 'jobs', name: 'Jobs', icon: 'brief', color: GRAD.jobs, open: async (ph) => {

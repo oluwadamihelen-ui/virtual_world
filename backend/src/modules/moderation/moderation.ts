@@ -1,6 +1,7 @@
 import type { AppContext } from '../../context.js';
 import { withTx, type Tx } from '../../db.js';
 import { badRequest, notFound } from '../../errors.js';
+import { open as openMsg } from '../phone/secret.js';
 import { transfer, playerAccount, systemAccount, balanceOf, assertAmount } from '../economy/ledger.js';
 
 export async function audit(tx: Pick<Tx, 'query'>, actorAccountId: string | null, action: string, targetType: string, targetId: string, detail: object) {
@@ -16,7 +17,7 @@ export async function fileReport(ctx: AppContext, reporterCharacterId: string, t
   const dms = (await ctx.pool.query(
     `SELECT from_id=$1::uuid AS by_reporter, body, created_at FROM direct_messages
       WHERE (from_id=$1 AND to_id=$2) OR (from_id=$2 AND to_id=$1) ORDER BY id DESC LIMIT 15`, [reporterCharacterId, targetCharacterId])).rows
-    .reverse().map((m) => ({ by: m.by_reporter ? 'reporter' : 'target', text: m.body, at: m.created_at }));
+    .reverse().map((m) => ({ by: m.by_reporter ? 'reporter' : 'target', text: openMsg(ctx, m.body), at: m.created_at }));
   const pay = (await ctx.pool.query(
     `SELECT t.amount, t.actor_character_id=$1::uuid AS by_reporter, t.created_at FROM ledger_transactions t
       WHERE t.type='p2p_transfer' AND ((t.actor_character_id=$1::uuid AND t.reference_id=$2::uuid::text) OR (t.actor_character_id=$2::uuid AND t.reference_id=$1::uuid::text))

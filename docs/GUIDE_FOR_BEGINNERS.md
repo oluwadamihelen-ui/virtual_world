@@ -89,8 +89,21 @@ Close the browser tab any time. When you come back and sign in, your money, home
 
 ---
 
+## Part 4: Try messaging with a second player (same computer)
+
+1. Keep your first browser window open and signed in.
+2. Open a **private/incognito window** (Ctrl + Shift + N in Chrome or Edge) and go to `http://localhost:3000/play`. Create a **second account** (different email) with a different character name. Use a date of birth that makes the player **18 or older** for both (messages only connect players in the same age group).
+3. In window 1: tap the **phone** icon, then **Chatter**, **New message**, type the **exact name** of your second character, then **Start chat** and send a message. (Shortcut: click another player's name tag in the world and choose **Message**.)
+4. In window 2: a toast says "New message from…", the phone icon shows a red number, and the message is waiting in **Chatter**. Reply, and window 1 updates live.
+5. Also try **Vault > Send** (money), and the **Map** (take a flight to another country and watch your money change currency).
+
+**How private are messages?** Only the two people in a chat can read it. Other players never see it, and other players cannot ask the server for it. Messages are **encrypted in the database** so a copy of the database does not show them in plain text. It is **not end-to-end encryption**: the game server holds the key and could read them. The only time a moderator sees any messages is when one player **reports** the other: then the last 15 messages between those two are attached to that report. Block a player and you will not get their messages. In production set a separate `MESSAGE_KEY` in `backend/.env` (32+ random characters) and back it up: if you lose it, old messages cannot be read.
+
+---
+
 ## Stopping and starting again
 - **Stop:** click the black window and press **Ctrl + C**.
+- **Updating to a newer download:** extract the new ZIP into a new folder, copy your old `backend\.env` file into its `backend` folder, run `npm install` and `npm run dev` (the database upgrades itself).
 - **Start again later:** open the `backend` folder, type `cmd` in the address bar, and run `npm run dev`. (No need for the other two commands again.)
 
 ## If something goes wrong

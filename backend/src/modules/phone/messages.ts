@@ -3,6 +3,7 @@ import { AppError, badRequest } from '../../errors.js';
 import { checkChat, isBlockedEitherWay } from '../social/social.js';
 import { assertCanAct } from '../identity/service.js';
 import { withTx } from '../../db.js';
+import { seal, open } from './secret.js';
 import { assertSameAgeGroup, findByName, nameOf } from './common.js';
 
 export async function send(ctx: AppContext, fromId: string, toName: string | undefined, toId: string | undefined, text: string) {
@@ -15,7 +16,7 @@ export async function send(ctx: AppContext, fromId: string, toName: string | und
   if (chk.text.length > ctx.data.phone.messages.maxLength) throw badRequest('message_too_long');
   const row = await withTx(ctx.pool, async (tx) => {
     await assertCanAct(ctx, tx, fromId);
-    return (await tx.query('INSERT INTO direct_messages (from_id,to_id,body,created_at) VALUES ($1,$2,$3,$4) RETURNING id, created_at', [fromId, to.id, chk.text, ctx.now()])).rows[0];
+    return (await tx.query('INSERT INTO direct_messages (from_id,to_id,body,created_at) VALUES ($1,$2,$3,$4) RETURNING id, created_at', [fromId, to.id, seal(ctx, chk.text), ctx.now()])).rows[0];
   });
   return { id: Number(row.id), toId: to.id, to: to.name, body: chk.text, at: (row.created_at as Date).toISOString(), filtered: chk.filtered };
 }
@@ -31,7 +32,7 @@ export async function inbox(ctx: AppContext, me: string) {
        FROM last l JOIN characters c ON c.id=l.other
        WHERE NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id=$1 AND b.blocked_id=l.other) OR (b.blocker_id=l.other AND b.blocked_id=$1))
        ORDER BY l.created_at DESC LIMIT 50`, [me]);
-  return r.rows.map((x) => ({ id: x.other as string, name: x.display_name as string, last: x.body as string, mine: x.from_id === me, at: (x.created_at as Date).toISOString(), unread: x.unread as number }));
+  return r.rows.map((x) => ({ id: x.other as string, name: x.display_name as string, last: open(ctx, x.body as string), mine: x.from_id === me, at: (x.created_at as Date).toISOString(), unread: x.unread as number }));
 }
 
 export async function thread(ctx: AppContext, me: string, other: string) {
@@ -39,7 +40,7 @@ export async function thread(ctx: AppContext, me: string, other: string) {
   await ctx.pool.query('UPDATE direct_messages SET read_at=$3 WHERE to_id=$1 AND from_id=$2 AND read_at IS NULL', [me, other, ctx.now()]);
   const r = await ctx.pool.query(
     `SELECT id, from_id, body, created_at FROM direct_messages WHERE (from_id=$1 AND to_id=$2) OR (from_id=$2 AND to_id=$1) ORDER BY id DESC LIMIT 60`, [me, other]);
-  return { with: { id: other, name: await nameOf(ctx, other) }, messages: r.rows.reverse().map((x) => ({ mine: x.from_id === me, body: x.body as string, at: (x.created_at as Date).toISOString() })) };
+  return { with: { id: other, name: await nameOf(ctx, other) }, messages: r.rows.reverse().map((x) => ({ mine: x.from_id === me, body: open(ctx, x.body as string), at: (x.created_at as Date).toISOString() })) };
 }
 
 export async function unreadCount(ctx: AppContext, me: string): Promise<number> {

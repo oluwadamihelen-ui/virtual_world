@@ -7,6 +7,8 @@ const Env = z.object({
   DATABASE_URL: z.string().min(1),
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
   SERVER_API_KEY: z.string().min(24, 'SERVER_API_KEY must be at least 24 characters'),
+  // Optional separate key for encrypting direct messages at rest (falls back to a key derived from JWT_SECRET).
+  MESSAGE_KEY: z.string().min(32).optional(),
   GAME_DATA_DIR: z.string().default('../game-data'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'silent']).default('info'),
   // Load-testing aid only. Ignored (forced off) when NODE_ENV=production.

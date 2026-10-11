@@ -221,3 +221,21 @@ describe('reports carry context for moderators', () => {
     expect(JSON.stringify(ev)).not.toContain('unrelated');
   });
 });
+
+describe('message privacy', () => {
+  it('stores messages encrypted, shows them only to the two people, and never to a third player', async () => {
+    const a = await adult('Priv A'), b = await adult('Priv B'), c = await adult('Priv C');
+    await app(a, 'messages', 'send', { to: 'Priv B', text: 'my secret plan 12345' });
+    const raw = (await w.ctx.pool.query('SELECT body FROM direct_messages')).rows[0].body as string;
+    expect(raw.startsWith('v1:')).toBe(true);
+    expect(raw).not.toContain('secret');
+    expect(((await app(b, 'messages', 'thread', { with: a.characterId })).data as any).messages[0].body).toBe('my secret plan 12345');
+    // a third player sees nothing, whichever side of the conversation they ask about
+    expect(((await app(c, 'messages', 'inbox')).data as any).chats).toHaveLength(0);
+    expect(((await app(c, 'messages', 'thread', { with: a.characterId })).data as any).messages).toHaveLength(0);
+    expect(((await app(c, 'messages', 'thread', { with: b.characterId })).data as any).messages).toHaveLength(0);
+    // a tampered ciphertext is not shown as text
+    await w.ctx.pool.query(`UPDATE direct_messages SET body = 'v1:' || 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'`);
+    expect(((await app(b, 'messages', 'thread', { with: a.characterId })).data as any).messages[0].body).toContain('could not be decrypted');
+  });
+});
