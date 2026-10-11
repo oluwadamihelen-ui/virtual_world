@@ -60,12 +60,12 @@ export interface RentResult { txId: string; tenancyId: string; propertyId: strin
 
 export async function currentTenancy(tx: Pick<Tx, 'query'>, characterId: string) {
   const r = await tx.query(
-    `SELECT t.*, p.name AS property_name, p.furniture_slots FROM tenancies t JOIN properties p ON p.id=t.property_id
+    `SELECT t.*, p.name AS property_name, p.furniture_slots, p.district AS property_district FROM tenancies t JOIN properties p ON p.id=t.property_id
       WHERE t.character_id=$1 AND t.status = ANY($2) ORDER BY t.started_at DESC LIMIT 1`, [characterId, LIVE]);
   const t = r.rows[0];
   if (!t) return null;
   return {
-    tenancyId: t.id as string, propertyId: t.property_id as string, propertyName: t.property_name as string, status: t.status as string,
+    tenancyId: t.id as string, propertyId: t.property_id as string, propertyName: t.property_name as string, district: t.property_district as string, status: t.status as string,
     rentAmount: t.rent_amount as number, paidUntil: (t.paid_until as Date).toISOString(),
     graceUntil: t.grace_until ? (t.grace_until as Date).toISOString() : null, furnitureSlots: t.furniture_slots as number,
   };

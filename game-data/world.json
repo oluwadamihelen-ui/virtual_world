@@ -1,8 +1,8 @@
 {
  "name": "New Meridian",
  "district": {
-  "id": "residential",
-  "name": "Residential District",
+  "id": "yaba",
+  "name": "Maple Court, Yaba",
   "place": "Maple Court"
  },
  "bounds": {
@@ -487,5 +487,26 @@
     "z": -22
    }
   ]
- ]
+ ],
+ "cityId": "lagos",
+ "theme": {
+  "ground": "#8fcf72",
+  "road": "#4b505d",
+  "sidewalk": "#cdc9bd",
+  "park": "#7bbd5f",
+  "hedge": "#5e9f4d"
+ },
+ "names": {
+  "apt": "Maple Court Apartments",
+  "grocery": "Corner Grocery",
+  "cafe": "Meridian Cafe",
+  "jobs": "Job Centre",
+  "bank": "Meridian Bank"
+ },
+ "park": {
+  "cx": -23,
+  "cz": -16,
+  "sx": 22,
+  "sz": 20
+ }
 }

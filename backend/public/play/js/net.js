@@ -12,7 +12,9 @@ async function call(method, path, body, token) {
 
 export const api = {
   world: () => call('GET', '/v1/world'),
-  register: (email, password) => call('POST', '/v1/auth/register', { email, password }),
+  register: (email, password, birthDate) => call('POST', '/v1/auth/register', { email, password, birthDate }),
+  me: (t) => call('GET', '/v1/me', null, t),
+  setBirthDate: (t, birthDate) => call('POST', '/v1/me/birthdate', { birthDate }, t),
   login: (email, password) => call('POST', '/v1/auth/login', { email, password }),
   characters: (t) => call('GET', '/v1/characters', null, t),
   createCharacter: (t, displayName, appearance) => call('POST', '/v1/characters', { displayName, appearance }, t),
@@ -22,7 +24,7 @@ export const api = {
 export function friendlyError(e) {
   const map = {
     email_taken: 'That email can\'t be used. Try signing in instead.', invalid_credentials: 'Wrong email or password.',
-    display_name_taken: 'That name is taken. Try another.', display_name_reserved: 'That name isn\'t allowed.', account_banned: 'This account has been banned.',
+    display_name_taken: 'That name is taken. Try another.', display_name_reserved: 'That name isn\'t allowed.', account_banned: 'This account has been banned.', too_young: 'You must be 13 or older to play.', invalid_birth_date: 'Please check the date of birth.', birth_date_already_set: 'Your date of birth is already set.',
     account_suspended: 'This account is suspended right now.', validation_error: 'Please check what you typed (password needs 10+ characters).',
   };
   return map[e.code] ?? e.message ?? 'Something went wrong.';

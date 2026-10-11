@@ -16,7 +16,7 @@ import { AppError, badRequest, conflict } from '../../errors.js';
 
 export const MAX_AMOUNT = 1_000_000_000_000;
 
-export type SystemAccount = 'faucet:world' | 'faucet:npc_employers' | 'faucet:npc_customers' | 'sink:landlord_npc' | 'sink:supplier_npc' | 'sink:city_fees' | 'adjustments:admin' | `shop:${string}`;
+export type SystemAccount = 'faucet:world' | 'faucet:npc_employers' | 'faucet:npc_customers' | 'sink:landlord_npc' | 'sink:supplier_npc' | 'sink:city_fees' | 'sink:transport' | 'adjustments:admin' | `shop:${string}`;
 // Faucets and admin adjustments may run negative (they are the source of new money); everything else may not.
 const NEGATIVE_OK = (ref: string) => ref.startsWith('faucet:') || ref.startsWith('adjustments:');
 

@@ -13,6 +13,8 @@ import * as shop from '../modules/commerce/shop.js';
 import * as social from '../modules/social/social.js';
 import * as moderation from '../modules/moderation/moderation.js';
 import * as ledger from '../modules/economy/ledger.js';
+import * as travel from '../modules/travel/travel.js';
+import { currencyOfCity, formatMoney } from '../modules/economy/currency.js';
 import { buildColliders, stepPlayer, dist2, isBlocked, type Colliders } from '../../shared/sim.mjs';
 
 /**
@@ -46,17 +48,20 @@ const Msg = z.discriminatedUnion('t', [
   z.object({ t: z.literal('report'), targetId: z.string().uuid(), category: z.enum(['harassment', 'cheating', 'scam', 'inappropriate_name', 'other']), detail: z.string().max(500).optional() }),
   z.object({ t: z.literal('block'), targetId: z.string().uuid() }),
   z.object({ t: z.literal('unblock'), targetId: z.string().uuid() }),
+  z.object({ t: z.literal('quote'), to: z.string().max(40) }),
+  z.object({ t: z.literal('travel'), to: z.string().max(40), mode: z.string().max(20) }),
   z.object({ t: z.literal('ping'), c: z.number().optional() }),
 ]);
 
 interface Body { x: number; z: number; ry: number; moving: boolean }
 interface Player extends Body {
-  id: string; name: string; appearance: unknown; ws: WebSocket; ip: string;
+  id: string; city: string; travel: { to: string; until: number; mode: string } | null; name: string; appearance: unknown; ws: WebSocket; ip: string;
   input: { dx: number; dz: number; run: boolean }; seq: number; lastInputAt: number;
   access: Set<string>; busy: boolean; lastActAt: number; lastEmoteAt: number;
   known: Set<string>; budget: number; budgetAt: number; strikes: number; dirty: boolean; lastSave: number;
   emote: string | null; emoteUntil: number;
 }
+interface CityRuntime { id: string; world: any; colliders: Colliders; npcs: Npc[] }
 interface Npc extends Body { id: string; name: string; appearance: unknown; route: { x: number; z: number }[]; leg: number; dir: 1 | -1; loop: boolean }
 
 const NPC_APPEARANCES = [
@@ -69,32 +74,36 @@ const NPC_APPEARANCES = [
 ];
 
 const FRIENDLY: Record<string, string> = {
-  insufficient_funds: 'Not enough MVC.', out_of_stock: 'Sold out.', property_unavailable: 'Someone else already rents that room.',
+  insufficient_funds: 'Not enough money for that.', out_of_stock: 'Sold out.', property_unavailable: 'Someone else already rents that room.',
   tenancy_limit: 'You already rent a home.', shift_limit_reached: 'You have worked enough shifts for today.',
   shift_in_progress: 'Finish your current shift first.', requirements_not_met: 'You do not meet this job\'s requirements yet.',
 };
 
 export class Gateway {
   readonly players = new Map<string, Player>();
-  readonly npcs: Npc[] = [];
+  private cities = new Map<string, CityRuntime>();
   private wss = new WebSocketServer({ noServer: true, maxPayload: 4096 });
-  private colliders: Colliders;
   private timer?: NodeJS.Timeout;
   private tick = 0;
   private connsByIp = new Map<string, number>();
-  private world: any;
 
   constructor(private ctx: AppContext) {
-    this.world = ctx.data.world;
-    this.colliders = buildColliders(this.world);
-    this.world.npcRoutes.forEach((route: { x: number; z: number }[], i: number) => {
-      const a = route[0]!;
-      this.npcs.push({
-        id: `npc-${i + 1}`, name: 'Resident', appearance: NPC_APPEARANCES[i % NPC_APPEARANCES.length],
-        x: a.x, z: a.z, ry: 0, moving: true, route, leg: 1 % route.length, dir: 1, loop: route.length > 2,
+    for (const [id, world] of ctx.data.worlds) {
+      const rt: CityRuntime = { id, world, colliders: buildColliders(world), npcs: [] };
+      world.npcRoutes.forEach((route: { x: number; z: number }[], i: number) => {
+        const a = route[0]!;
+        rt.npcs.push({
+          id: `npc-${id}-${i + 1}`, name: 'Resident', appearance: NPC_APPEARANCES[(i + id.length) % NPC_APPEARANCES.length],
+          x: a.x, z: a.z, ry: 0, moving: true, route, leg: 1 % route.length, dir: 1, loop: route.length > 2,
+        });
       });
-    });
+      this.cities.set(id, rt);
+    }
   }
+  /** Back-compat for tests: the start city's NPC list. */
+  get npcs(): Npc[] { return this.rt(this.ctx.data.geo.startCity).npcs; }
+  private rt(cityId: string): CityRuntime { return this.cities.get(cityId) ?? this.cities.get(this.ctx.data.geo.startCity)!; }
+  private worldOf(p: { city: string }) { return this.rt(p.city).world; }
 
   // ------------------------------------------------------------------ lifecycle
   attach(server: HttpServer) {
@@ -130,22 +139,40 @@ export class Gateway {
   }
 
   // ------------------------------------------------------------------ connection
+  private publicGeo() {
+    const g = this.ctx.data.geo;
+    return {
+      countries: g.countries.map((c) => ({ ...c, currency: { code: c.currency, ...g.currencies[c.currency]! } })),
+      cities: g.cities.map((c) => ({ id: c.id, country: c.country, name: c.name, lat: c.lat, lon: c.lon, blurb: c.blurb, priceIndex: c.priceIndex })),
+      transport: g.transport.map((m) => ({ id: m.id, name: m.name, icon: m.icon })),
+    };
+  }
+
+  private accessFor(summary: { tenancy: { district: string } | null }, city: string) {
+    return new Set<string>(summary.tenancy && summary.tenancy.district === city ? ['apartment'] : []);
+  }
+
   private async onConnection(ws: WebSocket, id: string, ip: string) {
     try {
       const prev = this.players.get(id);
       if (prev) { this.players.delete(id); prev.ws.close(4000, 'logged in elsewhere'); }
 
       await housing.sweepTenancies(this.ctx, id);
-      const summary = await characterSummary(this.ctx, id);
-      const spawnX = summary.location.x, spawnZ = summary.location.z;
-      const hasHome = !!summary.tenancy;
-      const access = new Set<string>(hasHome ? ['apartment'] : []);
-      const bounds = this.world.bounds;
-      const saved = summary.location.district === this.world.district.id && !(spawnX === 0 && spawnZ === 0)
-        && !isBlocked(spawnX, spawnZ, this.colliders, (g) => access.has(g), bounds);
+      let summary = await characterSummary(this.ctx, id);
+      // A journey that finished while the player was offline completes now.
+      if (summary.travel && new Date(summary.travel.arrivesAt).getTime() <= this.ctx.now().getTime()) {
+        await travel.completeArrival(this.ctx, id);
+        summary = await characterSummary(this.ctx, id);
+      }
+      const city = this.cities.has(summary.city) ? summary.city : this.ctx.data.geo.startCity;
+      const world = this.rt(city).world;
+      const access = this.accessFor(summary, city);
+      const saved = !(summary.location.x === 0 && summary.location.z === 0)
+        && !isBlocked(summary.location.x, summary.location.z, this.rt(city).colliders, (g) => access.has(g), world.bounds);
       const p: Player = {
-        id, name: summary.displayName, appearance: summary.appearance, ws, ip,
-        x: saved ? spawnX : this.world.spawn.x, z: saved ? spawnZ : this.world.spawn.z, ry: 0, moving: false,
+        id, city, travel: summary.travel ? { to: summary.travel.to, until: new Date(summary.travel.arrivesAt).getTime(), mode: 'flight' } : null,
+        name: summary.displayName, appearance: summary.appearance, ws, ip,
+        x: saved ? summary.location.x : world.spawn.x, z: saved ? summary.location.z : world.spawn.z, ry: 0, moving: false,
         input: { dx: 0, dz: 0, run: false }, seq: 0, lastInputAt: Date.now(), access, busy: false, lastActAt: 0, lastEmoteAt: 0,
         known: new Set(), budget: 120, budgetAt: Date.now(), strikes: 0, dirty: false, lastSave: Date.now(), emote: null, emoteUntil: 0,
       };
@@ -156,15 +183,22 @@ export class Gateway {
       ws.on('close', () => { void this.onClose(p); });
       ws.on('error', () => {});
 
-      this.send(p, {
-        t: 'welcome', you: { id, name: p.name, appearance: p.appearance, x: p.x, z: p.z }, world: this.world,
-        summary, door: await this.doorInfo(p, summary), serverNow: Date.now(), tickHz: TICK_HZ,
-        achievements: this.ctx.data.achievements, jobs: jobs.listJobs(this.ctx),
-      });
+      await this.sendWelcome(p, summary);
+      if (p.travel) this.send(p, { t: 'travel', to: p.travel.to, toName: this.ctx.data.cityById.get(p.travel.to)?.name, arrivesAt: p.travel.until, mode: p.travel.mode });
       this.sendSnapshot(p);
     } catch (err) {
       ws.close(1011, 'join failed');
     }
+  }
+
+  private async sendWelcome(p: Player, summary: Awaited<ReturnType<typeof characterSummary>>, extra: object = {}) {
+    const city = this.ctx.data.cityById.get(p.city)!;
+    this.send(p, {
+      t: 'welcome', you: { id: p.id, name: p.name, appearance: p.appearance, x: p.x, z: p.z }, world: this.worldOf(p),
+      city: { id: city.id, name: city.name, country: city.country, blurb: city.blurb }, currency: currencyOfCity(this.ctx.data, p.city),
+      geo: this.publicGeo(), summary, door: await this.doorInfo(p, summary), serverNow: Date.now(), tickHz: TICK_HZ,
+      achievements: this.ctx.data.achievements, jobs: jobs.listJobs(this.ctx), ...extra,
+    });
   }
 
   private async onClose(p: Player) {
@@ -177,7 +211,8 @@ export class Gateway {
 
   private async save(p: Player) {
     p.dirty = false; p.lastSave = Date.now();
-    await this.ctx.pool.query('UPDATE characters SET district=$2,pos_x=$3,pos_y=0,pos_z=$4 WHERE id=$1', [p.id, this.world.district.id, p.x, p.z]);
+    if (p.travel) return; // position is meaningless mid-journey
+    await this.ctx.pool.query('UPDATE characters SET district=$2,pos_x=$3,pos_y=0,pos_z=$4 WHERE id=$1 AND travel_to IS NULL', [p.id, p.city, p.x, p.z]);
   }
 
   // ------------------------------------------------------------------ messages
@@ -199,9 +234,11 @@ export class Gateway {
           p.seq = m.seq; p.input = { dx: m.dx, dz: m.dz, run: !!m.run }; p.lastInputAt = now; return;
         }
         case 'ping': this.send(p, { t: 'pong', c: m.c ?? 0, serverNow: now }); return;
-        case 'chat': return await this.onChat(p, m.text);
+        case 'quote': this.send(p, { t: 'quote', to: m.to, options: travel.quote(this.ctx, p.city, m.to) }); return;
+        case 'travel': return await this.onTravel(p, m.to, m.mode);
+        case 'chat': if (p.travel) return; return await this.onChat(p, m.text);
         case 'emote': return this.onEmote(p, m.e);
-        case 'interact': return await this.onInteract(p, m.zone, m.item);
+        case 'interact': if (p.travel) throw new AppError(409, 'travelling', 'You are on a journey.'); return await this.onInteract(p, m.zone, m.item);
         case 'shopinfo': return await this.onShopInfo(p, m.zone);
         case 'phone': return await this.onPhone(p, m.tab);
         case 'home': return await this.onHome(p);
@@ -217,13 +254,15 @@ export class Gateway {
     }
   }
 
+  private money(p: { city: string }, mvc: number) { return formatMoney(this.ctx.data, mvc, p.city); }
+
   private friendly(err: unknown): string {
     if (err instanceof AppError) return FRIENDLY[err.code] ?? (err.message && err.message !== err.code ? err.message : err.code.replace(/_/g, ' '));
     return 'Something went wrong. Please try again.';
   }
 
-  private nearby(p: Body, radius: number): Player[] {
-    return [...this.players.values()].filter((o) => dist2(p.x, p.z, o.x, o.z) <= radius);
+  private nearby(p: Player, radius: number): Player[] {
+    return [...this.players.values()].filter((o) => o.city === p.city && !o.travel && dist2(p.x, p.z, o.x, o.z) <= radius);
   }
 
   private async onChat(p: Player, text: string) {
@@ -249,7 +288,7 @@ export class Gateway {
 
   // ------------------------------------------------------------------ interactions (server-validated)
   private zoneFor(p: Player, zoneId: string) {
-    const zone = this.world.zones.find((z: any) => z.id === zoneId);
+    const zone = this.worldOf(p).zones.find((z: any) => z.id === zoneId);
     if (!zone) throw new AppError(404, 'unknown_zone');
     if (dist2(p.x, p.z, zone.x, zone.z) > zone.radius + INTERACT_SLACK) throw new AppError(409, 'too_far', 'You are too far away.');
     return zone;
@@ -257,14 +296,17 @@ export class Gateway {
 
   private async refresh(p: Player) {
     const summary = await characterSummary(this.ctx, p.id);
-    p.access = new Set(summary.tenancy ? ['apartment'] : []);
+    p.access = this.accessFor(summary, p.city);
     this.send(p, { t: 'summary', summary, door: await this.doorInfo(p, summary) });
     return summary;
   }
 
-  private async doorInfo(_p: Player, summary: { tenancy: { propertyName: string } | null }) {
-    if (summary.tenancy) return { state: 'tenant', name: summary.tenancy.propertyName };
-    const free = (await housing.listProperties(this.ctx)).find((x) => x.available && x.type === 'room');
+  private async doorInfo(p: Pick<Player, 'city'>, summary: { tenancy: { propertyName: string; district: string } | null }) {
+    if (summary.tenancy) {
+      if (summary.tenancy.district === p.city) return { state: 'tenant', name: summary.tenancy.propertyName };
+      return { state: 'away', name: summary.tenancy.propertyName, city: this.ctx.data.cityById.get(summary.tenancy.district)?.name ?? '' };
+    }
+    const free = (await housing.listProperties(this.ctx)).find((x) => x.available && x.type === 'room' && x.district === p.city);
     return free ? { state: 'free', propertyId: free.propertyId, name: free.name, rent: free.rentPerPeriod } : { state: 'full' };
   }
 
@@ -282,13 +324,13 @@ export class Gateway {
           if (info.state !== 'free') throw new AppError(409, 'no_rooms', 'No rooms are free right now.');
           const r = await housing.rent(this.ctx, p.id, info.propertyId!, randomUUID());
           p.access.add('apartment');
-          this.toast(p, 'ok', `You rented ${info.name} for ${r.rentPaid} MVC. The door is unlocked.`);
+          this.toast(p, 'ok', `You rented ${info.name} for ${this.money(p, r.rentPaid)}. The door is unlocked.`);
         }
       } else if (zone.kind === 'shop') {
         const choice = zone.items.find((i: any) => i.itemId === item);
         if (!choice) throw new AppError(400, 'unknown_item', 'They do not sell that here.');
         const r = await shop.purchase(this.ctx, p.id, { shopId: zone.shopId, itemId: choice.itemId, quantity: 1, idempotencyKey: randomUUID() });
-        this.toast(p, 'ok', `Bought ${choice.label} for ${r.totalPrice} MVC.`);
+        this.toast(p, 'ok', `Bought ${choice.label} for ${this.money(p, r.totalPrice)}.`);
       } else if (zone.kind === 'work') {
         const summary = await characterSummary(this.ctx, p.id);
         if (!summary.activeShift) {
@@ -298,7 +340,7 @@ export class Gateway {
           const t = await jobs.completeTask(this.ctx, p.id, summary.activeShift.shiftId);
           if (t.tasksDone >= t.tasksRequired) {
             const c = await jobs.completeShift(this.ctx, p.id, summary.activeShift.shiftId);
-            this.toast(p, 'ok', `Shift complete! You earned ${c.wage} MVC.`);
+            this.toast(p, 'ok', `Shift complete! You earned ${this.money(p, c.wage)}.`);
           } else this.toast(p, 'ok', `Task ${t.tasksDone} of ${t.tasksRequired} done.`);
         }
       }
@@ -317,11 +359,42 @@ export class Gateway {
 
   private async onHome(p: Player) {
     const summary = await characterSummary(this.ctx, p.id);
-    if (!summary.tenancy) throw new AppError(409, 'no_home', 'You do not rent a home yet. Visit Maple Court Apartments.');
-    const apt = this.world.buildings.find((b: any) => b.id === 'apt');
+    if (!summary.tenancy) throw new AppError(409, 'no_home', 'You do not rent a home yet. Visit the apartments.');
+    if (summary.tenancy.district !== p.city) {
+      throw new AppError(409, 'home_elsewhere', `Your home is in ${this.ctx.data.cityById.get(summary.tenancy.district)?.name}. Open the map to travel there.`);
+    }
+    const apt = this.worldOf(p).buildings.find((b: any) => b.id === 'apt');
     p.access.add('apartment');
-    p.x = apt.cx; p.z = apt.cz + 1.5; p.moving = false; p.dirty = true;
+    p.x = apt.cx; p.z = apt.cz + (apt.doorSide === '+z' ? -1.5 : 1.5); p.moving = false; p.dirty = true;
     this.toast(p, 'ok', 'Welcome home.');
+  }
+
+  // ------------------------------------------------------------------ travel
+  private async onTravel(p: Player, to: string, mode: string) {
+    if (p.travel) throw new AppError(409, 'already_travelling', 'You are already on a journey.');
+    const t = await travel.startTrip(this.ctx, p.id, to, mode, randomUUID());
+    p.travel = { to, until: new Date(t.arrivesAt).getTime(), mode };
+    p.input = { dx: 0, dz: 0, run: false }; p.moving = false;
+    const name = this.ctx.data.cityById.get(to)?.name;
+    this.send(p, { t: 'travel', to, toName: name, mode, arrivesAt: p.travel.until, seconds: t.seconds });
+    this.toast(p, 'ok', `${this.money(p, t.fare)} paid. Heading to ${name}.`);
+    await this.refresh(p);
+  }
+
+  private async arrive(p: Player) {
+    const t = p.travel; if (!t) return;
+    p.travel = null; // clear first so the tick doesn't fire this twice
+    try {
+      const city = await travel.completeArrival(this.ctx, p.id);
+      if (!city || this.players.get(p.id) !== p) return;
+      p.city = this.cities.has(city) ? city : this.ctx.data.geo.startCity;
+      const w = this.worldOf(p);
+      p.x = w.spawn.x; p.z = w.spawn.z; p.known.clear(); p.moving = false; p.dirty = false;
+      const summary = await characterSummary(this.ctx, p.id);
+      p.access = this.accessFor(summary, p.city);
+      await this.sendWelcome(p, summary, { arrived: true });
+      this.toast(p, 'ok', `Welcome to ${this.ctx.data.cityById.get(p.city)?.name}! Prices here are in ${currencyOfCity(this.ctx.data, p.city).name}.`);
+    } catch { p.travel = t; /* retry next tick */ }
   }
 
   private async onPhone(p: Player, tab: 'wallet' | 'jobs' | 'achievements') {
@@ -343,15 +416,17 @@ export class Gateway {
     const now = Date.now();
     this.tick++;
     for (const p of this.players.values()) {
+      if (p.travel) { if (this.ctx.now().getTime() >= p.travel.until) void this.arrive(p); continue; }
+      const rt = this.rt(p.city);
       const input = now - p.lastInputAt > INPUT_STALE_MS ? { dx: 0, dz: 0, run: false } : p.input;
       const before = p.x * 1e3 + p.z;
-      stepPlayer(p, input, dt, this.colliders, (g) => p.access.has(g), this.world.bounds);
+      stepPlayer(p, input, dt, rt.colliders, (g) => p.access.has(g), rt.world.bounds);
       if (p.x * 1e3 + p.z !== before) p.dirty = true;
       if (p.emote && now > p.emoteUntil) p.emote = null;
       if (p.dirty && now - p.lastSave > SAVE_EVERY_MS) void this.save(p).catch(() => {});
     }
-    for (const n of this.npcs) this.stepNpc(n, dt);
-    if (this.tick % SNAPSHOT_EVERY === 0) for (const p of this.players.values()) this.sendSnapshot(p);
+    for (const rt of this.cities.values()) for (const n of rt.npcs) this.stepNpc(n, dt);
+    if (this.tick % SNAPSHOT_EVERY === 0) for (const p of this.players.values()) if (!p.travel) this.sendSnapshot(p);
   }
 
   private stepNpc(n: Npc, dt: number) {
@@ -376,10 +451,14 @@ export class Gateway {
       if (!p.known.has(o.id)) { p.known.add(o.id); spawns.push({ id: o.id, name: npc ? null : o.name, appearance: o.appearance, npc }); }
       ps.push([o.id, +o.x.toFixed(2), +o.z.toFixed(2), +o.ry.toFixed(2), o.moving ? 1 : 0, emote ?? 0]);
     };
-    for (const o of this.players.values()) consider(o, false, o.emote);
-    for (const n of this.npcs) consider(n, true, null);
+    let online = 0;
+    for (const o of this.players.values()) {
+      if (o.city !== p.city || o.travel) continue;
+      online++; consider(o, false, o.emote);
+    }
+    for (const n of this.rt(p.city).npcs) consider(n, true, null);
     const gone: string[] = [];
     for (const id of p.known) if (!seen.has(id)) { gone.push(id); p.known.delete(id); }
-    this.send(p, { t: 'snap', tick: this.tick, ack: p.seq, you: [+p.x.toFixed(2), +p.z.toFixed(2), +p.ry.toFixed(2)], ps, spawns, gone, online: this.players.size });
+    this.send(p, { t: 'snap', tick: this.tick, ack: p.seq, you: [+p.x.toFixed(2), +p.z.toFixed(2), +p.ry.toFixed(2)], ps, spawns, gone, online, city: p.city });
   }
 }

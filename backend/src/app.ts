@@ -103,6 +103,11 @@ export async function buildApp(ctx: AppContext, opts: { rateLimit?: boolean } = 
     const u = await identity.login(ctx, b.email, b.password);
     return { token: await signToken(ctx.config, u), accountId: u.accountId, role: u.role };
   });
+  app.get('/v1/me', async (req) => identity.accountInfo(ctx, (await player(req)).accountId));
+  app.post('/v1/me/birthdate', async (req) => {
+    const u = await player(req);
+    return identity.setBirthDate(ctx, u.accountId, z.object({ birthDate: identity.BirthDate }).parse(req.body).birthDate);
+  });
   app.post('/v1/characters', async (req, reply) => {
     const u = await player(req);
     const r = await identity.createCharacter(ctx, u.accountId, identity.CreateCharacterBody.parse(req.body));

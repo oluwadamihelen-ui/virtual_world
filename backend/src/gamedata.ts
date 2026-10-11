@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
+import { generateWorld, cityShopId } from './world/cities.js';
 
 const Economy = z.object({
   currency: z.object({ code: z.string(), name: z.string() }),
@@ -37,6 +38,23 @@ const World = z.object({
   zones: z.array(z.object({ id: z.string(), kind: z.enum(['door', 'shop', 'work']), x: z.number(), z: z.number(), radius: z.number() }).passthrough()),
   npcRoutes: z.array(z.array(z.object({ x: z.number(), z: z.number() }))),
 }).passthrough();
+const Geo = z.object({
+  startCity: z.string(),
+  currencies: z.record(z.string(), z.object({ symbol: z.string(), name: z.string(), perMVC: z.number().positive(), decimals: z.number().int().min(0).max(4) })),
+  countries: z.array(z.object({ id: z.string(), name: z.string(), flag: z.string(), currency: z.string() })),
+  cities: z.array(z.object({
+    id: z.string(), country: z.string(), name: z.string(), lat: z.number(), lon: z.number(), priceIndex: z.number().positive(), blurb: z.string(),
+    mirror: z.enum(['none', 'x', 'z', 'xz']).optional(),
+    theme: z.object({ ground: z.string(), road: z.string(), buildings: z.array(z.string()), roofs: z.array(z.string()) }).optional(),
+    names: z.record(z.string(), z.string()).optional(),
+  })),
+  transport: z.array(z.object({
+    id: z.string(), name: z.string(), icon: z.string(), intercity: z.boolean(), domesticOnly: z.boolean().optional(),
+    minKm: z.number().optional(), maxKm: z.number().optional(), base: z.number().optional(), perKm: z.number().optional(),
+    secPerKm: z.number().optional(), internationalFee: z.number().optional(),
+  })),
+  minTravelSeconds: z.number().positive(),
+});
 const Achievement = z.object({ id: z.string(), name: z.string(), reputation: z.number().int() });
 const Shop = z.object({
   id: z.string(), name: z.string(), district: z.string(),
@@ -71,6 +89,7 @@ function parseAll(read: (f: string) => unknown) {
   const chat = Chat.parse(read('chat.json'));
   const achievements = z.array(Achievement).parse(read('achievements.json'));
   const world = World.parse(read('world.json'));
+  const geo = Geo.parse(read('geo.json'));
   // Cross-reference validation: catch typos in data at boot rather than at purchase time.
   const itemIds = new Set(items.map((i) => i.id));
   for (const s of shops) for (const st of s.stock) {
@@ -79,7 +98,28 @@ function parseAll(read: (f: string) => unknown) {
   for (const [t, def] of Object.entries(businesses.types)) {
     if (!items.some((i) => def.categories.includes(i.category) && i.wholesalePrice)) throw new Error(`businesses.json: type ${t} has no sellable items`);
   }
-  return { economy, items, shops, properties, jobs, appearance, businesses, chat, achievements, world, itemIds };
+  // ---- geography: validate references, derive per-city worlds, shops and rooms ----
+  const countryIds = new Set(geo.countries.map((c) => c.id));
+  for (const c of geo.countries) if (!geo.currencies[c.currency]) throw new Error(`geo.json: unknown currency ${c.currency}`);
+  for (const c of geo.cities) if (!countryIds.has(c.country)) throw new Error(`geo.json: city ${c.id} has unknown country ${c.country}`);
+  if (!geo.cities.some((c) => c.id === geo.startCity)) throw new Error('geo.json: startCity not found');
+  const worlds = new Map<string, any>();
+  const baseShop = shops.find((s) => s.id === 'shop_corner_grocery')!;
+  const allShops = [...shops];
+  const allProps = [...properties];
+  for (const city of geo.cities) {
+    worlds.set(city.id, city.id === 'lagos' ? { ...world, cityId: 'lagos' } : generateWorld(world, city));
+    if (city.id === 'lagos') continue;
+    allShops.push({ ...baseShop, id: cityShopId(city.id), name: `${city.names?.grocery ?? 'Corner Grocery'}`, district: city.id,
+      stock: baseShop.stock.map((st) => ({ ...st, price: Math.max(1, Math.round(st.price * city.priceIndex)) })) });
+    for (let n = 1; n <= 8; n++) {
+      allProps.push({ id: `prop_${city.id}_room_${n}`, type: 'room', district: city.id, name: `Room ${n}, ${city.names?.apt ?? 'Apartments'}`,
+        rentPerPeriod: Math.max(1, Math.round(500 * city.priceIndex)), capacity: 1, furnitureSlots: 4 });
+    }
+  }
+  const cityById = new Map(geo.cities.map((c) => [c.id, c]));
+  const countryById = new Map(geo.countries.map((c) => [c.id, c]));
+  return { economy, items, shops: allShops, properties: allProps, jobs, appearance, businesses, chat, achievements, world, geo, worlds, cityById, countryById, itemIds };
 }
 
 export function loadGameData(dir: string): GameData {

@@ -31,7 +31,7 @@ console.log(`Creating ${PLAYERS} players…`);
 const players = [];
 await Promise.all(Array.from({ length: PLAYERS }, async (_, i) => {
   const email = `lt${uid}${i}@example.com`;
-  await call('setup:register', 'POST', '/v1/auth/register', { email, password: 'load test password' });
+  await call('setup:register', 'POST', '/v1/auth/register', { email, password: 'load test password', birthDate: '1990-01-01' });
   const login = await call('setup:login', 'POST', '/v1/auth/login', { email, password: 'load test password' });
   const auth = { authorization: `Bearer ${login.json?.token}` };
   const ch = await call('setup:character', 'POST', '/v1/characters', { displayName: `LT ${uid} ${i}`, appearance: { bodyPreset: 'body_a', skinTone: 1, hairstyle: 'short', hairColor: 'black', outfit: 'casual_1' } }, auth);

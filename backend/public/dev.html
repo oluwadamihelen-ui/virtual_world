@@ -111,7 +111,7 @@ function show(s){loadBiz(s);$('bal').textContent=s.balance;$('who').textContent=
 async function act(fn,okMsg){const r=await fn();log(r.ok?okMsg+' ✔':'Oops: '+explain(r.j),r.ok?'ok':'err');await load()}
 $('create').onclick=async()=>{
   const email=`kid${Date.now()}@example.com`,password='a long test password';
-  let r=await api('POST','/v1/auth/register',{email,password},true);if(!r.ok)return log(explain(r.j),'err');
+  let r=await api('POST','/v1/auth/register',{email,password,birthDate:'1990-01-01'},true);if(!r.ok)return log(explain(r.j),'err');
   r=await api('POST','/v1/auth/login',{email,password},true);token=r.j.token;
   r=await api('POST','/v1/characters',{displayName:$('cname').value||'Kid '+Math.floor(Math.random()*1e4),appearance:{bodyPreset:'body_a',skinTone:2,hairstyle:'short',hairColor:'brown',outfit:'casual_1'}},true);
   if(!r.ok)return log('Oops: '+explain(r.j),'err');cid=r.j.characterId;localStorage.setItem('mvwcid',cid);

@@ -2,7 +2,7 @@
   {
     "id": "prop_resi_room_101",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 101, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -11,7 +11,7 @@
   {
     "id": "prop_resi_room_102",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 102, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -20,7 +20,7 @@
   {
     "id": "prop_resi_apt_201",
     "type": "apartment",
-    "district": "residential",
+    "district": "lagos",
     "name": "Apartment 201, Maple Court",
     "rentPerPeriod": 900,
     "capacity": 2,
@@ -29,7 +29,7 @@
   {
     "id": "prop_resi_room_103",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 103, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -38,7 +38,7 @@
   {
     "id": "prop_resi_room_104",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 104, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -47,7 +47,7 @@
   {
     "id": "prop_resi_room_105",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 105, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -56,7 +56,7 @@
   {
     "id": "prop_resi_room_106",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 106, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -65,7 +65,7 @@
   {
     "id": "prop_resi_room_107",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 107, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -74,7 +74,7 @@
   {
     "id": "prop_resi_room_108",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 108, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -83,7 +83,7 @@
   {
     "id": "prop_resi_room_109",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 109, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -92,7 +92,7 @@
   {
     "id": "prop_resi_room_110",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 110, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -101,7 +101,7 @@
   {
     "id": "prop_resi_room_111",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 111, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -110,7 +110,7 @@
   {
     "id": "prop_resi_room_112",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 112, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -119,7 +119,7 @@
   {
     "id": "prop_resi_room_202",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 202, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -128,7 +128,7 @@
   {
     "id": "prop_resi_room_203",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 203, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -137,7 +137,7 @@
   {
     "id": "prop_resi_room_204",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 204, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -146,7 +146,7 @@
   {
     "id": "prop_resi_room_205",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 205, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -155,7 +155,7 @@
   {
     "id": "prop_resi_room_206",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 206, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -164,7 +164,7 @@
   {
     "id": "prop_resi_room_207",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 207, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -173,7 +173,7 @@
   {
     "id": "prop_resi_room_208",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 208, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -182,7 +182,7 @@
   {
     "id": "prop_resi_room_209",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 209, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -191,7 +191,7 @@
   {
     "id": "prop_resi_room_210",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 210, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -200,7 +200,7 @@
   {
     "id": "prop_resi_room_211",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 211, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -209,7 +209,7 @@
   {
     "id": "prop_resi_room_212",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 212, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -218,7 +218,7 @@
   {
     "id": "prop_resi_room_301",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 301, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -227,7 +227,7 @@
   {
     "id": "prop_resi_room_302",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 302, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -236,7 +236,7 @@
   {
     "id": "prop_resi_room_303",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 303, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -245,7 +245,7 @@
   {
     "id": "prop_resi_room_304",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 304, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -254,7 +254,7 @@
   {
     "id": "prop_resi_room_305",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 305, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -263,7 +263,7 @@
   {
     "id": "prop_resi_room_306",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 306, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -272,7 +272,7 @@
   {
     "id": "prop_resi_room_307",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 307, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -281,7 +281,7 @@
   {
     "id": "prop_resi_room_308",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 308, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -290,7 +290,7 @@
   {
     "id": "prop_resi_room_309",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 309, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -299,7 +299,7 @@
   {
     "id": "prop_resi_room_310",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 310, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -308,7 +308,7 @@
   {
     "id": "prop_resi_room_311",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 311, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -317,7 +317,7 @@
   {
     "id": "prop_resi_room_312",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 312, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -326,7 +326,7 @@
   {
     "id": "prop_resi_room_313",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 313, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -335,7 +335,7 @@
   {
     "id": "prop_resi_room_314",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 314, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -344,7 +344,7 @@
   {
     "id": "prop_resi_room_315",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 315, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,
@@ -353,7 +353,7 @@
   {
     "id": "prop_resi_room_316",
     "type": "room",
-    "district": "residential",
+    "district": "lagos",
     "name": "Room 316, Maple Court",
     "rentPerPeriod": 500,
     "capacity": 1,

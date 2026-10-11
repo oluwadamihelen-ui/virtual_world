@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { createWorld3D } from './world3d.js';
 import { createAvatar } from './avatar.js';
-import { stepPlayer, buildColliders, gameClock, dist2 } from '/shared/sim.mjs';
+import { stepPlayer, buildColliders, buildingBoxes, gameClock, dist2 } from '/shared/sim.mjs';
 import { api, friendlyError, Connection } from './net.js';
 import * as U from './ui.js';
+import { phoneApps } from './apps.js';
 
 // ============================================================================ renderer
 const canvas = document.getElementById('gl');
@@ -17,32 +18,34 @@ function resize() { renderer.setSize(innerWidth, innerHeight, false); camera.asp
 addEventListener('resize', resize); resize();
 
 // ============================================================================ state
-const S = { token: sessionStorage.getItem('mvw.token'), world: null, w3d: null, colliders: null, clockOffset: 0, conn: null, char: null, mode: 'menu', orbit: 0 };
+const S = { token: sessionStorage.getItem('mvw.token'), world: null, w3d: null, colliders: null, clockOffset: 0, conn: null, char: null, mode: 'menu', orbit: 0, geo: null };
 let G = null; // in-game state, exists only while connected to a world
+const now = () => Date.now() + S.clockOffset;
 
 const GOALS = [
-  { id: 'first_home', icon: '🏠', title: 'Rent your first home', sub: 'Visit Maple Court Apartments' },
-  { id: 'first_purchase', icon: '🥪', title: 'Buy something to eat', sub: 'Try the Corner Grocery' },
-  { id: 'first_shift', icon: '💼', title: 'Finish a work shift', sub: 'Use the stock room work station' },
-];
-const PLACES = [
-  { id: 'apt_door', icon: '🏠', label: 'Apartments' }, { id: 'grocery_counter', icon: '🛒', label: 'Grocery' }, { id: 'grocery_work', icon: '💼', label: 'Work station' },
+  { id: 'first_home', icon: 'home', title: 'Rent your first home', sub: 'Find the apartments' },
+  { id: 'first_purchase', icon: 'coin', title: 'Buy something to eat', sub: 'Visit the grocery' },
+  { id: 'first_shift', icon: 'brief', title: 'Finish a work shift', sub: 'Use the stock room work station' },
 ];
 
 // ============================================================================ boot / menus
 async function boot() {
   try { S.world = await api.world(); } catch { document.body.innerHTML = '<p style="color:#fff;padding:30px">Cannot reach the game server. Is it running?</p>'; return; }
-  S.colliders = buildColliders(S.world);
-  S.w3d = createWorld3D(S.world, scene);
+  setWorld(S.world);
   requestAnimationFrame(frame);
   if (S.token) { try { await showCharacterScreen(); return; } catch { /* token expired */ } }
   showLogin();
 }
+function setWorld(world) {
+  if (S.w3d && S.w3d.cityId === world.cityId) { S.world = world; S.colliders = buildColliders(world); return; }
+  S.w3d?.dispose();
+  S.world = world; S.colliders = buildColliders(world); S.w3d = createWorld3D(world, scene);
+}
 function showLogin() {
   S.token = null; sessionStorage.removeItem('mvw.token');
-  U.showAuth({ onSubmit: async (mode, email, pw) => {
+  U.showAuth({ onSubmit: async (mode, email, pw, dob) => {
     try {
-      if (mode === 'register') await api.register(email, pw);
+      if (mode === 'register') { if (!dob) throw new Error('Please enter your date of birth.'); await api.register(email, pw, dob); }
       const r = await api.login(email, pw);
       S.token = r.token; sessionStorage.setItem('mvw.token', r.token);
       await showCharacterScreen();
@@ -50,6 +53,11 @@ function showLogin() {
   } });
 }
 async function showCharacterScreen() {
+  const me = await api.me(S.token);
+  if (!me.birthDateSet) {
+    return U.showBirthdate({ onLogout: showLogin, onSubmit: async (dob) => { try { await api.setBirthDate(S.token, dob); } catch (e) { throw new Error(friendlyError(e)); } await showCharacterScreen(); } });
+  }
+  S.me = me;
   const { characters } = await api.characters(S.token);
   if (!characters.length) return showCreateScreen(false);
   U.showCharacters(characters, { onPlay: play, onNew: () => showCreateScreen(true), onLogout: showLogin });
@@ -65,7 +73,7 @@ function showCreateScreen(canGoBack) {
 // ============================================================================ entering the world
 function play(char) {
   S.char = char; U.clear();
-  document.getElementById('ui').innerHTML = '<div class="screen"><div class="card"><h1>Entering New Meridian…</h1><p class="sub">Connecting to the game server.</p></div></div>';
+  document.getElementById('ui').innerHTML = '<div class="screen"><div class="card"><h1>Entering the world…</h1><p class="sub">Connecting to the game server.</p></div></div>';
   S.conn?.close();
   S.conn = new Connection({
     getTicket: async () => (await api.ticket(S.token, char.characterId)).ticket,
@@ -81,13 +89,16 @@ function play(char) {
   S.conn.open();
 }
 function endSession(text) {
-  teardown(); S.mode = 'menu';
+  teardownWorld(); S.conn?.close(); S.mode = 'menu';
   document.getElementById('ui').innerHTML = `<div class="screen"><div class="card"><h1>Disconnected</h1><p class="sub">${U.esc(text)}</p><button class="btn" id="again">Back to the menu</button></div></div>`;
   document.getElementById('again').onclick = () => showCharacterScreen().catch(showLogin);
 }
-function teardown() {
-  if (G) { for (const e of G.ents.values()) { scene.remove(e.av.group); e.tag.remove(); } scene.remove(G.me.av.group); G.me.tag.remove(); clearInterval(G.sendTimer); clearInterval(G.pingTimer); clearInterval(G.mapTimer); }
-  G = null; S.conn?.close();
+function teardownWorld() {
+  if (!G) return;
+  for (const e of G.ents.values()) { scene.remove(e.av.group); e.tag.remove(); }
+  scene.remove(G.me.av.group); G.me.tag.remove();
+  clearInterval(G.sendTimer); clearInterval(G.pingTimer); clearInterval(G.mapTimer); G.hideTravel?.();
+  G = null;
 }
 
 const keys = new Set();
@@ -100,8 +111,11 @@ function onServer(m) {
     case 'toast': return U.toast(m.kind, m.text);
     case 'summary': return G && onSummary(m.summary, m.door);
     case 'shopinfo': if (G) { G.shop[m.zone] = { items: m.items, at: performance.now() }; G.ctxKey = null; } return;
-    case 'phone': return G && onPhone(m);
+    case 'phone': return G?.phoneWait?.(m);
+    case 'quote': return G && G.onQuote?.(m);
+    case 'travel': return G && onTravelStart(m);
     case 'pong': if (G) G.ping = Math.round(performance.now() - m.c); return;
+    case 'app': return G?.appWait?.(m);
   }
 }
 
@@ -111,34 +125,52 @@ function makeTag(name, { me = false, npc = false } = {}) {
 }
 
 function enterWorld(w) {
-  const reconnect = !!G; if (G) teardown();
-  S.world = w.world; S.colliders = buildColliders(w.world);
-  S.clockOffset = w.serverNow - Date.now(); S.mode = 'game'; S.conn = S.conn ?? null;
+  const keepSheet = !!G && !w.arrived;
+  if (G) teardownWorld();
+  setWorld(w.world);
+  S.geo = w.geo; S.clockOffset = w.serverNow - Date.now(); S.mode = 'game';
+  U.setCurrency(w.currency);
   const me = { x: w.you.x, z: w.you.z, ry: 0, moving: false, av: createAvatar(w.you.appearance, { me: true }), tag: makeTag(w.you.name, { me: true }), name: w.you.name };
   scene.add(me.av.group);
-  G = { w, me, ents: new Map(), summary: w.summary, door: w.door, access: new Set(w.summary.tenancy ? ['apartment'] : []), jobs: w.jobs ?? [],
+  G = { w, me, ents: new Map(), summary: w.summary, door: w.door, city: w.city, currency: w.currency, access: new Set(w.summary.tenancy?.district === w.city.id ? ['apartment'] : []), jobs: w.jobs ?? [],
     yaw: -0.75, pitch: 0.8, dist: 19, camT: new THREE.Vector3(me.x, 1, me.z), seq: 0, lastSent: { dx: 0, dz: 0, run: false, t: 0 }, ctxKey: null, shop: {},
-    auto: null, nextTaskAt: 0, ping: 0, online: 1, sheet: null, minSeconds: 20 };
+    auto: null, nextTaskAt: 0, ping: 0, online: 1, minSeconds: 20, achievements: w.achievements };
   const gj = G.jobs.find((j) => j.jobId === 'job_grocery_assistant'); if (gj) G.minSeconds = gj.minSecondsPerTask;
-  U.buildHud({ places: PLACES, openSheet, say: sendChat, emote: (e) => S.conn.send({ t: 'emote', e }), walkTo });
-  U.setGoals(GOALS, w.summary.achievements, w.summary.reputation); U.setMoney(w.summary.balance);
-  { const c = gameClock(Date.now() + S.clockOffset); U.setClock(c.hour, c.dayIndex); U.setOnline(1); }
+  U.buildHud({
+    openPhone: (app) => openPhone(app), openMap, goHome: () => S.conn.send({ t: 'home' }),
+    say: sendChat, emote: (e) => S.conn.send({ t: 'emote', e }),
+  });
+  refreshHud();
   G.sendTimer = setInterval(sendInput, 50);
   G.pingTimer = setInterval(() => G && S.conn.send({ t: 'ping', c: Math.round(performance.now()) }), 3000);
-  if (!reconnect) U.toast('info', `Welcome, ${w.you.name}!`);
+  if (w.arrived) U.toast('ok', `Welcome to ${w.city.name}!`);
+  else U.toast('info', `Welcome, ${w.you.name}!`);
+}
+function refreshHud() {
+  const s = G.summary;
+  U.setWallet({ name: G.me.name, mvcAmount: s.balance, cityName: G.city.name, country: G.currency });
+  U.setGoals(GOALS, s.achievements, s.reputation);
+  const c = gameClock(now()); U.setClock(c.hour, c.dayIndex, `${G.city.name} · ${G.online} online`);
 }
 
 function onSummary(summary, door) {
   const prevDone = G.summary.activeShift?.tasksDone ?? -1;
-  G.summary = summary; G.door = door; G.access = new Set(summary.tenancy ? ['apartment'] : []);
-  U.setMoney(summary.balance); U.setGoals(GOALS, summary.achievements, summary.reputation);
+  G.summary = summary; G.door = door; G.access = new Set(summary.tenancy?.district === G.city.id ? ['apartment'] : []);
   if (summary.activeShift && summary.activeShift.tasksDone > prevDone) G.nextTaskAt = performance.now() + G.minSeconds * 1000;
-  G.ctxKey = null;
+  G.ctxKey = null; refreshHud(); G.onSummary?.();
+}
+
+// ============================================================================ travel
+function onTravelStart(m) {
+  G.hideTravel?.();
+  const mode = S.geo.transport.find((t) => t.id === m.mode);
+  G.traveling = true; U.closePanel();
+  G.hideTravel = U.showTravel({ toName: m.toName, icon: mode?.icon ?? '🧳', mode: mode?.name ?? '', arrivesAt: m.arrivesAt, seconds: m.seconds, now });
 }
 
 // ============================================================================ snapshots & entities
 function onSnap(m) {
-  G.online = m.online; U.setOnline(m.online);
+  G.online = m.online;
   const [sx, sz] = m.you; const err = Math.hypot(sx - G.me.x, sz - G.me.z);
   if (err > 1.5) { G.me.x = sx; G.me.z = sz; } else if (err > 0.04) { G.me.x += (sx - G.me.x) * 0.12; G.me.z += (sz - G.me.z) * 0.12; }
   for (const s of m.spawns) {
@@ -166,22 +198,23 @@ function onChat(m) {
 }
 function playerMenu(ent, ev) {
   U.showMenu(ev.clientX, ev.clientY, ent.name, [
-    { label: '🚫 Block', run: () => S.conn.send({ t: 'block', targetId: ent.id }) },
-    { label: '⚠️ Report…', run: () => S.conn.send({ t: 'report', targetId: ent.id, category: 'harassment', detail: 'Reported from the game menu' }) },
+    { label: 'Block', run: () => S.conn.send({ t: 'block', targetId: ent.id }) },
+    { label: 'Report…', run: () => S.conn.send({ t: 'report', targetId: ent.id, category: 'harassment', detail: 'Reported from the game menu' }) },
   ]);
 }
 
 // ============================================================================ input
-const typing = () => /INPUT|TEXTAREA/.test(document.activeElement?.tagName ?? '');
+const typing = () => /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName ?? '');
 addEventListener('keydown', (e) => {
-  if (!G) return;
+  if (!G || G.traveling) return;
   if (typing()) { if (e.key === 'Escape') document.activeElement.blur(); return; }
   const k = e.key.toLowerCase();
   if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'shift'].includes(k)) { keys.add(k); G.auto = null; e.preventDefault(); }
   if (k === 'e' || k === ' ') { primaryAction(); e.preventDefault(); }
   if (k === 'enter') { document.getElementById('say')?.focus(); e.preventDefault(); }
-  if (k === 'escape') U.closeSheet();
-  if (k === 'm') openSheet('map');
+  if (k === 'escape') U.closePanel();
+  if (k === 'm') openMap();
+  if (k === 'p') openPhone();
 });
 addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 addEventListener('blur', () => keys.clear());
@@ -198,7 +231,6 @@ function moveJoy(e) {
   const l = Math.hypot(x, y); if (l > 1) { x /= l; y /= l; } joy.dx = x; joy.dz = y; knob.style.transform = `translate(${x * 35}px,${y * 35}px)`;
 }
 
-// camera drag / zoom
 const pointers = new Map(); let pinch = 0;
 canvas.addEventListener('pointerdown', (e) => { pointers.set(e.pointerId, { x: e.clientX, y: e.clientY }); canvas.setPointerCapture(e.pointerId); });
 canvas.addEventListener('pointermove', (e) => {
@@ -212,8 +244,8 @@ const upPtr = (e) => { pointers.delete(e.pointerId); pinch = 0; };
 canvas.addEventListener('pointerup', upPtr); canvas.addEventListener('pointercancel', upPtr);
 canvas.addEventListener('wheel', (e) => { if (G) G.dist = Math.min(30, Math.max(7, G.dist * (1 + e.deltaY * 0.001))); e.preventDefault(); }, { passive: false });
 
-/** Movement direction in WORLD space from keys/joystick, relative to where the camera looks. */
 function wantedDirection() {
+  if (G.traveling) return { dx: 0, dz: 0, run: false };
   let f = 0, r = 0;
   if (keys.has('w') || keys.has('arrowup')) f += 1; if (keys.has('s') || keys.has('arrowdown')) f -= 1;
   if (keys.has('d') || keys.has('arrowright')) r += 1; if (keys.has('a') || keys.has('arrowleft')) r -= 1;
@@ -229,21 +261,32 @@ function wantedDirection() {
 }
 function sendInput() {
   if (!G) return;
-  const d = wantedDirection(), now = performance.now(), L = G.lastSent;
+  const d = wantedDirection(), t = performance.now(), L = G.lastSent;
   const dx = Math.round(d.dx * 100) / 100, dz = Math.round(d.dz * 100) / 100;
   const changed = dx !== L.dx || dz !== L.dz || d.run !== L.run;
-  if (changed || ((dx || dz) && now - L.t > 250)) { S.conn.send({ t: 'input', seq: ++G.seq, dx, dz, run: d.run }); G.lastSent = { dx, dz, run: d.run, t: now }; }
+  if (changed || ((dx || dz) && t - L.t > 250)) { S.conn.send({ t: 'input', seq: ++G.seq, dx, dz, run: d.run }); G.lastSent = { dx, dz, run: d.run, t }; }
   G.cur = { dx, dz, run: d.run };
 }
 
+// ---- click-to-walk: out of the current building, along the road, in through the target's door
+const inBuilding = (b, x, z) => x > b.cx - b.sx / 2 && x < b.cx + b.sx / 2 && z > b.cz - b.sz / 2 && z < b.cz + b.sz / 2;
+function doorPoints(b) {
+  const { frontZ } = buildingBoxes(b); const s = b.doorSide === '+z' ? 1 : -1;
+  return { out: { x: b.cx, z: frontZ + s * 1.8 }, inn: { x: b.cx, z: frontZ - s * 1.8 } };
+}
 function walkTo(zoneId) {
   const z = S.world.zones.find((q) => q.id === zoneId); if (!z) return;
-  const inside = S.world.buildings.find((b) => b.enterable && G.me.x > b.cx - b.sx / 2 && G.me.x < b.cx + b.sx / 2 && G.me.z > b.cz - b.sz / 2 && G.me.z < b.cz + b.sz / 2);
-  if (inside && !(z.building === inside.id)) return U.toast('info', 'Walk out of the building first.');
-  const road = 0, path = [];
-  if (z.building !== inside?.id) { path.push({ x: G.me.x, z: road }); path.push({ x: z.x, z: road }); }
-  if (zoneId === 'apt_door' || zoneId.startsWith('grocery')) { if (zoneId !== 'apt_door') { const b = S.world.buildings.find((q) => q.id === 'grocery'); path.push({ x: b.cx, z: b.cz - b.sz / 2 - 1.5 }); path.push({ x: b.cx, z: b.cz - b.sz / 2 + 1.5 }); } }
-  path.push({ x: z.x, z: z.z }); G.auto = path;
+  const here = S.world.buildings.find((b) => b.enterable && inBuilding(b, G.me.x, G.me.z));
+  const target = S.world.buildings.find((b) => b.id === z.building);
+  const path = [];
+  if (here) { const d = doorPoints(here); path.push(d.inn, d.out); }
+  const roadZ = (S.world.road.minZ + S.world.road.maxZ) / 2;
+  const targetInside = target && inBuilding(target, z.x, z.z);
+  const entry = targetInside ? doorPoints(target).out : { x: z.x, z: z.z };
+  if (!(here && here === target && targetInside)) { path.push({ x: here ? doorPoints(here).out.x : G.me.x, z: roadZ }); path.push({ x: entry.x, z: roadZ }); path.push(entry); }
+  if (targetInside) path.push(doorPoints(target).inn);
+  path.push({ x: z.x, z: z.z });
+  G.auto = path; U.closePanel();
 }
 
 // ============================================================================ interactions & context card
@@ -251,11 +294,11 @@ const zoneNear = () => S.world.zones.find((z) => dist2(G.me.x, G.me.z, z.x, z.z)
 function act(zone, item) { S.conn.send({ t: 'interact', zone, item }); }
 function primaryAction() {
   const z = zoneNear(); if (!z) return;
-  if (z.kind === 'door') return act(z.id);
-  if (z.kind === 'shop') { const it = z.items[0]; return act(z.id, it.itemId); }
-  if (z.kind === 'work') return act(z.id);
+  if (z.kind === 'door' || z.kind === 'work') return act(z.id);
+  if (z.kind === 'shop') return act(z.id, z.items[0].itemId);
 }
 function renderCtx() {
+  if (G.traveling) return U.showCtx(null);
   const z = zoneNear(); const s = G.summary;
   const key = z ? `${z.id}|${G.door?.state}|${s.activeShift?.tasksDone}|${s.balance}|${!!G.shop[z.id]}|${Math.ceil(Math.max(0, G.nextTaskAt - performance.now()) / 1000)}` : '';
   if (key === G.ctxKey) return; G.ctxKey = key;
@@ -264,63 +307,86 @@ function renderCtx() {
   let body = '';
   if (z.kind === 'door') {
     const d = G.door;
-    body = d.state === 'tenant' ? `<h3>🏠 ${U.esc(d.name)}</h3><p>This is your home. The door is unlocked for you.</p><div class="row">${btn('door', 'Unlock door [E]', 'green')}</div>`
-      : d.state === 'free' ? `<h3>🏠 ${U.esc(d.name)}</h3><p>${U.mvc(d.rent)} MVC per week · you have ${U.mvc(s.balance)} MVC</p><div class="row">${btn('door', `Rent & move in [E]`, 'green', s.balance < d.rent)}${s.balance < d.rent ? '<small style="color:var(--red)">Not enough MVC yet</small>' : ''}</div>`
-        : `<h3>🏠 ${U.esc(z.label)}</h3><p>Every room is taken right now. Check back soon!</p>`;
+    body = d.state === 'tenant' ? `<h3>${U.esc(d.name)}</h3><p>Your home. The door is unlocked for you.</p><div class="row">${btn('door', 'Unlock door [E]', 'go')}</div>`
+      : d.state === 'free' ? `<h3>${U.esc(d.name)}</h3><p>${U.fmt(d.rent)} per week · you have ${U.fmt(s.balance)}</p><div class="row">${btn('door', 'Rent &amp; move in [E]', 'go', s.balance < d.rent)}${s.balance < d.rent ? '<small style="color:#a33">Not enough money yet</small>' : ''}</div>`
+        : d.state === 'away' ? `<h3>${U.esc(z.label)}</h3><p>You already rent ${U.esc(d.name)} in ${U.esc(d.city)}. One home at a time.</p>`
+          : `<h3>${U.esc(z.label)}</h3><p>Every room is taken right now. Check back soon!</p>`;
   } else if (z.kind === 'shop') {
     if (!G.shop[z.id]) { S.conn.send({ t: 'shopinfo', zone: z.id }); G.shop[z.id] = { items: z.items.map((i) => ({ ...i, price: null })), at: performance.now() }; }
     const items = G.shop[z.id].items;
-    body = `<h3>🛒 ${U.esc(z.label)}</h3><p>You have ${U.mvc(s.balance)} MVC</p><div class="row">${items.map((i, n) => btn(`buy:${i.itemId}`, `${U.esc(i.label)}${i.price != null ? ` · ${i.price} MVC` : ''}${n === 0 ? ' [E]' : ''}`, 'green', i.price != null && s.balance < i.price)).join('')}</div>`;
+    body = `<h3>${U.esc(z.label)}</h3><p>You have ${U.fmt(s.balance)}</p><div class="row">${items.map((i, n) => btn(`buy:${i.itemId}`, `${U.esc(i.label)}${i.price != null ? ` · ${U.fmt(i.price)}` : ''}${n === 0 ? ' [E]' : ''}`, 'go', i.price != null && s.balance < i.price)).join('')}</div>`;
   } else if (z.kind === 'work') {
     const sh = s.activeShift, wait = Math.ceil(Math.max(0, G.nextTaskAt - performance.now()) / 1000);
     const job = G.jobs.find((j) => j.jobId === z.jobId);
-    body = sh ? `<h3>💼 Shift in progress</h3><p>${sh.tasksDone} of ${sh.tasksRequired} tasks done${wait ? ` · next task in ${wait}s` : ''}</p><div class="row">${btn('work', wait ? `Wait ${wait}s…` : 'Do the next task [E]', 'green', wait > 0)}</div>`
-      : `<h3>💼 ${U.esc(job?.name ?? 'Work station')}</h3><p>${job ? `${job.tasksPerShift} tasks · pays ${U.mvc(job.wagePerShift)} MVC` : 'Earn MVC with a shift.'}</p><div class="row">${btn('work', 'Start a shift [E]', 'green')}</div>`;
+    body = sh ? `<h3>Shift in progress</h3><p>${sh.tasksDone} of ${sh.tasksRequired} tasks done${wait ? ` · next task in ${wait}s` : ''}</p><div class="row">${btn('work', wait ? `Wait ${wait}s…` : 'Do the next task [E]', 'go', wait > 0)}</div>`
+      : `<h3>${U.esc(job?.name ?? 'Work station')}</h3><p>${job ? `${job.tasksPerShift} tasks · pays ${U.fmt(job.wagePerShift)}` : 'Earn money with a shift.'}</p><div class="row">${btn('work', 'Start a shift [E]', 'go')}</div>`;
   }
   U.showCtx(body, (el) => el.querySelectorAll('button[data-a]').forEach((b) => b.onclick = () => {
     const a = b.dataset.a; if (a === 'door' || a === 'work') act(z.id); else if (a.startsWith('buy:')) act(z.id, a.slice(4));
   }));
 }
 
-// ============================================================================ sheets (Home / Buy / Map / Phone)
+// ============================================================================ chat, phone, map
 function sendChat(input) { const t = input.value.trim(); if (!t) return; S.conn.send({ t: 'chat', text: t }); input.value = ''; input.blur(); }
-function openSheet(tab, sub) {
-  if (G.sheet === tab && !sub) { U.closeSheet(); G.sheet = null; return; }
-  G.sheet = tab; clearInterval(G.mapTimer);
-  if (tab === 'home') {
-    if (G.summary.tenancy) { U.closeSheet(); G.sheet = null; S.conn.send({ t: 'home' }); return; }
-    U.openSheet(tab, `${U.sheetTitle('Home')}<p>You don't have a home yet. Rent a room at <b>Maple Court Apartments</b> (the blue building) for ${U.mvc(G.door?.rent ?? 500)} MVC a week.</p><button class="btn green" id="goApt">Show me the way</button>`, () => { document.getElementById('goApt').onclick = () => { U.closeSheet(); G.sheet = null; walkTo('apt_door'); }; });
-  } else if (tab === 'buy') {
-    const z = zoneNear();
-    U.openSheet(tab, `${U.sheetTitle('Buy')}${z?.kind === 'shop' ? `<p>You're at <b>${U.esc(z.label)}</b>. Tap an item to buy it.</p><div class="list">${(G.shop[z.id]?.items ?? z.items).map((i) => `<div class="li"><div><b>${U.esc(i.label)}</b><small>${i.price != null ? i.price + ' MVC' : ''}</small></div><button class="btn small green" data-i="${i.itemId}">Buy</button></div>`).join('')}</div>`
-      : '<p>Walk up to a shop counter to buy things. Try the <b>Corner Grocery</b> on the south side of the street.</p><button class="btn green" id="goShop">Show me the way</button>'}`, (el) => {
-      el.querySelectorAll('button[data-i]').forEach((b) => b.onclick = () => act(z.id, b.dataset.i));
-      el.querySelector('#goShop')?.addEventListener('click', () => { U.closeSheet(); G.sheet = null; walkTo('grocery_counter'); });
-    });
-  } else if (tab === 'map') {
-    U.openSheet(tab, `${U.sheetTitle('Map')}<div class="mapbox"><canvas id="mapc" width="560" height="430"></canvas></div>
-      <div class="list" style="margin-top:10px"><div class="li"><div><b>📍 Residential District</b><small>You are here: Maple Court</small></div></div>
-      ${['Market District', 'Central District', 'Waterfront District'].map((d) => `<div class="li" style="opacity:.55"><div><b>🔒 ${d}</b><small>Coming soon</small></div></div>`).join('')}</div>`);
-    const draw = () => U.drawMap(document.getElementById('mapc'), S.world, G.me, [...G.ents.values()]); draw(); G.mapTimer = setInterval(draw, 250);
-  } else {
-    U.openSheet('phone', `${U.sheetTitle('Phone')}<div class="tabs"><button data-t="wallet">💰 Wallet</button><button data-t="jobs">💼 Jobs</button><button data-t="achievements">⭐ Goals</button></div><div id="phoneBody"><p>Loading…</p></div>`, (el) => {
-      el.querySelectorAll('.tabs button').forEach((b) => b.onclick = () => phoneTab(b.dataset.t));
-    });
-    phoneTab(sub ?? 'wallet');
-  }
+
+let ridN = 0;
+/** Ask the game server for an app action and wait for the matching reply (matched by request id). */
+const sendWait = (msg) => new Promise((resolve) => {
+  const rid = `${Date.now().toString(36)}${++ridN}`; const prev = G.appWait;
+  const timer = setTimeout(() => { G.appWait = prev; resolve({ ok: false, error: 'The server took too long to answer.' }); }, 8000);
+  G.appWait = (m) => { if (m.rid === rid) { clearTimeout(timer); G.appWait = prev; resolve(m); } else prev?.(m); };
+  S.conn.send({ t: 'app', rid, ...msg });
+});
+
+function openPhone(openApp) {
+  const c = gameClock(now());
+  const ctx = { G: () => G, S, U, send: (m) => S.conn.send(m), ask: sendWait, fmt: U.fmt, openMap, onSummary: (fn) => { if (G) G.onSummary = fn; } };
+  const phone = U.openPhone({ apps: phoneApps(ctx), hour: c.hour, cityName: `${G.city.name}, ${G.currency.countryName}`, onClose: () => { U.closePanel(); if (G) { G.onSummary = null; G.phoneWait = null; } } });
+  if (openApp) phoneApps(ctx).find((a) => a.id === openApp)?.open(phone);
 }
-function phoneTab(t) { G.phoneTab = t; document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.t === t)); S.conn.send({ t: 'phone', tab: t }); }
-function onPhone(m) {
-  const el = document.getElementById('phoneBody'); if (!el || m.tab !== G.phoneTab) return;
-  el.innerHTML = m.tab === 'wallet' ? `<p style="margin:0 0 8px">Balance <b>${U.mvc(G.summary.balance)} MVC</b></p>${U.renderWallet(m.data)}` : m.tab === 'jobs' ? U.renderJobs(m.data) : U.renderGoals(m.data);
+
+function openMap() {
+  const st = { scope: G.city.country, sel: G.city.id, quotes: new Map(), armed: null };
+  const geo = S.geo;
+  const draw = () => {
+    const here = G.city.id, sel = geo.cities.find((c) => c.id === st.sel);
+    const country = geo.countries.find((k) => k.id === sel.country);
+    const tabs = [...geo.countries.map((k) => ({ id: k.id, label: `${k.flag} ${k.name}` })), { id: 'world', label: 'World' }];
+    const here_ = geo.cities.find((c) => c.id === here);
+    let side = '';
+    if (sel.id === here) {
+      const places = S.world.buildings.map((b) => { const z = S.world.zones.find((q) => q.building === b.id); return { b, z }; });
+      side = `<div class="hd"><h3>${country.flag} ${U.esc(sel.name)} <span class="pill">You are here</span></h3><p>${U.esc(sel.blurb)}</p><p><span class="pill">${country.currency.symbol} ${U.esc(country.currency.name)}</span><span class="pill">Prices ×${sel.priceIndex}</span></p></div>
+        <div class="list">${places.map(({ b, z }) => `<div class="li"><div><b>${U.esc(b.name)}</b><small>${z ? 'Walkable from here' : 'Coming soon'}</small></div>${z ? `<button class="btn small mint" data-walk="${z.id}">Walk there</button>` : ''}</div>`).join('')}</div>`;
+    } else {
+      const opts = st.quotes.get(sel.id);
+      const cur = G.currency;
+      side = `<div class="hd"><h3>${country.flag} ${U.esc(sel.name)}</h3><p>${U.esc(sel.blurb)}</p><p><span class="pill">${country.currency.symbol} ${U.esc(country.currency.name)}</span><span class="pill">Prices ×${sel.priceIndex}</span>${country.id !== here_.country ? '<span class="pill">International</span>' : ''}</p></div>
+        <div class="list">${!opts ? '<p style="color:var(--mut)">Checking routes…</p>' : opts.map((o) => `<button class="opt" data-mode="${o.mode}" ${o.available ? '' : 'disabled'}><span class="em">${o.icon}</span><span><b>${U.esc(o.name)}</b><small>${o.available ? `${o.km} km · about ${o.seconds}s` : U.esc(o.reason ?? 'Not available')}</small></span><span class="pr">${o.available ? (st.armed === o.mode ? 'Tap to pay ' : '') + o.fareText : ''}${o.available ? `<small style="display:block;color:var(--mut);font-weight:600">${U.mvc(o.fare)}</small>` : ''}</span></button>`).join('')}</div>
+        <p style="color:var(--mut);font-size:12px">Fares are charged in your wallet (${cur.code}). Arriving in ${country.name} switches your wallet to ${country.currency.name} at the game's fixed rate.</p>`;
+    }
+    U.openPanel('Map', `<div class="tabs">${tabs.map((t) => `<button data-scope="${t.id}" class="${st.scope === t.id ? 'on' : ''}">${t.label}</button>`).join('')}</div>
+      <div class="mapwrap"><div class="mapsvg" id="mapsvg">${U.renderMapSvg(geo, st.scope, here, st.sel)}</div><div class="sidepanel">${side}</div></div>`, (el) => {
+      el.querySelectorAll('[data-scope]').forEach((b) => b.onclick = () => { st.scope = b.dataset.scope; draw(); });
+      el.querySelectorAll('.city').forEach((g) => g.onclick = () => { st.sel = g.dataset.city; st.armed = null; draw(); if (st.sel !== here && !st.quotes.has(st.sel)) S.conn.send({ t: 'quote', to: st.sel }); });
+      el.querySelectorAll('[data-walk]').forEach((b) => b.onclick = () => walkTo(b.dataset.walk));
+      el.querySelectorAll('[data-mode]').forEach((b) => b.onclick = () => {
+        if (st.armed !== b.dataset.mode) { st.armed = b.dataset.mode; draw(); return; }  // second tap confirms and pays
+        S.conn.send({ t: 'travel', to: st.sel, mode: b.dataset.mode });
+      });
+    }, { width: '980px' });
+  };
+  G.onQuote = (m) => { st.quotes.set(m.to, m.options); if (document.getElementById('mapsvg')) draw(); };
+  draw();
+  if (st.sel !== G.city.id) S.conn.send({ t: 'quote', to: st.sel });
 }
 
 // ============================================================================ frame loop
 let last = performance.now();
-function frame(now) {
+function frame(t) {
   requestAnimationFrame(frame);
-  const dt = Math.min(0.1, (now - last) / 1000); last = now;
-  const clock = gameClock(Date.now() + S.clockOffset);
+  const dt = Math.min(0.1, (t - last) / 1000); last = t;
+  const clock = gameClock(now());
 
   if (G && S.mode === 'game') {
     const hasGate = (g) => G.access.has(g);
@@ -335,7 +401,6 @@ function frame(now) {
       let r = e.tr - e.ry; r = Math.atan2(Math.sin(r), Math.cos(r)); e.ry += r * k;
       e.av.group.position.set(e.x, 0, e.z); e.av.group.rotation.y = e.ry; e.av.update(dt, e.moving);
     }
-    // camera follows with a little smoothing
     G.camT.lerp(new THREE.Vector3(G.me.x, 1.0, G.me.z), 1 - Math.exp(-dt * 9));
     const cp = Math.cos(G.pitch) * G.dist;
     camera.position.set(G.camT.x + Math.sin(G.yaw) * cp, G.camT.y + Math.sin(G.pitch) * G.dist, G.camT.z + Math.cos(G.yaw) * cp);
@@ -343,10 +408,9 @@ function frame(now) {
     S.w3d.update(dt, clock.hour, G.me, G.access.has('apartment'));
     updateOverlay(clock);
   } else {
-    // menu backdrop: a slow orbit around the neighbourhood
     S.orbit += dt * 0.05;
     camera.position.set(Math.sin(S.orbit) * 44, 20, Math.cos(S.orbit) * 36); camera.lookAt(0, 1, 0);
-    if (S.w3d) S.w3d.update(dt, 15.2, { x: 0, z: 0 }, false); // the menu backdrop is always a sunny afternoon
+    if (S.w3d) S.w3d.update(dt, 15.2, { x: 0, z: 0 }, false);
   }
   renderer.render(scene, camera);
 }
@@ -359,7 +423,7 @@ function placeTag(tag, x, z, show) {
   tag.style.display = ''; tag.style.left = `${p.x}px`; tag.style.top = `${p.y}px`;
 }
 function updateOverlay(clock) {
-  placeTag(G.me.tag, G.me.x, G.me.z, true);
+  placeTag(G.me.tag, G.me.x, G.me.z, !G.traveling);
   let near = 1;
   for (const e of G.ents.values()) {
     const d = dist2(G.me.x, G.me.z, e.x, e.z);
@@ -368,16 +432,13 @@ function updateOverlay(clock) {
   }
   hudT += 1;
   if (hudT % 6 === 0) {
-    U.setClock(clock.hour, clock.dayIndex); U.setSayPlaceholder(near);
-    const ping = document.getElementById('ping'); if (ping) ping.textContent = G.ping ? `${G.ping} ms` : '--';
-    const inside = S.world.buildings.find((b) => b.enterable && G.me.x > b.cx - b.sx / 2 && G.me.x < b.cx + b.sx / 2 && G.me.z > b.cz - b.sz / 2 && G.me.z < b.cz + b.sz / 2);
+    U.setClock(clock.hour, clock.dayIndex, `${G.city.name} · ${G.online} online`); U.setSayPlaceholder(near);
+    const inside = S.world.buildings.find((b) => b.enterable && inBuilding(b, G.me.x, G.me.z));
     const z = zoneNear();
-    U.setPlace(inside ? inside.name : 'Maple Court', inside ? `Inside · ${S.world.district.name}` : z ? z.label : `${S.world.district.name} · New Meridian`);
+    U.setPlace(inside ? inside.name : S.world.district.place, inside ? `Inside · ${G.city.name}` : z ? z.label : `${G.city.name}, ${G.currency.countryName}`);
     renderCtx();
   }
 }
 
 boot();
-
-// debug handle for automated screenshots and console poking
 window.mvw = { S, get G() { return G; }, scene, camera };

@@ -43,15 +43,18 @@ export function createWorld3D(world, scene) {
 
   // ---- ground, road, sidewalks ----
   const B = world.bounds, W = B.maxX - B.minX, D = B.maxZ - B.minZ;
-  const ground = box(W + 40, 0.4, D + 40, mat('#8fcf72'), 0, -0.2, 0, false); root.add(ground);
-  const park = box(22, 0.05, 20, mat('#7bbd5f'), -23, 0.03, -16, false); park.castShadow = false; root.add(park);
+  const T = { ground: '#8fcf72', road: '#4b505d', sidewalk: '#cdc9bd', park: '#7bbd5f', hedge: '#5e9f4d', ...(world.theme ?? {}) };
+  const ground = box(W + 40, 0.4, D + 40, mat(T.ground), 0, -0.2, 0, false); root.add(ground);
+  const pk = world.park ?? { cx: -23, cz: -16, sx: 22, sz: 20 };
+  const parkMat = new THREE.Color(T.ground).lerp(new THREE.Color('#2f7a3a'), 0.25);
+  const park = box(pk.sx, 0.05, pk.sz, mat(parkMat), pk.cx, 0.03, pk.cz, false); park.castShadow = false; root.add(park);
   const R = world.road, roadW = R.maxZ - R.minZ;
-  root.add(box(W, 0.08, roadW, mat('#4b505d'), 0, 0.04, (R.minZ + R.maxZ) / 2, false));
-  for (const side of [-1, 1]) root.add(box(W, 0.12, 1.8, mat('#cdc9bd'), 0, 0.06, side * (roadW / 2 + 0.9), false));
+  root.add(box(W, 0.08, roadW, mat(T.road), 0, 0.04, (R.minZ + R.maxZ) / 2, false));
+  for (const side of [-1, 1]) root.add(box(W, 0.12, 1.8, mat(T.sidewalk), 0, 0.06, side * (roadW / 2 + 0.9), false));
   const dash = mat('#f4efe0');
   for (let x = B.minX + 2; x < B.maxX; x += 4) root.add(box(2, 0.01, 0.16, dash, x, 0.09, 0, false));
   for (let i = -3; i <= 3; i++) root.add(box(0.6, 0.01, 1.6, dash, 0.5, 0.09, i * 1.1, false));   // zebra crossing
-  const hedge = mat('#5e9f4d');
+  const hedge = mat(T.hedge);
   root.add(box(W, 0.9, 0.5, hedge, 0, 0.45, B.minZ - 0.25), box(W, 0.9, 0.5, hedge, 0, 0.45, B.maxZ + 0.25),
     box(0.5, 0.9, D + 1, hedge, B.minX - 0.25, 0.45, 0), box(0.5, 0.9, D + 1, hedge, B.maxX + 0.25, 0.45, 0));
 
@@ -158,7 +161,12 @@ export function createWorld3D(world, scene) {
   let time = 0;
 
   return {
-    buildings, markers,
+    buildings, markers, cityId: world.cityId,
+    dispose() {
+      scene.remove(root);
+      root.traverse((o) => { if (o.material) { const ms = Array.isArray(o.material) ? o.material : [o.material]; for (const m of ms) { m.map?.dispose(); m.dispose(); } } if (o.geometry && o.geometry !== BOX) o.geometry.dispose(); });
+      scene.background = null; scene.fog = null;
+    },
     /** hour 0..24, me = {x,z}, hasAccess = bool (apartment gate), focus = point the sun's shadow box follows */
     update(dt, hour, me, hasAccess) {
       time += dt;

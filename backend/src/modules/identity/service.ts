@@ -1,12 +1,29 @@
 import { z } from 'zod';
 import type { AppContext } from '../../context.js';
 import { withTx, type Tx } from '../../db.js';
-import { badRequest, conflict, forbidden, notFound, unauthorized } from '../../errors.js';
+import { AppError, badRequest, conflict, forbidden, notFound, unauthorized } from '../../errors.js';
 import { hashPassword, verifyPassword } from './password.js';
 import { validateDisplayName } from './names.js';
 import { transfer, playerAccount, systemAccount } from '../economy/ledger.js';
 
-export const RegisterBody = z.object({ email: z.string().email().max(254), password: z.string().min(10).max(200) });
+export const BirthDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use the format YYYY-MM-DD').refine((d) => !Number.isNaN(Date.parse(d)), 'Invalid date');
+export const RegisterBody = z.object({ email: z.string().email().max(254), password: z.string().min(10).max(200), birthDate: BirthDate });
+
+/** Whole years between a YYYY-MM-DD birth date and `now`. */
+export function ageYears(birthDate: string, now: Date): number {
+  const [y, m, d] = birthDate.split('-').map(Number) as [number, number, number];
+  let age = now.getUTCFullYear() - y;
+  if (now.getUTCMonth() + 1 < m || (now.getUTCMonth() + 1 === m && now.getUTCDate() < d)) age--;
+  return age;
+}
+export type AgeBand = 'adult' | 'teen' | 'unknown';
+export const ageBand = (birthDate: string | null, now: Date): AgeBand => (!birthDate ? 'unknown' : ageYears(birthDate, now) >= 18 ? 'adult' : 'teen');
+const MIN_AGE = 13;
+export function assertOldEnough(birthDate: string, now: Date) {
+  const age = ageYears(birthDate, now);
+  if (age < MIN_AGE) throw new AppError(403, 'too_young', `You must be ${MIN_AGE} or older to play.`);
+  if (age > 120 || age < 0) throw badRequest('invalid_birth_date', 'Please check the date of birth.');
+}
 export const CreateCharacterBody = z.object({
   displayName: z.string().max(60),
   appearance: z.object({
@@ -15,11 +32,12 @@ export const CreateCharacterBody = z.object({
 });
 
 export async function register(ctx: AppContext, body: z.infer<typeof RegisterBody>) {
+  assertOldEnough(body.birthDate, ctx.now());
   const hash = await hashPassword(body.password);
   try {
     const r = await ctx.pool.query(
-      'INSERT INTO accounts (email, password_hash, created_at) VALUES ($1,$2,$3) RETURNING id, role',
-      [body.email, hash, ctx.now()],
+      'INSERT INTO accounts (email, password_hash, birth_date, created_at) VALUES ($1,$2,$3,$4) RETURNING id, role',
+      [body.email, hash, body.birthDate, ctx.now()],
     );
     return { accountId: r.rows[0].id as string, role: r.rows[0].role as 'player' };
   } catch (e: any) {
@@ -89,4 +107,28 @@ export async function assertCanAct(ctx: AppContext, tx: Pick<Tx, 'query'>, chara
   if (!row) throw notFound('character_not_found');
   if (row.status === 'banned') throw forbidden('account_banned');
   if (row.status === 'suspended' && (!row.suspended_until || row.suspended_until > ctx.now())) throw forbidden('account_suspended');
+}
+
+export async function accountInfo(ctx: AppContext, accountId: string) {
+  const r = (await ctx.pool.query(`SELECT id, role, to_char(birth_date,'YYYY-MM-DD') AS bd FROM accounts WHERE id=$1`, [accountId])).rows[0];
+  if (!r) throw notFound('account_not_found');
+  return { accountId: r.id as string, role: r.role as string, birthDateSet: !!r.bd, ageBand: ageBand(r.bd, ctx.now()) };
+}
+
+/** One-time: accounts created before age checks existed set it once; it cannot be changed afterwards. */
+export async function setBirthDate(ctx: AppContext, accountId: string, birthDate: string) {
+  assertOldEnough(birthDate, ctx.now());
+  const r = await ctx.pool.query('UPDATE accounts SET birth_date=$2 WHERE id=$1 AND birth_date IS NULL', [accountId, birthDate]);
+  if (r.rowCount === 0) throw conflict('birth_date_already_set', 'Your date of birth is already set.');
+  return accountInfo(ctx, accountId);
+}
+
+/** Age band of the account behind a character. Unknown (no date of birth) is treated like a teen: the safe default. */
+export async function characterAgeBand(ctx: AppContext, characterId: string): Promise<AgeBand> {
+  const r = (await ctx.pool.query(`SELECT to_char(a.birth_date,'YYYY-MM-DD') AS bd FROM characters c JOIN accounts a ON a.id=c.account_id WHERE c.id=$1`, [characterId])).rows[0];
+  if (!r) throw notFound('character_not_found');
+  return ageBand(r.bd, ctx.now());
+}
+export async function assertAdult(ctx: AppContext, characterId: string) {
+  if ((await characterAgeBand(ctx, characterId)) !== 'adult') throw new AppError(403, 'adults_only', 'This app is for players aged 18 and over.');
 }

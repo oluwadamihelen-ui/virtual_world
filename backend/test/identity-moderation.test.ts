@@ -17,9 +17,9 @@ describe('identity', () => {
     const none = await w.app.inject({ method: 'POST', url: '/v1/auth/login', payload: { email: 'nobody@example.com', password: 'wrong password!!' } });
     expect(bad.statusCode).toBe(401); expect(none.statusCode).toBe(401);
     expect(bad.body).toBe(none.body);
-    const dup = await w.app.inject({ method: 'POST', url: '/v1/auth/register', payload: { email: 'ALICE@example.com', password: 'another long password' } });
+    const dup = await w.app.inject({ method: 'POST', url: '/v1/auth/register', payload: { email: 'ALICE@example.com', password: 'another long password', birthDate: '1990-01-01' } });
     expect(dup.statusCode).toBe(409);
-    const weak = await w.app.inject({ method: 'POST', url: '/v1/auth/register', payload: { email: 'x@example.com', password: 'short' } });
+    const weak = await w.app.inject({ method: 'POST', url: '/v1/auth/register', payload: { email: 'x@example.com', password: 'short', birthDate: '1990-01-01' } });
     expect(weak.statusCode).toBe(400);
   });
 

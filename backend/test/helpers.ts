@@ -13,7 +13,7 @@ const URL = process.env.TEST_DATABASE_URL ?? 'postgres://mvw:mvw_dev_password@lo
 
 export interface TestWorld {
   ctx: AppContext; app: FastifyInstance; clock: { t: Date }; close(): Promise<void>;
-  newPlayer(name?: string, email?: string): Promise<{ accountId: string; token: string; characterId: string }>;
+  newPlayer(name?: string, email?: string, opts?: { birthDate?: string }): Promise<{ accountId: string; token: string; characterId: string }>;
   gameReq(method: string, url: string, body?: unknown): Promise<{ status: number; body: any }>;
   playerReq(token: string, method: string, url: string, body?: unknown): Promise<{ status: number; body: any }>;
   setRole(accountId: string, role: 'moderator' | 'admin'): Promise<string>;
@@ -41,10 +41,10 @@ export async function createWorld(): Promise<TestWorld> {
     close: async () => { await app.close(); await pool.end(); },
     gameReq: (m, u, b) => send({ 'x-server-key': SERVER_KEY }, m, u, b),
     playerReq: (tok, m, u, b) => send({ authorization: `Bearer ${tok}` }, m, u, b),
-    async newPlayer(name, email) {
+    async newPlayer(name, email, opts = {}) {
       const id = randomUUID().slice(0, 8);
       email ??= `p${id}@example.com`;
-      const reg = await send({}, 'POST', '/v1/auth/register', { email, password: 'correct horse battery' });
+      const reg = await send({}, 'POST', '/v1/auth/register', { email, password: 'correct horse battery', birthDate: opts.birthDate ?? '1990-06-15' });
       if (reg.status !== 201) throw new Error('register failed ' + JSON.stringify(reg.body));
       const login = await send({}, 'POST', '/v1/auth/login', { email, password: 'correct horse battery' });
       const token = login.body.token as string;
