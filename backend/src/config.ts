@@ -16,6 +16,8 @@ const Env = z.object({
   FLUTTERWAVE_SECRET_HASH: z.string().min(8).optional(),        // the 'secret hash' you set for webhooks in the Flutterwave dashboard
   KORAPAY_SECRET_KEY: z.string().min(8).optional(),
   MANUAL_TOPUP_INSTRUCTIONS: z.string().max(600).optional(),    // e.g. "Zenith Bank, 0123456789, My Virtual World Ltd" shown to players who pay by transfer
+  // Set to 1 when the server sits behind ONE reverse proxy (Render, Railway, Fly, nginx, Cloudflare...) so each player's real IP is used for rate limits and connection caps.
+  TRUST_PROXY: z.enum(['0', '1']).default('0'),
   GAME_DATA_DIR: z.string().default('../game-data'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'silent']).default('info'),
   // Load-testing aid only. Ignored (forced off) when NODE_ENV=production.

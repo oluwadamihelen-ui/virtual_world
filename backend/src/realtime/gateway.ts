@@ -189,7 +189,9 @@ export class Gateway {
       // Same-origin check (blocks cross-site WebSocket hijacking from other web pages).
       const origin = req.headers.origin;
       if (origin && new URL(origin).host !== req.headers.host) return this.reject(socket, 403, 'Forbidden');
-      const ip = req.socket.remoteAddress ?? '?';
+      // behind one reverse proxy the socket address is the proxy's, so take the last X-Forwarded-For entry (the one the proxy itself added)
+      const fwd = this.ctx.config.TRUST_PROXY === '1' ? String(req.headers['x-forwarded-for'] ?? '').split(',').pop()?.trim() : '';
+      const ip = fwd || req.socket.remoteAddress || '?';
       if ((this.connsByIp.get(ip) ?? 0) >= MAX_CONN_PER_IP) return this.reject(socket, 429, 'Too Many Connections');
       const ticket = url.searchParams.get('ticket') ?? '';
       let id: string;

@@ -25,6 +25,7 @@ Set these in the host's dashboard (never commit real values). Names are in `back
 | `PORT` | Usually set by the host; the server listens on it (default 3000). |
 | `MESSAGE_KEY` | 32+ random characters; encrypts direct messages at rest. Back it up: lose it and old messages cannot be read. |
 | `PUBLIC_BASE_URL` | The public https address, e.g. `https://play.example.com` (payment return pages). |
+| `TRUST_PROXY` | `1` on any host that puts a proxy in front of you (Render, Railway, Fly...). **Required for real hosting**: without it all players share the proxy's IP and hit the per-IP rate and connection limits together. |
 | `LOG_LEVEL` | `info` (default) |
 
 **Optional: top-ups** (a method appears only when its keys are set; see `docs/PAYMENTS.md`)
