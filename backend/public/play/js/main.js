@@ -147,6 +147,7 @@ function enterWorld(w) {
     say: sendChat, emote: (e) => S.conn.send({ t: 'emote', e }),
   });
   refreshHud(); U.setPhoneBadge(G.phone.unread);
+  syncFurniture();   // show the furniture you already placed (nothing else triggers this when you come back online)
   G.sendTimer = setInterval(sendInput, 50);
   loadEstate(); G.estateTimer = setInterval(() => loadEstate(), 20000);
   G.pingTimer = setInterval(() => G && S.conn.send({ t: 'ping', c: Math.round(performance.now()) }), 3000);
@@ -157,7 +158,7 @@ function enterWorld(w) {
 function onArea(m) {
   G.city = m.city; G.currency = m.currency; U.setCurrency(m.currency); G.ctxKey = null; refreshHud();
   U.toast('info', `${m.city.name}, ${m.currency.countryName}`);
-  loadEstate();
+  loadEstate(); syncFurniture();
 }
 function onNotify(m) {
   if (m.kind === 'message') { G.phone.unread++; U.toast('info', `New message from ${m.from}`); }
@@ -490,6 +491,7 @@ function frame(t) {
     camera.position.set(G.camT.x + Math.sin(G.yaw) * cp, G.camT.y + Math.sin(G.pitch) * G.dist, G.camT.z + Math.cos(G.yaw) * cp);
     camera.lookAt(G.camT);
     S.w3d.update(dt, clock.hour, G.me, (g) => G.access.has(g)); S.w3d.setCameraDistance(G.dist);
+    applyInteriorView(S.w3d.focus());
     updateOverlay(clock);
   } else {
     S.orbit += dt * 0.05;
@@ -516,7 +518,8 @@ function updateOverlay(clock) {
   let near = 1;
   for (const e of G.ents.values()) {
     const d = dist2(G.me.x, G.me.z, e.x, e.z);
-    placeTag(e.tag, e.x, e.z, d < (e.npc ? 14 : 38));
+    const fb = S.w3d.focus(), outside = fb && !(e.x > fb.minX && e.x < fb.maxX && e.z > fb.minZ && e.z < fb.maxZ);
+    placeTag(e.tag, e.x, e.z, !outside && d < (e.npc ? 14 : 38));
     if (!e.npc && d <= 25) near++;
   }
   hudT += 1;
@@ -656,9 +659,20 @@ function furnValid(def, x, z, yaw) {
   }
   return G.summary.furniture.length < G.furn.info.home.slots;
 }
+// Inside a business or home you only see its interior: everything outside the footprint is clipped away until you walk out.
+const clipPlanes = [0, 1, 2, 3].map(() => new THREE.Plane());
+let interiorOn = false;
+function applyInteriorView(f) {
+  if (!f) { if (interiorOn) { renderer.clippingPlanes = []; interiorOn = false; } return; }
+  clipPlanes[0].set(new THREE.Vector3(1, 0, 0), -f.minX); clipPlanes[1].set(new THREE.Vector3(-1, 0, 0), f.maxX);
+  clipPlanes[2].set(new THREE.Vector3(0, 0, 1), -f.minZ); clipPlanes[3].set(new THREE.Vector3(0, 0, -1), f.maxZ);
+  renderer.clippingPlanes = clipPlanes; interiorOn = true;
+}
 function syncFurniture() {
   if (!G || !S.w3d) return;
-  const here = G.summary.tenancy && G.summary.tenancy.district === G.city.id;
+  const t = G.summary.tenancy;
+  // the home is in this metro world when its area is one of the world's districts (G.city may still be unset right after joining)
+  const here = !!t && !!G.w?.world?.districts?.some((d) => d.id === t.district);
   S.w3d.setFurniture(here ? G.summary.furniture : [], G.catalog);
   if (G.furn) { if (!here) endFurnish(); else drawFurnBar(); }
 }

@@ -394,4 +394,21 @@ describe('a metro is one continuous world', () => {
     for (const n of people) expect(isBlocked(n.x, n.z, col, () => false, world.bounds), `${n.id} inside a wall`).toBe(false);
     expect(people.some((n: any) => n.moving || n.wait > 0)).toBe(true);
   });
+  it('people in the same building hear each other; people outside do not hear inside, and vice versa', async () => {
+    const a = await w.newPlayer('Teller Fan'); const b = await w.newPlayer('Queue Pal'); const o = await w.newPlayer('Outside Oz');
+    const [ca, cb, co] = [await join(a), await join(b), await join(o)];
+    const world = w.ctx.data.worlds.get('lagos')!;
+    const bk = world.buildings.find((x: any) => x.kind === 'public' && x.short === 'bank')!;
+    me(a).x = bk.cx - 1; me(a).z = bk.cz; me(b).x = bk.cx + 1; me(b).z = bk.cz;
+    me(o).x = bk.cx; me(o).z = bk.cz + bk.sz / 2 + 4;           // just outside the doorway, well within 25 m
+    ca.send({ t: 'chat', text: 'queue is long today' });
+    await cb.until(() => cb.of('chat').length > 0);
+    await new Promise((r) => setTimeout(r, 150));
+    expect(co.of('chat')).toHaveLength(0);
+    co.send({ t: 'chat', text: 'hello from the pavement' });
+    await co.until(() => co.of('chat').length > 0);
+    await new Promise((r) => setTimeout(r, 150));
+    expect(cb.of('chat')).toHaveLength(1); expect(ca.of('chat').filter((m) => m.text.includes('pavement'))).toHaveLength(0);
+    ca.close(); cb.close(); co.close();
+  });
 });

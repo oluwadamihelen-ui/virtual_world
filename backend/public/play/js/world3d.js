@@ -299,6 +299,7 @@ export function createWorld3D(world, scene) {
 
   // ---- furniture & goods ----
   const goodsColors = ['#e94f4f', '#4fa3e9', '#f2c94c', '#6fcf97', '#bb6bd9', '#f2994a'];
+  let focusBox = null;
   const furnG = new THREE.Group(); root.add(furnG);
   for (const f of world.furniture) {
     const g = furnG, sid = f.id.split(':').pop();
@@ -445,6 +446,8 @@ export function createWorld3D(world, scene) {
       scene.background = null; scene.fog = null;
     },
     /** hour 0..24, me = {x,z}, hasAccess = bool (apartment gate), focus = point the sun's shadow box follows */
+    /** While you are inside a building this is its footprint: the renderer clips everything outside it (interior view only). */
+    focus() { return focusBox ? { minX: focusBox.minX - 0.35, maxX: focusBox.maxX + 0.35, minZ: focusBox.minZ - 0.35, maxZ: focusBox.maxZ + 0.35 } : null; },
     update(dt, hour, me, hasAccess) {
       time += dt;
       const elev = Math.sin(((hour - 6) / 12) * Math.PI);
@@ -469,12 +472,14 @@ export function createWorld3D(world, scene) {
       lampHead.emissiveIntensity = 0.1 + dark * 2.4;
       winMat.emissiveIntensity = dark * 0.9; winMatP.emissiveIntensity = dark * 0.9;
       // roofs lift and walls drop to a cut-away when you step inside, so you can see the room
+      focusBox = null;
       for (const bd of buildings) {
         const inside = me.x > bd.minX && me.x < bd.maxX && me.z > bd.minZ && me.z < bd.maxZ && bd.b.enterable;
         bd.cut += ((inside ? 1 : 0) - bd.cut) * Math.min(1, dt * 8);
         const h = bd.b.height * (1 - bd.cut * 0.78);
         for (const w of bd.wallMeshes) { w.scale.y = h; w.position.y = h / 2; }
         bd.roof.visible = bd.cut < 0.5; if (bd.lintel) bd.lintel.visible = bd.cut < 0.5;
+        if (inside && bd.cut > 0.6) focusBox = bd;
       }
       // door swings open for tenants who are close
       for (const d of doors) {

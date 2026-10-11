@@ -325,6 +325,17 @@ export class Gateway {
     return [...this.players.values()].filter((o) => o.metro === p.metro && !o.travel && dist2(p.x, p.z, o.x, o.z) <= radius);
   }
 
+  /** The enterable building (shop, bank, home...) the player is standing in, if any. */
+  private buildingOf(p: Player): string | null {
+    const b = this.rt(p.metro).world.buildings.find((x: any) => x.enterable && Math.abs(p.x - x.cx) < x.sx / 2 && Math.abs(p.z - x.cz) < x.sz / 2);
+    return b ? b.id : null;
+  }
+  /** Who can hear: everyone in the same building, otherwise people nearby who are not inside some other building. */
+  private audience(p: Player): Player[] {
+    const mine = this.buildingOf(p);
+    return this.nearby(p, mine ? 1e9 : CHAT_RADIUS).filter((o) => (mine ? this.buildingOf(o) === mine : this.buildingOf(o) === null) || o.id === p.id);
+  }
+
   private async onChat(p: Player, text: string) {
     const r = await social.checkChat(this.ctx, p.id, text);
     if (!r.allowed) {
@@ -333,7 +344,7 @@ export class Gateway {
       return;
     }
     const msg = { t: 'chat', id: p.id, name: p.name, text: r.text, ts: Date.now() };
-    for (const o of this.nearby(p, CHAT_RADIUS)) {
+    for (const o of this.audience(p)) {
       if (o.id !== p.id && await social.isBlockedEitherWay(this.ctx, p.id, o.id)) continue;
       this.send(o, msg);
     }
@@ -343,7 +354,7 @@ export class Gateway {
     const now = Date.now();
     if (!EMOTES.has(e) || now - p.lastEmoteAt < 800) return;
     p.lastEmoteAt = now; p.emote = e; p.emoteUntil = now + 3000;
-    for (const o of this.nearby(p, CHAT_RADIUS)) this.send(o, { t: 'emote', id: p.id, e });
+    for (const o of this.audience(p)) this.send(o, { t: 'emote', id: p.id, e });
   }
 
   // ------------------------------------------------------------------ interactions (server-validated)
