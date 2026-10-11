@@ -26,6 +26,7 @@ const P = {
   smile: '<circle cx="12" cy="12" r="9"/><path d="M8 14c1 1.8 2.5 2.6 4 2.6s3-.8 4-2.6M9 9.5v.5M15 9.5v.5"/>',
   eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   wallet: '<path d="M4 7a2 2 0 0 1 2-2h12v3"/><path d="M4 7v11a2 2 0 0 0 2 2h13a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H6a2 2 0 0 1-2-2z"/><circle cx="16" cy="14" r="1.2"/>',
+  mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/>',
   sofa: '<path d="M5 11V8a2 2 0 012-2h10a2 2 0 012 2v3"/><path d="M3 13a2 2 0 014 0v2h10v-2a2 2 0 014 0v5H3z"/><path d="M6 18v2M18 18v2"/>',
   bank: '<path d="M3 9l9-5 9 5"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/>',
   brief: '<rect x="3" y="8" width="18" height="12" rx="2"/><path d="M9 8V5.5h6V8M3 13h18"/>',
@@ -170,6 +171,7 @@ export function buildHud(h) {
     <button id="rHome" title="Go home">${icon('home')}</button>
     <button id="rView" title="City view [V]">${icon('pin')}</button>
     <button id="rFurn" title="Furnish your home">${icon('sofa')}</button>
+    <button id="rMic" title="Voice chat (hold T to talk)">${icon('mic')}</button>
     <button id="rEmote" title="Emotes">${icon('smile')}</button>
     <button id="rClean" title="Hide the interface">${icon('eye')}</button>
   </div>
@@ -188,6 +190,7 @@ export function buildHud(h) {
   q('#rHome').onclick = () => h.goHome();
   q('#rView').onclick = () => h.cityView();
   q('#rFurn').onclick = () => h.furnish();
+  q('#rMic').onclick = () => h.voice();
   q('#rEmote').onclick = () => q('#emotes').classList.toggle('hidden');
   q('#rClean').onclick = () => { document.body.classList.add('cleanui'); toast('info', 'Interface hidden. Tap the screen corner to bring it back.'); addEventListener('pointerdown', function back(e) { if (e.clientX > innerWidth - 90 && e.clientY < 90) { document.body.classList.remove('cleanui'); removeEventListener('pointerdown', back); } }); };
   q('#journalTab').onclick = () => q('#journal').classList.toggle('hidden');

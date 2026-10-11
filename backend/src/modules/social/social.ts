@@ -43,6 +43,16 @@ export async function isBlockedEitherWay(ctx: AppContext, a: string, b: string):
   return (r.rowCount ?? 0) > 0;
 }
 
+/** Can this character speak right now? Used by voice chat: suspended, banned and moderator-muted accounts cannot. */
+export async function canSpeak(ctx: AppContext, characterId: string): Promise<{ ok: true } | { ok: false; reason: 'muted' | 'suspended' }> {
+  const a = (await ctx.pool.query(`SELECT a.status, a.suspended_until, a.muted_until FROM characters c JOIN accounts a ON a.id=c.account_id WHERE c.id=$1`, [characterId])).rows[0];
+  if (!a) throw notFound('character_not_found');
+  const now = ctx.now();
+  if (a.status === 'banned' || (a.status === 'suspended' && (!a.suspended_until || a.suspended_until > now))) return { ok: false, reason: 'suspended' };
+  if (a.muted_until && a.muted_until > now) return { ok: false, reason: 'muted' };
+  return { ok: true };
+}
+
 // ---------- Chat checks (the game server calls this before broadcasting) ----------
 const recent = new Map<string, number[]>(); // per-process sliding window; move to Redis when running >1 backend instance
 

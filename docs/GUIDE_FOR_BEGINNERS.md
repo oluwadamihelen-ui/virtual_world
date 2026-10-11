@@ -129,4 +129,4 @@ Close the browser tab any time. When you come back and sign in, your money, home
 - `npm test`: the automated safety checks (about a minute; it erases the **test** database only).
 
 ## What isn't built yet
-Other districts (market, central, waterfront), real services inside most public buildings (you can walk into banks, cafes and the like and see people there, but only food and the bank counter do anything), businesses in 3D, trading in 3D, voice chat, sound, and real art (everything is simple stylized shapes). The earlier Unreal Engine version is paused; the browser game is the main version now.
+Other districts (market, central, waterfront), real services inside most public buildings (you can walk into banks, cafes and the like and see people there, but only food and the bank counter do anything), businesses in 3D, trading in 3D, voice reporting (voice chat itself works for adults: click the microphone button, hold T to talk inside a building), sound, and real art (everything is simple stylized shapes). The earlier Unreal Engine version is paused; the browser game is the main version now.

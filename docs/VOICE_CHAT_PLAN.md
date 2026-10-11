@@ -1,4 +1,6 @@
-# Voice chat plan (proposal, nothing built yet)
+# Voice chat plan
+
+**Status:** steps 1 and 2 below are built (server rooms and rules with tests; browser opt-in, push-to-talk, WebRTC mesh, speaking ring). Verified with two headless browsers and a fake microphone. Steps 3 and 4 are still open. How to use it: `docs/WEB_CLIENT.md`.
 
 Goal: players inside the same building can talk by voice. Text chat already works building-wide (see `docs/WEB_CLIENT.md`).
 
@@ -7,7 +9,7 @@ Goal: players inside the same building can talk by voice. Text chat already work
 - **Adults only at first.** Under-18 accounts get no voice in version 1. Adults and minors are never in the same voice room (same rule as DMs, `docs/SAFETY.md`).
 - **Same building only.** You join the room of the building you stand in and leave it when you walk out. Rooms are capped (start with 8 speakers).
 - **Blocks, mutes and suspensions apply.** A blocked pair never hears each other; a moderator-muted or suspended account cannot speak.
-- **Push-to-talk by default** (hold V is taken, so hold T), with a mute button, a "speaking" ring above heads, and a per-player mute.
+- **Push-to-talk by default** (hold T), with a mute button, a "speaking" ring above heads, and a per-player mute.
 - **No recording by default.** Reports attach who was in the room and when, plus the text evidence already captured. Recording voice needs a legal and consent decision first.
 
 ## How it would work

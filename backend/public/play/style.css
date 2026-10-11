@@ -186,3 +186,6 @@ body.panelopen .stack,body.panelopen .chatlog,body.panelopen .journal{visibility
 .vstrip{display:flex;gap:18px;align-items:center;flex-wrap:wrap;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:14px;padding:8px 14px}.vstrip>div{display:grid}.vstrip small{color:var(--mut);font-size:11px}.vstrip b{font-size:17px}
 .pill.up{background:rgba(123,224,180,.2);color:var(--mint)}.pill.down{background:rgba(255,122,89,.2);color:#ff9d85}.pl{font-size:12px!important}.spark{margin-left:auto}
 .sidepanel{max-height:560px;overflow:auto;padding-right:4px}.places .li small{display:block}
+
+.rail button.on{color:var(--mint);outline:1px solid var(--mint)}.rail button.live{background:var(--mint);color:#06231f}
+.tag.speaking .name{box-shadow:0 0 0 2px var(--mint),0 0 14px 2px rgba(111,224,160,.7)}

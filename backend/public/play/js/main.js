@@ -3,6 +3,7 @@ import { createWorld3D } from './world3d.js';
 import { createAvatar } from './avatar.js';
 import { stepPlayer, buildColliders, buildingBoxes, gameClock, dist2 } from '/shared/sim.mjs';
 import { api, friendlyError, Connection } from './net.js';
+import { createVoice } from './voice.js';
 import * as U from './ui.js';
 import { phoneApps } from './apps.js';
 
@@ -96,6 +97,7 @@ function endSession(text) {
 }
 function teardownWorld() {
   if (!G) return;
+  G.voice?.close();
   for (const e of G.ents.values()) { scene.remove(e.av.group); e.tag.remove(); }
   scene.remove(G.me.av.group); G.me.tag.remove();
   clearInterval(G.estateTimer); clearInterval(G.sendTimer); clearInterval(G.pingTimer); clearInterval(G.mapTimer); G.hideTravel?.();
@@ -108,6 +110,8 @@ function onServer(m) {
     case 'welcome': return enterWorld(m);
     case 'snap': return G && onSnap(m);
     case 'chat': return G && onChat(m);
+    case 'voice': return G && G.voice.onRoom(m);
+    case 'vsig': return G && G.voice.onSignal(m);
     case 'emote': return G && onEmote(m);
     case 'toast': return U.toast(m.kind, m.text);
     case 'summary': return G && onSummary(m.summary, m.door);
@@ -141,9 +145,12 @@ function enterWorld(w) {
   G = { w, me, ents: new Map(), summary: w.summary, door: w.door, city: w.city, currency: w.currency, access: gatesFor(w.summary, w.city.id), catalog: new Map((w.furnitureCatalog ?? []).map((c) => [c.id, c])), jobs: w.jobs ?? [], local: w.localTransport,
     yaw: -0.75, pitch: 0.8, dist: 19, camT: new THREE.Vector3(me.x, 1, me.z), seq: 0, lastSent: { dx: 0, dz: 0, run: false, t: 0 }, ctxKey: null, shop: {},
     pending: new Map(), phone: w.phone ?? { adult: false, unread: 0 }, auto: null, nextTaskAt: 0, ping: 0, online: 1, minSeconds: 20, achievements: w.achievements };
+  G.voice = createVoice({ send: (m) => S.conn.send(m), myId: w.you.id, toast: U.toast, iceServers: w.voiceIce, onChange: () => G && updateVoiceUi() });
+  G.voice.resume(); window.mvwVoice = () => G.voice.debug();
   const gj = G.jobs.find((j) => j.jobId === 'job_grocery_assistant'); if (gj) G.minSeconds = gj.minSecondsPerTask;
   U.buildHud({
     openPhone: (app) => openPhone(app), openMap, furnish: () => toggleFurnish(), cityView: () => toggleCityView(), goHome: () => S.conn.send({ t: 'home' }),
+    voice: () => G.voice.toggle(),
     say: sendChat, emote: (e) => S.conn.send({ t: 'emote', e }),
   });
   refreshHud(); U.setPhoneBadge(G.phone.unread);
@@ -165,6 +172,14 @@ function onNotify(m) {
   else if (m.kind === 'money') U.toast('ok', m.text);
   else if (m.kind === 'match') U.toast('ok', `It's a match with ${m.from}!`);
   G.onNotify?.(m); U.setPhoneBadge?.(G.phone.unread);
+}
+/** Mic button state, the room name, and a ring on the name tags of whoever is speaking. */
+function updateVoiceUi() {
+  const v = G.voice.state, b = document.getElementById('rMic'); if (!b) return;
+  b.classList.toggle('on', v.on); b.classList.toggle('live', v.on && (v.mode === 'open' || v.talking));
+  b.title = v.on ? (v.room ? `Voice on in ${v.room.name} (${v.peers.size} connected). Hold T to talk. Click to turn off.` : 'Voice is on. Walk into a building to talk with people inside. Click to turn off.') : 'Voice chat is off. Click to turn it on (18+).';
+  G.me.tag.classList.toggle('speaking', v.speaking.has(G.w.you.id));
+  for (const [id, e] of G.ents) e.tag.classList.toggle('speaking', v.speaking.has(id));
 }
 function refreshHud() {
   const s = G.summary;
@@ -241,9 +256,10 @@ addEventListener('keydown', (e) => {
   if (k === 'm') openMap();
   if (k === 'p') openPhone();
   if (k === 'v') toggleCityView();
+  if (k === 't' && !e.repeat) G.voice?.talk(true);
 });
-addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
-addEventListener('blur', () => keys.clear());
+addEventListener('keyup', (e) => { keys.delete(e.key.toLowerCase()); if (e.key.toLowerCase() === 't') G?.voice?.talk(false); });
+addEventListener('blur', () => { keys.clear(); G?.voice?.talk(false); });
 
 const joy = { active: false, id: null, dx: 0, dz: 0 };
 const joyEl = document.getElementById('joy'), knob = document.getElementById('joyknob');

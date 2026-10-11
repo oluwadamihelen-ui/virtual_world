@@ -15,6 +15,7 @@ import * as moderation from '../modules/moderation/moderation.js';
 import * as ledger from '../modules/economy/ledger.js';
 import * as travel from '../modules/travel/travel.js';
 import * as localTravel from '../modules/travel/local.js';
+import { characterAgeBand } from '../modules/identity/service.js';
 import { handleApp, phoneInfo } from '../modules/phone/index.js';
 import { currencyOfCity, formatMoney } from '../modules/economy/currency.js';
 import { builtHouseSpec } from '../world/cities.js';
@@ -39,6 +40,10 @@ const INTERACT_SLACK = 1.2;               // metres of latency tolerance on top 
 const INPUT_STALE_MS = 700;               // no input for this long -> stop (prevents runaway on dropped packets)
 const SAVE_EVERY_MS = 15_000;
 const MAX_CONN_PER_IP = 8;
+// STUN/TURN servers the browsers use to find each other. Set VOICE_ICE_SERVERS (JSON array) in .env to add your own TURN server and its credentials; never commit those.
+const VOICE_ICE: unknown[] = (() => { try { const v = JSON.parse(process.env.VOICE_ICE_SERVERS ?? ''); return Array.isArray(v) ? v : []; } catch { return []; } })();
+const VOICE_ROOM_MAX = 8;                  // speakers per building room (mesh WebRTC; see docs/VOICE_CHAT_PLAN.md)
+const VOICE_RECHECK_MS = 10_000;           // re-check mute/suspension of people with voice on
 const EMOTES = new Set(['wave', 'dance', 'laugh', 'heart', 'thumbs']);
 
 const Msg = z.discriminatedUnion('t', [
@@ -57,6 +62,8 @@ const Msg = z.discriminatedUnion('t', [
   z.object({ t: z.literal('app'), rid: z.string().max(40), app: z.string().max(20), a: z.string().max(30), d: z.record(z.string(), z.unknown()).optional() }),
   z.object({ t: z.literal('transit'), mode: z.enum(['bus', 'car']), x: z.number().min(-2000).max(2000), z: z.number().min(-2000).max(2000), name: z.string().max(60).optional() }),
   z.object({ t: z.literal('ride'), on: z.boolean() }),
+  z.object({ t: z.literal('voice'), on: z.boolean() }),
+  z.object({ t: z.literal('vsig'), to: z.string().uuid(), kind: z.enum(['offer', 'answer', 'ice']), data: z.record(z.string(), z.unknown()) }),
   z.object({ t: z.literal('ping'), c: z.number().optional() }),
 ]);
 
@@ -67,6 +74,7 @@ interface Player extends Body {
   access: Set<string>; busy: boolean; lastActAt: number; lastEmoteAt: number;
   known: Set<string>; budget: number; budgetAt: number; strikes: number; dirty: boolean; lastSave: number;
   emote: string | null; emoteUntil: number;
+  voice: { on: boolean; since: number; checked: number; sig: string; peers: Set<string> };
 }
 interface CityRuntime { id: string; world: any; colliders: Colliders; npcs: Npc[]; builtLoaded: boolean }
 interface Npc extends Body {
@@ -228,7 +236,7 @@ export class Gateway {
         name: summary.displayName, appearance: summary.appearance, ws, ip,
         x: saved ? summary.location.x : spawn.x, z: saved ? summary.location.z : spawn.z, ry: 0, moving: false,
         input: { dx: 0, dz: 0, run: false }, seq: 0, lastInputAt: Date.now(), access, busy: false, lastActAt: 0, lastEmoteAt: 0,
-        known: new Set(), budget: 120, budgetAt: Date.now(), strikes: 0, dirty: false, lastSave: Date.now(), emote: null, emoteUntil: 0,
+        known: new Set(), budget: 120, budgetAt: Date.now(), strikes: 0, dirty: false, lastSave: Date.now(), voice: { on: false, since: 0, checked: 0, sig: '', peers: new Set() }, emote: null, emoteUntil: 0,
       };
       { const d = districtAt(world, p.x, p.z); if (d) p.city = d; }
       this.players.set(id, p);
@@ -250,7 +258,7 @@ export class Gateway {
     await this.ensureBuilt(p.city);
     const city = this.ctx.data.cityById.get(p.city)!;
     this.send(p, {
-      t: 'welcome', you: { id: p.id, name: p.name, appearance: p.appearance, x: p.x, z: p.z }, world: this.worldOf(p),
+      t: 'welcome', voiceIce: VOICE_ICE, you: { id: p.id, name: p.name, appearance: p.appearance, x: p.x, z: p.z }, world: this.worldOf(p),
       city: { id: city.id, name: city.name, country: city.country, blurb: city.blurb, metro: city.metro }, currency: currencyOfCity(this.ctx.data, p.city),
       geo: this.publicGeo(), summary, door: await this.doorInfo(p, summary), serverNow: Date.now(), tickHz: TICK_HZ,
       achievements: this.ctx.data.achievements, jobs: jobs.listJobs(this.ctx), localTransport: this.ctx.data.geo.localTransport, furnitureCatalog: this.ctx.data.items.filter((i) => i.furniture).map((i) => ({ id: i.id, name: i.name, ...i.furniture })), phone: await phoneInfo(this.ctx, p.id), ...extra,
@@ -290,6 +298,8 @@ export class Gateway {
           if (m.seq < p.seq) return; // stale
           p.seq = m.seq; p.input = { dx: m.dx, dz: m.dz, run: !!m.run }; p.lastInputAt = now; return;
         }
+        case 'voice': return await this.onVoice(p, m.on);
+        case 'vsig': return this.onVoiceSignal(p, m);
         case 'ping': this.send(p, { t: 'pong', c: m.c ?? 0, serverNow: now }); return;
         case 'quote': this.send(p, { t: 'quote', to: m.to, options: travel.quote(this.ctx, p.city, m.to) }); return;
         case 'travel': return await this.onTravel(p, m.to, m.mode);
@@ -323,6 +333,64 @@ export class Gateway {
 
   private nearby(p: Player, radius: number): Player[] {
     return [...this.players.values()].filter((o) => o.metro === p.metro && !o.travel && dist2(p.x, p.z, o.x, o.z) <= radius);
+  }
+
+  // ------------------------------------------------------------------ voice chat (the server only decides who may talk and relays the WebRTC set-up; audio never passes through it)
+  private voiceOff(p: Player) { p.voice = { on: false, since: 0, checked: 0, sig: '', peers: new Set() }; }
+  private voiceState(p: Player, extra: Record<string, unknown> = {}) { this.send(p, { t: 'voice', on: p.voice.on, room: null, peers: [], max: VOICE_ROOM_MAX, ...extra }); }
+
+  private async onVoice(p: Player, on: boolean) {
+    if (!on) { this.voiceOff(p); return this.voiceState(p); }
+    if ((await characterAgeBand(this.ctx, p.id)) !== 'adult') return this.voiceState(p, { reason: 'adults_only', text: 'Voice chat is for players aged 18 and over.' });
+    const ok = await social.canSpeak(this.ctx, p.id);
+    if (!ok.ok) return this.voiceState(p, { reason: ok.reason, text: ok.reason === 'muted' ? 'You are muted right now, so voice is off.' : 'Your account is suspended.' });
+    p.voice = { on: true, since: Date.now(), checked: Date.now(), sig: '', peers: new Set() };
+    await this.refreshVoice();
+  }
+
+  private voiceBusy = false; private voiceAgain = false;
+  /** Recompute building rooms (about once a second) and tell each speaker who is in theirs. */
+  private async refreshVoice() {
+    if (this.voiceBusy) { this.voiceAgain = true; return; } this.voiceBusy = true;
+    try {
+      const now = Date.now(), on = [...this.players.values()].filter((p) => p.voice.on);
+      for (const p of on) {
+        if (now - p.voice.checked < VOICE_RECHECK_MS) continue;
+        p.voice.checked = now;
+        const ok = await social.canSpeak(this.ctx, p.id);
+        if (!ok.ok) { this.voiceOff(p); this.voiceState(p, { reason: ok.reason, text: 'Voice was turned off for your account.' }); }
+      }
+      const rooms = new Map<string, Player[]>();
+      for (const p of on) {
+        if (!p.voice.on || p.travel) continue;
+        const b = this.buildingOf(p); if (!b) continue;
+        const key = `${this.metroOf(p.metro)}|${b}`; (rooms.get(key) ?? rooms.set(key, []).get(key)!).push(p);
+      }
+      const inRoom = new Set<string>();
+      for (const [key, list] of rooms) {
+        list.sort((a, b) => a.voice.since - b.voice.since);
+        const members = list.slice(0, VOICE_ROOM_MAX);
+        const building = key.split('|')[1]!;
+        const name = this.rt(members[0]!.metro).world.buildings.find((x: any) => x.id === building)?.name ?? 'this place';
+        for (const p of members) {
+          inRoom.add(p.id);
+          const peers: Player[] = [];
+          for (const o of members) if (o.id !== p.id && !(await social.isBlockedEitherWay(this.ctx, p.id, o.id))) peers.push(o);
+          const sig = `${building}:${peers.map((o) => o.id).sort().join(',')}`;
+          p.voice.peers = new Set(peers.map((o) => o.id));
+          if (sig !== p.voice.sig) { p.voice.sig = sig; this.voiceState(p, { room: { id: building, name }, peers: peers.map((o) => ({ id: o.id, name: o.name })) }); }
+        }
+        for (const p of list.slice(VOICE_ROOM_MAX)) { inRoom.add(p.id); if (p.voice.sig !== 'full') { p.voice.sig = 'full'; p.voice.peers = new Set(); this.voiceState(p, { reason: 'room_full', text: 'This room is full right now.' }); } }
+      }
+      for (const p of on) if (p.voice.on && !inRoom.has(p.id) && p.voice.sig !== 'none') { p.voice.sig = 'none'; p.voice.peers = new Set(); this.voiceState(p); }
+    } finally { this.voiceBusy = false; if (this.voiceAgain) { this.voiceAgain = false; void this.refreshVoice().catch(() => {}); } }
+  }
+
+  private onVoiceSignal(p: Player, m: { to: string; kind: 'offer' | 'answer' | 'ice'; data: Record<string, unknown> }) {
+    const o = this.players.get(m.to);
+    if (!p.voice.on || !o || !o.voice.on || !p.voice.peers.has(o.id) || !o.voice.peers.has(p.id)) return;   // only people the server put in the same room
+    if (JSON.stringify(m.data).length > 8000) return;
+    this.send(o, { t: 'vsig', from: p.id, kind: m.kind, data: m.data });
   }
 
   /** The enterable building (shop, bank, home...) the player is standing in, if any. */
@@ -581,6 +649,7 @@ export class Gateway {
   step(dt: number) {
     const now = Date.now();
     this.tick++;
+    if (this.tick % 20 === 0) void this.refreshVoice().catch(() => {});
     for (const p of this.players.values()) {
       if (p.travel) { if (this.ctx.now().getTime() >= p.travel.until) void this.arrive(p); continue; }
       const rt = this.rt(p.city);
