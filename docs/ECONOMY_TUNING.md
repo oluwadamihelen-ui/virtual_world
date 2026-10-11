@@ -49,6 +49,14 @@ Known balance risks (untested with real players): with a wholesale margin of ~50
 | Houses: Garden, Family, Corner Villa | 2,200 / 3,000 / 4,500 | 42,000 / 60,000 / 95,000 | one per house lot |
 | Land plots A, B / C, D | none | 9,000 / 14,000 | max 3 plots per player |
 | Build a Starter Home on land | | 15,000 | house is then worth price + 15,000, rent 5% of value |
-| Sell back | | 70% of value | back to the market account |
+| Sell | | current market value minus a 5% fee | paid by the market account (`faucet:real_estate`) |
 
 All numbers are **untested guesses**. With the 2,000 MVC starting grant and 250 MVC per shift (max 4 a day), a room is the realistic first home and a house is a long-term goal (about 6 weeks of full-time work at current wages). Use `npm run grant -- "Name" 50000` in development to try buying. The ledger account `faucet:real_estate` receives every purchase and pays every sell-back; a growing positive balance means money is being drained from the economy, negative means sell-backs outpace purchases (the 70% rate keeps it positive). Owners pay no rent, so owning is a one-off money sink.
+
+### Area value index (property values rise as people move in) - `estate.json` `values` and `settlersPerDay`
+- Every area has a value index, 1.00 = launch prices. **All prices, rents and sale values are the base number times this index.**
+- Residents = NPC settlers (3 at launch, then a per-area daily rate such as Lekki 0.9/day, Surulere 0.35/day, capped at 20) + real players who live there.
+- Target index = 1 + 0.1 x (residents - 3), kept between 0.8 and 2.5. The index moves toward the target by at most 0.02 every 10 minutes, so it never jumps.
+- Buying early in a fast-growing area and selling later is how investors profit; selling costs 5%, so flipping instantly loses 5%. If players leave and NPC growth has stopped at the cap, the index can fall (floor 0.8), so it is a real risk.
+- **Inflation warning:** profit is paid by the market account, i.e. new money. With the numbers above a Lekki investor can roughly double their money in about 11 days. That is probably far too generous for a real economy; lower `valuePerResident`, `settlersPerDay` or `ceiling`, or raise the fee, after watching `faucet:real_estate`. These values are untested guesses.
+- Furniture (Home Store): bed 300, double bed 520, sofa 350, armchair 220, coffee table 120, dining table 260, chair 70, wardrobe 340, bookshelf 180, TV 480, fridge 600, desk 200, lamp 120, rug 150, plant 60 MVC, times the city price index. Furniture is a money sink; it is not worth anything when you sell the home.

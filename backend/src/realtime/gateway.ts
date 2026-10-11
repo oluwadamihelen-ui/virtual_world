@@ -327,9 +327,9 @@ export class Gateway {
     return summary;
   }
 
-  private async doorInfo(p: Pick<Player, 'city'>, summary: { tenancy: { propertyName: string; district: string } | null }) {
+  private async doorInfo(p: Pick<Player, 'city'>, summary: { tenancy: { propertyName: string; district: string; lotId?: string | null } | null }) {
     if (summary.tenancy) {
-      if (summary.tenancy.district === p.city) return { state: 'tenant', name: summary.tenancy.propertyName };
+      if (summary.tenancy.district === p.city) return summary.tenancy.lotId && summary.tenancy.lotId !== 'apt' ? { state: 'house', name: summary.tenancy.propertyName } : { state: 'tenant', name: summary.tenancy.propertyName };
       return { state: 'away', name: summary.tenancy.propertyName, city: this.ctx.data.cityById.get(summary.tenancy.district)?.name ?? '' };
     }
     const free = (await housing.listProperties(this.ctx)).find((x) => x.available && x.type === 'room' && x.district === p.city);

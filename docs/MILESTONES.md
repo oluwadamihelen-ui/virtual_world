@@ -126,7 +126,10 @@ Legend: ✅ done and verified by automated tests · 🟡 done but unverified/par
 | Build on land, sell back (70%), move out, move in to an owned home | ✅ | tests |
 | One home at a time, max 3 plots, exclusive ownership, idempotent, ledger balanced | ✅ | tests |
 | Click a house/plot/apartment block in the 3D world; status signs | ✅ | screenshots |
-| Walk-in interiors for houses | ⬜ (you arrive at the front gate; the apartment block still has the shared interior) | |
+| Walk-in interiors for houses (and homes built on land), own door gate per house | ✅ | `estate.test.ts` + browser |
+| Homes start empty; Home Store; place/move/pick up furniture with server-side fit checks | ✅ | tests + browser (placed a sofa and a rug) |
+| Area value index driven by population, portfolio and profit on sale | ✅ (settler growth and rates are untested guesses) | `estate.test.ts` |
+| The apartment block interior is still one shared room: everybody sees only their own furniture there | ⚠ | |
 | Owners letting their property to other players, auctions, property tax | ⬜ | |
 
 ## Remaining tasks (sequenced)

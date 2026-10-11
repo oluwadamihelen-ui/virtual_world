@@ -178,3 +178,10 @@ body.panelopen .stack,body.panelopen .chatlog,body.panelopen .journal{visibility
 .prop .pic{display:grid;place-items:center;font-size:44px;min-height:110px}.prop .pbody{padding:10px 12px 12px 0;display:grid;gap:3px;align-content:start}.prop .pbody small{color:var(--mut)}.prop .pbody p{margin:2px 0 6px;font-size:13px;opacity:.9}
 .pbtns{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.metro h4{margin:12px 0 6px;font:700 15px var(--display)}.hint{font-size:12px;color:var(--mut)}.pill.dim{opacity:.55}
 @media (max-width:560px){.prop{grid-template-columns:76px 1fr}.prop .pic{font-size:32px}}
+
+/* ---- furnishing & values ---- */
+#furnbar{position:absolute;left:50%;bottom:92px;transform:translateX(-50%);width:min(620px,94vw);background:var(--glass2);border:1px solid var(--line);border-radius:18px;padding:10px 12px;display:grid;gap:7px;pointer-events:auto;z-index:20;box-shadow:var(--shadow)}
+#furnbar .fhead{display:flex;gap:8px;align-items:center}#furnbar .grow{flex:1}#furnbar .fhint{font-size:13px;opacity:.9}#furnbar .fitems{display:flex;gap:6px;flex-wrap:wrap}
+#furnbar .chip{padding:6px 11px;border-radius:99px;background:rgba(255,255,255,.12);font-weight:700;font-size:12px;color:var(--sand)}#furnbar .chip.on{background:var(--mint);color:#06301f}
+.vstrip{display:flex;gap:18px;align-items:center;flex-wrap:wrap;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:14px;padding:8px 14px}.vstrip>div{display:grid}.vstrip small{color:var(--mut);font-size:11px}.vstrip b{font-size:17px}
+.pill.up{background:rgba(123,224,180,.2);color:var(--mint)}.pill.down{background:rgba(255,122,89,.2);color:#ff9d85}.pl{font-size:12px!important}.spark{margin-left:auto}

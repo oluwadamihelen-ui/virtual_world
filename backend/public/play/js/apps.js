@@ -189,6 +189,19 @@ export function phoneApps(ctx) {
     });
   }
 
+  // ------------------------------------------------------------------ Home Store (furniture delivered to your backpack)
+  const EMOJI = { single_bed: '🛏️', double_bed: '🛏️', starter_sofa: '🛋️', armchair: '💺', coffee_table: '☕', dining_table: '🍽️', dining_chair: '🪑', wardrobe: '🚪', bookshelf: '📚', tv_stand: '📺', fridge: '🧊', desk: '💻', desk_lamp: '💡', rug: '🟫', plant: '🪴' };
+  async function storeApp(ph) {
+    ph.app('Home Store', '<p>Loading…</p>');
+    const d = await call('store', 'list'); if (!d) return;
+    const have = (id) => G().summary.inventory.find((i) => i.itemId === id)?.quantity ?? 0;
+    const draw = () => ph.setBody(`<div class="card2"><b>Furnish your home</b><small style="display:block;opacity:.8">Everything is delivered to your backpack. Then open your home and tap <b>Furnish</b> (the sofa button on the right).</small><button class="btn mint" id="stFurn" style="margin-top:8px">Go and furnish</button></div>
+      <div class="list">${d.items.map((i) => `<div class="li"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:26px">${EMOJI[i.itemId] ?? '📦'}</span><div><b>${esc(i.name)}</b><small>${i.size ? `${i.size.sx}×${i.size.sz} m` : ''}${have(i.itemId) ? ` · you have ${have(i.itemId)}` : ''}</small></div></div><button class="btn small gold" data-buy="${i.itemId}">${fmt(i.price)}</button></div>`).join('')}</div>`, (el) => {
+      el.querySelector('#stFurn').onclick = () => ctx.furnish();
+      el.querySelectorAll('[data-buy]').forEach((b) => b.onclick = async () => { const r = await call('store', 'buy', { itemId: b.dataset.buy, key: newKey() }); if (r) { U.toast('ok', 'Delivered to your backpack.'); setTimeout(draw, 200); } });
+    });
+    draw();
+  }
   return [
     { id: 'bank', name: 'Vault', icon: 'bank', color: GRAD.bank, open: (ph) => bankApp(ph) },
     { id: 'chat', name: 'Chatter', icon: 'chat', color: GRAD.chat, badge: G().phone?.unread || 0, open: (ph, arg) => messagesApp(ph, arg) },
@@ -204,6 +217,7 @@ export function phoneApps(ctx) {
       const d = await phoneAsk('achievements');
       ph.setBody(`<div class="card2">⭐ Reputation <b>${d.reputation}</b></div><div class="list">${d.achievements.map((a) => `<div class="li"><div><b>${a.earned ? '✅' : '⬜'} ${esc(a.name)}</b><small>${a.reputation ? `+${a.reputation} reputation` : 'Milestone'}</small></div></div>`).join('')}</div><b>Skills</b><div class="list">${d.skills.map((s) => `<div class="li"><b>${esc(s.skillId)}</b><span>${s.xp} xp</span></div>`).join('') || '<p style="opacity:.8">Work shifts to build skills.</p>'}</div>`);
     } },
+    { id: 'store', name: 'Home Store', icon: 'sofa', color: 'linear-gradient(135deg,#7c3aed,#c084fc)', open: (ph) => storeApp(ph) },
     { id: 'estate', name: 'Homes', icon: 'home', color: 'linear-gradient(135deg,#c2410c,#fb923c)', open: () => ctx.openEstate() },
     { id: 'map', name: 'Maps', icon: 'map', color: GRAD.map, open: () => ctx.openMap() },
     { id: 'settings', name: 'Settings', icon: 'gear', color: GRAD.settings, open: (ph) => {

@@ -36,8 +36,8 @@ async function boot() {
   if (S.token) { try { await showCharacterScreen(); return; } catch { /* token expired */ } }
   showLogin();
 }
-function setWorld(world) {
-  if (S.w3d && S.w3d.cityId === world.cityId) { S.world = world; S.colliders = buildColliders(world); return; }
+function setWorld(world, force = false) {
+  if (!force && S.w3d && S.w3d.cityId === world.cityId) { S.world = world; S.colliders = buildColliders(world); return; }
   S.w3d?.dispose();
   S.world = world; S.colliders = buildColliders(world); S.w3d = createWorld3D(world, scene);
 }
@@ -117,6 +117,7 @@ function onServer(m) {
     case 'pong': if (G) G.ping = Math.round(performance.now() - m.c); return;
     case 'app': { const f = G?.pending.get(m.rid); if (f) { G.pending.delete(m.rid); f(m); } return; }
     case 'notify': return G && onNotify(m);
+    case 'world': if (G) { G.w.world = m.world; setWorld(m.world, true); paintLots(); syncFurniture(); } return;
   }
 }
 
@@ -133,12 +134,12 @@ function enterWorld(w) {
   U.setCurrency(w.currency);
   const me = { x: w.you.x, z: w.you.z, ry: 0, moving: false, av: createAvatar(w.you.appearance, { me: true }), tag: makeTag(w.you.name, { me: true }), name: w.you.name };
   scene.add(me.av.group);
-  G = { w, me, ents: new Map(), summary: w.summary, door: w.door, city: w.city, currency: w.currency, access: new Set(w.summary.tenancy?.district === w.city.id ? ['apartment'] : []), jobs: w.jobs ?? [],
+  G = { w, me, ents: new Map(), summary: w.summary, door: w.door, city: w.city, currency: w.currency, access: gatesFor(w.summary, w.city.id), catalog: new Map((w.furnitureCatalog ?? []).map((c) => [c.id, c])), jobs: w.jobs ?? [],
     yaw: -0.75, pitch: 0.8, dist: 19, camT: new THREE.Vector3(me.x, 1, me.z), seq: 0, lastSent: { dx: 0, dz: 0, run: false, t: 0 }, ctxKey: null, shop: {},
     pending: new Map(), phone: w.phone ?? { adult: false, unread: 0 }, auto: null, nextTaskAt: 0, ping: 0, online: 1, minSeconds: 20, achievements: w.achievements };
   const gj = G.jobs.find((j) => j.jobId === 'job_grocery_assistant'); if (gj) G.minSeconds = gj.minSecondsPerTask;
   U.buildHud({
-    openPhone: (app) => openPhone(app), openMap, goHome: () => S.conn.send({ t: 'home' }),
+    openPhone: (app) => openPhone(app), openMap, furnish: () => toggleFurnish(), goHome: () => S.conn.send({ t: 'home' }),
     say: sendChat, emote: (e) => S.conn.send({ t: 'emote', e }),
   });
   refreshHud(); U.setPhoneBadge(G.phone.unread);
@@ -161,11 +162,13 @@ function refreshHud() {
   const c = gameClock(now()); U.setClock(c.hour, c.dayIndex, `${G.city.name} · ${G.online} online`);
 }
 
+const gateOf = (lotId) => (!lotId || lotId === 'apt' ? 'apartment' : lotId);
+const gatesFor = (summary, cityId) => new Set(summary.tenancy && summary.tenancy.district === cityId ? [gateOf(summary.tenancy.lotId)] : []);
 function onSummary(summary, door) {
   const prevDone = G.summary.activeShift?.tasksDone ?? -1;
-  G.summary = summary; G.door = door; G.access = new Set(summary.tenancy?.district === G.city.id ? ['apartment'] : []);
+  G.summary = summary; G.door = door; G.access = gatesFor(summary, G.city.id);
   if (summary.activeShift && summary.activeShift.tasksDone > prevDone) G.nextTaskAt = performance.now() + G.minSeconds * 1000;
-  G.ctxKey = null; refreshHud(); G.onSummary?.();
+  G.ctxKey = null; refreshHud(); G.onSummary?.(); syncFurniture();
 }
 
 // ============================================================================ travel
@@ -221,7 +224,8 @@ addEventListener('keydown', (e) => {
   if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'shift'].includes(k)) { keys.add(k); G.auto = null; e.preventDefault(); }
   if (k === 'e' || k === ' ') { primaryAction(); e.preventDefault(); }
   if (k === 'enter') { document.getElementById('say')?.focus(); e.preventDefault(); }
-  if (k === 'escape') U.closePanel();
+  if (k === 'escape') { if (G.furn) endFurnish(); else U.closePanel(); }
+  if (k === 'r' && G.furn) rotateFurn();
   if (k === 'm') openMap();
   if (k === 'p') openPhone();
 });
@@ -258,7 +262,9 @@ const upPtr = (e) => {
   if (d && G && S.w3d && e.type === 'pointerup' && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 6 && performance.now() - d.t < 450) {
     const r = canvas.getBoundingClientRect();
     const lot = S.w3d.pickLot(((e.clientX - r.left) / r.width) * 2 - 1, -(((e.clientY - r.top) / r.height) * 2 - 1), camera);
-    if (lot) openEstateSheet(lot);
+    const lo = G.w.world.lots?.find((l) => l.id === lot); const inside = lo && Math.abs(G.me.x - lo.cx) < lo.sx / 2 && Math.abs(G.me.z - lo.cz) < lo.sz / 2;
+    if (G.furn) onFurnTap(e, r);
+    else if (lot && !inside) openEstateSheet(lot);
   }
 };
 canvas.addEventListener('pointerup', upPtr); canvas.addEventListener('pointercancel', upPtr);
@@ -325,9 +331,13 @@ function renderCtx() {
   if (!z) return U.showCtx(null);
   const btn = (id, label, cls = '', dis = false) => `<button class="btn small ${cls}" data-a="${id}" ${dis ? 'disabled' : ''}>${label}</button>`;
   let body = '';
-  if (z.kind === 'door') {
+  if (z.kind === 'door' && z.lot && z.lot !== 'apt') {
+    const mine = s.tenancy && s.tenancy.lotId === z.lot && s.tenancy.district === G.city.id;
+    body = mine ? `<h3>${U.esc(s.tenancy.propertyName)}</h3><p>Your home. The door is unlocked for you.</p><div class="row">${btn('door', 'Unlock door [E]', 'go')}</div>`
+      : `<h3>${U.esc(z.label)}</h3><p>The door is locked. See whether it is for sale or rent.</p><div class="row">${btn('details', 'See details', 'go')}</div>`;
+  } else if (z.kind === 'door') {
     const d = G.door;
-    body = d.state === 'tenant' ? `<h3>${U.esc(d.name)}</h3><p>Your home. The door is unlocked for you.</p><div class="row">${btn('door', 'Unlock door [E]', 'go')}</div>`
+    body = d.state === 'house' ? `<h3>${U.esc(z.label)}</h3><p>You live in ${U.esc(d.name)}, a house on this street.</p>` : d.state === 'tenant' ? `<h3>${U.esc(d.name)}</h3><p>Your home. The door is unlocked for you.</p><div class="row">${btn('door', 'Unlock door [E]', 'go')}</div>`
       : d.state === 'free' ? `<h3>${U.esc(d.name)}</h3><p>${U.fmt(d.rent)} per week · you have ${U.fmt(s.balance)}</p><div class="row">${btn('door', 'Rent &amp; move in [E]', 'go', s.balance < d.rent)}${s.balance < d.rent ? '<small style="color:#a33">Not enough money yet</small>' : ''}</div>`
         : d.state === 'away' ? `<h3>${U.esc(z.label)}</h3><p>You already rent ${U.esc(d.name)} in ${U.esc(d.city)}. One home at a time.</p>`
           : `<h3>${U.esc(z.label)}</h3><p>Every room is taken right now. Check back soon!</p>`;
@@ -342,7 +352,7 @@ function renderCtx() {
       : `<h3>${U.esc(job?.name ?? 'Work station')}</h3><p>${job ? `${job.tasksPerShift} tasks · pays ${U.fmt(job.wagePerShift)}` : 'Earn money with a shift.'}</p><div class="row">${btn('work', 'Start a shift [E]', 'go')}</div>`;
   }
   U.showCtx(body, (el) => el.querySelectorAll('button[data-a]').forEach((b) => b.onclick = () => {
-    const a = b.dataset.a; if (a === 'door' || a === 'work') act(z.id); else if (a.startsWith('buy:')) act(z.id, a.slice(4));
+    const a = b.dataset.a; if (a === 'details') openEstateSheet(z.lot); else if (a === 'door' || a === 'work') act(z.id); else if (a.startsWith('buy:')) act(z.id, a.slice(4));
   }));
 }
 
@@ -360,7 +370,7 @@ const sendWait = (msg) => new Promise((resolve) => {
 
 function openPhone(openApp, arg) {
   const c = gameClock(now());
-  const ctx = { G: () => G, S, U, send: (m) => S.conn.send(m), ask: sendWait, fmt: U.fmt, openMap: () => openMap(), openEstate: () => openEstateOverview(), openChat: null, onSummary: (fn) => { if (G) G.onSummary = fn; } };
+  const ctx = { G: () => G, S, U, send: (m) => S.conn.send(m), ask: sendWait, fmt: U.fmt, openMap: () => openMap(), openEstate: () => openEstateOverview(), furnish: () => { U.closePanel(); toggleFurnish(); }, openChat: null, onSummary: (fn) => { if (G) G.onSummary = fn; } };
   const phone = U.openPhone({ apps: phoneApps(ctx), hour: c.hour, cityName: `${G.city.name}, ${G.currency.countryName}`, onClose: () => { U.closePanel(); if (G) { G.onSummary = null; G.onNotify = null; G.phoneWait = null; } } });
   if (openApp) phoneApps(ctx).find((a) => a.id === openApp)?.open(phone, arg);
 }
@@ -431,12 +441,12 @@ function frame(t) {
     const cp = Math.cos(G.pitch) * G.dist;
     camera.position.set(G.camT.x + Math.sin(G.yaw) * cp, G.camT.y + Math.sin(G.pitch) * G.dist, G.camT.z + Math.cos(G.yaw) * cp);
     camera.lookAt(G.camT);
-    S.w3d.update(dt, clock.hour, G.me, G.access.has('apartment'));
+    S.w3d.update(dt, clock.hour, G.me, (g) => G.access.has(g));
     updateOverlay(clock);
   } else {
     S.orbit += dt * 0.05;
     camera.position.set(Math.sin(S.orbit) * 44, 20, Math.cos(S.orbit) * 36); camera.lookAt(0, 1, 0);
-    if (S.w3d) S.w3d.update(dt, 15.2, { x: 0, z: 0 }, false);
+    if (S.w3d) S.w3d.update(dt, 15.2, { x: 0, z: 0 }, () => false);
   }
   renderer.render(scene, camera);
 }
@@ -490,12 +500,23 @@ function paintLots() {
     }
     const l = L[0]; if (!l) continue;
     const isHome = l.type === 'house';
-    if (l.state === 'available') st[lot.lotId] = { lines: [isHome ? 'HOUSE' : 'LAND FOR SALE', `${fmt(l.price)}${l.rent ? ` · rent ${fmt(l.rent)}` : ''}`], tone: 'free', house: isHome };
-    else if (l.state === 'yours_owned') st[lot.lotId] = { lines: [isHome ? 'YOUR HOME' : 'YOUR LAND', 'tap to manage'], tone: 'yours', house: isHome };
-    else if (l.state === 'yours_renting') st[lot.lotId] = { lines: ['YOU RENT HERE', 'tap to manage'], tone: 'yours', house: true };
-    else st[lot.lotId] = { lines: [isHome ? 'HOUSE · TAKEN' : 'LAND · SOLD'], tone: 'taken', house: isHome };
+    if (l.state === 'available') st[lot.lotId] = { lines: [isHome ? 'HOUSE' : 'LAND FOR SALE', `${fmt(l.price)}${l.rent ? ` · rent ${fmt(l.rent)}` : ''}`], tone: 'free' };
+    else if (l.state === 'yours_owned') st[lot.lotId] = { lines: [isHome ? 'YOUR HOME' : 'YOUR LAND', 'tap to manage'], tone: 'yours' };
+    else if (l.state === 'yours_renting') st[lot.lotId] = { lines: ['YOU RENT HERE', 'tap to manage'], tone: 'yours' };
+    else st[lot.lotId] = { lines: [isHome ? 'HOUSE · TAKEN' : 'LAND · SOLD'], tone: 'taken' };
   }
   S.w3d?.setLotStates(st);
+}
+const pctText = (x) => `${x >= 0 ? '▲' : '▼'} ${Math.abs(x * 100).toFixed(1)}%`;
+function spark(points, w = 120, h = 28) {
+  if (!points?.length) return '';
+  const lo = Math.min(...points), hi = Math.max(...points, lo + 0.001);
+  const pts = points.map((v, i) => `${((i / Math.max(1, points.length - 1)) * w).toFixed(1)},${(h - 3 - ((v - lo) / (hi - lo)) * (h - 6)).toFixed(1)}`).join(' ');
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><polyline fill="none" stroke="#7be0b4" stroke-width="2" points="${pts}"/></svg>`;
+}
+function valueStrip(a) {
+  if (!a) return '';
+  return `<div class="vstrip"><div><small>Area value index</small><b>${a.idx.toFixed(2)}</b></div><div><small>This week</small><b class="${a.change7d >= 0 ? 'pos' : 'neg'}">${pctText(a.change7d)}</b></div><div><small>Residents</small><b>${Math.round(a.residents)}</b><small>${a.players} players</small></div>${spark(a.spark)}</div><p class="hint" style="margin:6px 0 8px">Prices and rents follow this index. 1.00 = launch prices. It rises as more people move in.</p>`;
 }
 function estateCard(l, armed) {
   const f = U.fmt, [em, col] = PIC[l.type] ?? PIC.room, per = periodWord(G.estate.rentPeriodHours);
@@ -503,9 +524,9 @@ function estateCard(l, armed) {
   let btns = '';
   if (l.state === 'available') btns = [l.rent ? arm('rent', 'Rent', l.rent) : '', l.price ? arm('buy', 'Buy', l.price) : ''].join('');
   else if (l.state === 'yours_renting') btns = `<span class="pill">You rent this</span><button class="btn small ghost" data-act="leave" data-id="${l.propertyId}">Move out</button>`;
-  else if (l.state === 'yours_owned') btns = `<span class="pill">You own this</span>${l.type === 'land' ? (l.buildCost ? arm('build', 'Build a home', l.buildCost) : '') : l.livingHere ? '<span class="pill">You live here</span>' : '<button class="btn small mint" data-act="movein" data-id="' + l.propertyId + '">Move in</button>'}${l.livingHere ? `<button class="btn small ghost" data-act="leave" data-id="${l.propertyId}">Move out</button>` : ''}${l.sellBack ? arm('sell', 'Sell back', l.sellBack) : ''}`;
+  else if (l.state === 'yours_owned') btns = `<span class="pill">You own this</span>${l.type === 'land' ? (l.buildCost ? arm('build', 'Build a home', l.buildCost) : '') : l.livingHere ? '<span class="pill">You live here</span>' : '<button class="btn small mint" data-act="movein" data-id="' + l.propertyId + '">Move in</button>'}${l.livingHere ? `<button class="btn small ghost" data-act="leave" data-id="${l.propertyId}">Move out</button>` : ''}${l.sellBack ? arm('sell', 'Sell for', l.sellBack) : ''}`;
   else btns = '<span class="pill">Taken</span>';
-  return `<div class="prop"><div class="pic" style="background:linear-gradient(150deg,${col},#16313a)">${em}</div><div class="pbody"><b>${U.esc(l.name)}</b><small>${l.beds ? `${l.beds} bed · ` : ''}${l.sizeSqm} sqm · ${l.type === 'land' ? 'Land' : l.type[0].toUpperCase() + l.type.slice(1)}</small><p>${U.esc(l.blurb)}</p><div class="pbtns">${btns}</div></div></div>`;
+  return `<div class="prop"><div class="pic" style="background:linear-gradient(150deg,${col},#16313a)">${em}</div><div class="pbody"><b>${U.esc(l.name)}</b><small>${l.beds ? `${l.beds} bed · ` : ''}${l.sizeSqm} sqm · ${l.type === 'land' ? 'Land' : l.type[0].toUpperCase() + l.type.slice(1)}</small><p>${U.esc(l.blurb)}</p>${l.boughtFor ? `<p class="pl">You paid ${f(l.boughtFor)} · worth ${f(l.sellBack)} after fees · <b class="${l.sellBack >= l.boughtFor ? 'pos' : 'neg'}">${l.sellBack >= l.boughtFor ? '+' : ''}${f(l.sellBack - l.boughtFor)}</b></p>` : ''}<div class="pbtns">${btns}</div></div></div>`;
 }
 const ESTATE_OK = {
   buy: (r) => (r.movedIn ? `You bought ${r.name} and moved in!` : `You bought ${r.name}.`), rent: () => 'Rented. You have moved in!', build: (r) => (r.movedIn ? 'Your new home is built and you have moved in!' : 'Your new home is built.'),
@@ -525,7 +546,7 @@ function openEstateSheet(lotId) {
     const lo = lot(); if (!lo) return U.closePanel();
     const title = lotId === 'apt' ? `${U.esc(S.world.names.apt)}` : lo.listings[0].type === 'land' ? 'Plot of land' : U.esc(lo.listings[0].name);
     const rooms = lo.rooms ? `<p class="hint" style="margin:0 0 8px">${lo.rooms.available} of ${lo.rooms.total} rooms free${lo.rooms.cheapestRent ? ` · rooms from ${U.fmt(lo.rooms.cheapestRent)} / ${periodWord(G.estate.rentPeriodHours)}` : ''}. Showing the first free ones.</p>` : '';
-    U.openPanel(title, `${rooms}<div class="props">${lo.listings.map((l) => estateCard(l, st.armed)).join('')}</div><p class="hint">Prices are in ${U.esc(G.currency.name)}. Renting is charged every ${periodWord(G.estate.rentPeriodHours)}; owners pay no rent. Selling back returns ${G.estate.limits.sellBackPercent}% of the value. You can live in one home at a time.</p>`, (el) => {
+    U.openPanel(title, `${valueStrip(G.estate.area)}${rooms}<div class="props">${lo.listings.map((l) => estateCard(l, st.armed)).join('')}</div><p class="hint">Prices are in ${U.esc(G.currency.name)}. Renting is charged every ${periodWord(G.estate.rentPeriodHours)}; owners pay no rent. Property values follow how many people live in the area: buy early, sell later for a profit (or a loss if people leave). Selling costs ${G.estate.limits.sellFeePercent}%. You can live in one home at a time.</p>`, (el) => {
       el.querySelectorAll('[data-act]').forEach((b) => b.onclick = () => {
         const { act, id } = b.dataset; const k = `${act}:${id}`;
         if (['rent', 'buy', 'build', 'sell'].includes(act) && st.armed !== k) { st.armed = k; draw(); return; }   // second tap confirms
@@ -543,9 +564,85 @@ async function openEstateOverview() {
   const here_ = est.lots.map((lo) => { const l = lo.listings[0]; const free = lo.listings.some((x) => x.state === 'available') || lo.rooms?.available; return `<button class="li" data-lot="${lo.lotId}" style="width:100%;text-align:left"><div><b>${U.esc(lotName(lo))}</b><small>${lo.lotId === 'apt' ? `${lo.rooms.available} rooms and ${lo.listings.filter((x) => x.type === 'apartment').length} apartments` : `${l.type === 'land' ? l.sizeSqm + ' sqm land' : l.beds + ' bed house'}`}</small></div><span class="pill ${free ? '' : 'dim'}">${lo.listings.some((x) => x.state.startsWith('yours')) ? 'Yours' : free ? 'Available' : 'Taken'}</span></button>`; }).join('');
   const byMetro = new Map();
   for (const a of ov.data.areas) { const c = geo.cities.find((x) => x.id === a.cityId); if (!c) continue; const m = c.metro; if (!byMetro.has(m)) byMetro.set(m, []); byMetro.get(m).push({ c, a }); }
-  const rows = [...byMetro.entries()].map(([m, list]) => { const hub = geo.cities.find((c) => c.id === m); return `<div class="metro"><h4>${U.esc(hub.name)}${list.length > 1 ? ' areas' : ''}</h4>${list.sort((x, y) => x.c.priceIndex - y.c.priceIndex).map(({ c, a }) => { const cur = cityCur(c.id); return `<div class="li"><div><b>${U.esc(c.name)}${c.id === here.id ? ' <span class="pill">you are here</span>' : ''}</b><small>${a.cheapestRoom != null ? `Rooms from ${U.fmt(a.cheapestRoom, cur)}` : 'No rooms free'} · ${a.cheapestHome != null ? `homes from ${U.fmt(a.cheapestHome, cur)}` : 'no homes free'} · ${a.cheapestLand != null ? `land from ${U.fmt(a.cheapestLand, cur)}` : 'no land free'}</small></div>${c.id === here.id ? '' : `<button class="btn small ghost" data-go="${c.id}">Map</button>`}</div>`; }).join('')}</div>`; }).join('');
-  U.openPanel('Homes & land', `<h3 style="margin:0 0 6px">In ${U.esc(here.name)} <small style="opacity:.7">(tap one, or tap a building or plot in the world)</small></h3><div class="list">${here_}</div><h3 style="margin:16px 0 6px">Other areas and cities</h3><p class="hint" style="margin:0 0 6px">Each area is its own neighbourhood. Prices are shown in that country's currency. Travel there with the Map.</p>${rows}`, (el) => {
+  const rows = [...byMetro.entries()].map(([m, list]) => { const hub = geo.cities.find((c) => c.id === m); return `<div class="metro"><h4>${U.esc(hub.name)}${list.length > 1 ? ' areas' : ''}</h4>${list.sort((x, y) => x.c.priceIndex - y.c.priceIndex).map(({ c, a }) => { const cur = cityCur(c.id); const v = a.value; return `<div class="li"><div><b>${U.esc(c.name)}${c.id === here.id ? ' <span class="pill">you are here</span>' : ''}${v ? ` <span class="pill ${v.change7d >= 0 ? 'up' : 'down'}">${pctText(v.change7d)} 7d · idx ${v.idx.toFixed(2)}</span>` : ''}</b><small>${a.cheapestRoom != null ? `Rooms from ${U.fmt(a.cheapestRoom, cur)}` : 'No rooms free'} · ${a.cheapestHome != null ? `homes from ${U.fmt(a.cheapestHome, cur)}` : 'no homes free'} · ${a.cheapestLand != null ? `land from ${U.fmt(a.cheapestLand, cur)}` : 'no land free'}</small></div>${c.id === here.id ? '' : `<button class="btn small ghost" data-go="${c.id}">Map</button>`}</div>`; }).join('')}</div>`; }).join('');
+  const pf = est.portfolio;
+  const pfHtml = pf.items.length ? `<h3 style="margin:0 0 6px">My properties</h3><div class="list">${pf.items.map((i) => `<div class="li"><div><b>${U.esc(i.name)}</b><small>Paid ${U.fmt(i.paid)} · worth ${U.fmt(i.sellNet)} after fees${i.cityId === here.id ? '' : ` · in ${U.esc(i.cityName)}: travel there to sell`}</small></div><b class="${i.profit >= 0 ? 'pos' : 'neg'}">${i.profit >= 0 ? '+' : ''}${U.fmt(i.profit)} (${(i.profitPct * 100).toFixed(1)}%)</b></div>`).join('')}<div class="li"><b>Total profit if sold today</b><b class="${pf.profit >= 0 ? 'pos' : 'neg'}">${pf.profit >= 0 ? '+' : ''}${U.fmt(pf.profit)}</b></div></div><div style="height:12px"></div>` : '';
+  U.openPanel('Homes & land', `${pfHtml}<h3 style="margin:0 0 6px">In ${U.esc(here.name)} <small style="opacity:.7">(tap one, or tap a building or plot in the world)</small></h3><div class="list">${here_}</div><h3 style="margin:16px 0 6px">Other areas and cities</h3><p class="hint" style="margin:0 0 6px">Each area is its own neighbourhood. Prices are in that country's currency and follow the area's value index: buy where people are moving in, early, and sell when the index has risen. Travel there with the Map.</p>${rows}`, (el) => {
     el.querySelectorAll('[data-lot]').forEach((b) => b.onclick = () => openEstateSheet(b.dataset.lot));
     el.querySelectorAll('[data-go]').forEach((b) => b.onclick = () => { U.closePanel(); openMap(b.dataset.go); });
   }, { width: '820px' });
+}
+
+
+// ============================================================================ furnishing
+const furnDef = (itemId) => G.catalog.get(itemId);
+const quarter = (yaw) => Math.abs(Math.round(Math.sin(yaw))) === 1;
+const foot = (def, yaw) => (quarter(yaw) ? { w: def.sz, d: def.sx } : { w: def.sx, d: def.sz });
+function furnValid(def, x, z, yaw) {
+  const { rect: r, doorKeepOut: k } = G.furn.info, f = foot(def, yaw);
+  if (x - f.w / 2 < r.minX || x + f.w / 2 > r.maxX || z - f.d / 2 < r.minZ || z + f.d / 2 > r.maxZ) return false;
+  if (def.h > 0.1) {
+    if (x + f.w / 2 > k.minX && x - f.w / 2 < k.maxX && z + f.d / 2 > k.minZ && z - f.d / 2 < k.maxZ) return false;
+    for (const p of G.summary.furniture) { const od = furnDef(p.itemId); if (!od || od.h <= 0.1) continue; const of = foot(od, p.yaw); if (Math.abs(x - p.x) < (f.w + of.w) / 2 - 0.02 && Math.abs(z - p.z) < (f.d + of.d) / 2 - 0.02) return false; }
+  }
+  return G.summary.furniture.length < G.furn.info.home.slots;
+}
+function syncFurniture() {
+  if (!G || !S.w3d) return;
+  const here = G.summary.tenancy && G.summary.tenancy.district === G.city.id;
+  S.w3d.setFurniture(here ? G.summary.furniture : [], G.catalog);
+  if (G.furn) { if (!here) endFurnish(); else drawFurnBar(); }
+}
+async function toggleFurnish() {
+  if (G.furn) return endFurnish();
+  const t = G.summary.tenancy;
+  if (!t) return U.toast('info', 'You do not have a home yet. Tap a house or open the Homes app.');
+  if (t.district !== G.city.id) return U.toast('info', 'Your home is in another city. Open the Map to travel there.');
+  const r = await sendWait({ app: 'home', a: 'info', d: {} }); if (!r.ok) return U.toast('error', r.message);
+  const R = r.data.rect; if (!R) return U.toast('info', 'This home cannot be furnished.');
+  if (!(G.me.x > R.minX - 0.6 && G.me.x < R.maxX + 0.6 && G.me.z > R.minZ - 0.6 && G.me.z < R.maxZ + 0.6)) return U.toast('info', 'Walk inside your home first, then tap Furnish.');
+  G.furn = { info: r.data, sel: null, yaw: 0, picked: null, last: null, cam: { pitch: G.pitch, dist: G.dist } };
+  G.pitch = 1.25; G.dist = 11;            // look almost straight down so walls and other buildings do not hide the room
+  S.w3d.showBanners(false);
+  drawFurnBar();
+}
+function endFurnish() { S.w3d?.setGhost(null); S.w3d?.showBanners(true); if (G.furn?.cam) { G.pitch = G.furn.cam.pitch; G.dist = G.furn.cam.dist; } G.furn = null; document.getElementById('furnbar')?.remove(); }
+function drawFurnBar() {
+  let bar = document.getElementById('furnbar'); if (!bar) { bar = document.createElement('div'); bar.id = 'furnbar'; document.getElementById('ui').append(bar); }
+  const owned = G.summary.inventory.filter((i) => G.catalog.has(i.itemId));
+  const sel = G.furn.sel && owned.find((i) => i.itemId === G.furn.sel) ? G.furn.sel : null; if (!sel) { G.furn.sel = null; S.w3d.setGhost(null); }
+  const pk = G.furn.picked && G.summary.furniture.find((f) => f.furnitureId === G.furn.picked);
+  bar.innerHTML = `<div class="fhead"><b>Furnish</b><small>${G.summary.furniture.length}/${G.furn.info.home.slots} pieces</small><span class="grow"></span><button class="btn small ghost" id="fRot">Rotate [R]</button><button class="btn small ghost" id="fStore">Home Store</button><button class="btn small mint" id="fDone">Done</button></div>
+    <div class="fhint">${pk ? `<b>${U.esc(furnDef(pk.itemId).name)}</b> selected <button class="btn small danger" id="fPick">Pick up</button> <button class="btn small ghost" id="fCancel">Cancel</button>` : sel ? `Tap the floor to place <b>${U.esc(furnDef(sel).name)}</b>. Green = fits, red = blocked.` : owned.length ? 'Choose a piece, then tap the floor. Tap placed furniture to pick it up.' : 'Your backpack has no furniture. Buy some in the Home Store (phone &gt; Home Store).'}</div>
+    <div class="fitems">${owned.map((i) => `<button class="chip ${sel === i.itemId ? 'on' : ''}" data-f="${i.itemId}">${U.esc(furnDef(i.itemId).name)} ×${i.quantity}</button>`).join('')}</div>`;
+  bar.querySelectorAll('[data-f]').forEach((b) => b.onclick = () => { G.furn.sel = b.dataset.f; G.furn.picked = null; drawFurnBar(); });
+  bar.querySelector('#fRot').onclick = rotateFurn; bar.querySelector('#fDone').onclick = endFurnish;
+  bar.querySelector('#fStore').onclick = () => openPhone('store');
+  bar.querySelector('#fPick')?.addEventListener('click', async () => { const id = G.furn.picked; G.furn.picked = null; const r = await sendWait({ app: 'home', a: 'pickup', d: { id } }); if (!r.ok) U.toast('error', r.message); });
+  bar.querySelector('#fCancel')?.addEventListener('click', () => { G.furn.picked = null; drawFurnBar(); });
+}
+function rotateFurn() { if (!G?.furn) return; G.furn.yaw = (G.furn.yaw + Math.PI / 2) % (Math.PI * 2); if (G.furn.last) furnGhost(G.furn.last.x, G.furn.last.z); }
+const snap = (v) => Math.round(v * 4) / 4;
+function furnGhost(x, z) {
+  const sel = G.furn.sel; if (!sel) return S.w3d.setGhost(null);
+  const def = furnDef(sel); G.furn.last = { x, z };
+  S.w3d.setGhost(def, x, z, G.furn.yaw, furnValid(def, x, z, G.furn.yaw));
+}
+canvas.addEventListener('pointermove', (e) => {
+  if (!G?.furn?.sel || e.buttons) return;
+  const r = canvas.getBoundingClientRect(), p = S.w3d.floorPoint(((e.clientX - r.left) / r.width) * 2 - 1, -(((e.clientY - r.top) / r.height) * 2 - 1), camera);
+  if (p) furnGhost(snap(p.x), snap(p.z));
+});
+async function onFurnTap(e, r) {
+  const nx = ((e.clientX - r.left) / r.width) * 2 - 1, ny = -(((e.clientY - r.top) / r.height) * 2 - 1);
+  if (G.furn.sel) {
+    const p = S.w3d.floorPoint(nx, ny, camera); if (!p) return;
+    const x = snap(p.x), z = snap(p.z), def = furnDef(G.furn.sel);
+    if (!furnValid(def, x, z, G.furn.yaw)) { furnGhost(x, z); return U.toast('error', 'That does not fit there.'); }
+    const res = await sendWait({ app: 'home', a: 'place', d: { itemId: G.furn.sel, x, z, yaw: G.furn.yaw } });
+    if (!res.ok) U.toast('error', res.message ?? 'Could not place that.');
+  } else {
+    const fid = S.w3d.pickFurniture(nx, ny, camera);
+    G.furn.picked = fid; drawFurnBar();
+  }
 }

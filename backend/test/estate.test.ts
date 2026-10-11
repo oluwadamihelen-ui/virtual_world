@@ -268,4 +268,11 @@ describe('interiors and furniture', () => {
     expect(isBlocked(spec.building.cx, front, col, () => false, world.bounds)).toBe(true);
     expect(isBlocked(spec.building.cx, front, col, (g: string) => g === 'land_a', world.bounds)).toBe(false);
   });
+  it('a rented room in the apartment block can be furnished too, inside the block', async () => {
+    const a = await w.newPlayer('Roomie'); await fund(a, 5000);
+    await estateApp(a, 'rent', { id: 'prop_resi_room_101', key: key() });
+    await app(a, 'store', 'buy', { itemId: 'single_bed', key: key() });
+    const info: any = (await app(a, 'home', 'info')).data; expect(info.home.lotId).toBe('apt'); expect(info.rect.maxX - info.rect.minX).toBeGreaterThan(10);
+    expect(await code(() => app(a, 'home', 'place', { itemId: 'single_bed', x: (info.rect.minX + info.rect.maxX) / 2, z: info.rect.minZ + 1.2, yaw: 0 }))).toBe('ok');
+  });
 });

@@ -205,7 +205,7 @@ export function createWorld3D(world, scene) {
   }
 
   // ---- lots: clickable houses, apartment block and empty plots with status banners ----
-  const lots = new Map(), pickables = [];
+  const lots = new Map(), pickables = []; let bannersOn = true;
   const bannerTex = (lines, bg, fg) => {
     const c = document.createElement('canvas'); c.width = 512; c.height = 56 + lines.length * 62;
     const g = c.getContext('2d'); g.fillStyle = bg; g.beginPath(); g.roundRect(4, 4, c.width - 8, c.height - 8, 30); g.fill();
@@ -229,6 +229,12 @@ export function createWorld3D(world, scene) {
   }
   const miniHouse = (l) => { const h = new THREE.Group(); h.add(box(l.sx * 0.55, 2.6, l.sz * 0.55, mat('#e8d9b5'), l.cx, 1.3, l.cz), box(l.sx * 0.62, 0.35, l.sz * 0.62, mat('#b4553a'), l.cx, 2.8, l.cz), box(1.0, 1.8, 0.1, mat('#6b4a2b'), l.cx, 0.9, l.cz + (l.cz < 0 ? 1 : -1) * (l.sz * 0.275 + 0.03))); return h; };
 
+  // ---- furniture (only the player's own, inside their home) ----
+  const furnRoot = new THREE.Group(); root.add(furnRoot); const furnMeshes = new Map();
+  const buildModel = (def) => { const g = new THREE.Group(); for (const p of def.parts) g.add(box(p.w, p.h, p.d, mat(p.c), p.x, p.y, p.z)); return g; };
+  const ghost = new THREE.Mesh(BOX, new THREE.MeshBasicMaterial({ color: '#6fe0a0', transparent: true, opacity: 0.45, depthWrite: false })); ghost.visible = false; root.add(ghost);
+  const ndcRay = (x, y, camera) => { const r = new THREE.Raycaster(); r.setFromCamera({ x, y }, camera); return r; };
+
   const skyDay = new THREE.Color('#8ec9f7'), skyDusk = new THREE.Color('#f4a874'), skyNight = new THREE.Color('#0e1633');
   const sunWarm = new THREE.Color('#ffb877'), sunWhite = new THREE.Color('#fff3d6'), moonBlue = new THREE.Color('#7b93d8');
   const tmp = new THREE.Color();
@@ -242,10 +248,36 @@ export function createWorld3D(world, scene) {
         const o = lots.get(id); if (!o) continue;
         const col = { free: ['#1f8a5b', '#ffffff'], taken: ['#59606b', '#e6e8ec'], yours: ['#f4b942', '#2a1d00'] }[st.tone] ?? ['#1e2a44', '#fff'];
         const { t, w, h } = bannerTex(st.lines, col[0], col[1]);
-        o.banner.material.map?.dispose(); o.banner.material.map = t; o.banner.material.needsUpdate = true; o.banner.scale.set(w / 85, h / 85, 1); o.banner.visible = true;
+        o.banner.material.map?.dispose(); o.banner.material.map = t; o.banner.material.needsUpdate = true; o.banner.scale.set(w / 85, h / 85, 1); o.banner.visible = bannersOn;
         if (st.house && !o.house && o.l.kind === 'land') { o.house = miniHouse(o.l); o.g.add(o.house); }
         if (!st.house && o.house) { o.g.remove(o.house); o.house = null; }
       }
+    },
+    /** list: [{furnitureId,itemId,x,z,yaw}], catalog: Map(itemId -> {parts,...}) */
+    setFurniture(list, catalog) {
+      const keep = new Set(list.map((f) => f.furnitureId));
+      for (const [id, g] of furnMeshes) if (!keep.has(id)) { furnRoot.remove(g); furnMeshes.delete(id); }
+      for (const f of list) {
+        const def = catalog.get(f.itemId); if (!def) continue;
+        let g = furnMeshes.get(f.furnitureId);
+        if (!g) { g = buildModel(def); g.userData.fid = f.furnitureId; furnRoot.add(g); furnMeshes.set(f.furnitureId, g); }
+        g.position.set(f.x, 0, f.z); g.rotation.y = f.yaw ?? 0;
+      }
+    },
+    /** Placement preview: def = catalog entry or null to hide. */
+    setGhost(def, x, z, yaw, ok) {
+      if (!def) { ghost.visible = false; return; }
+      const quarter = Math.abs(Math.round(Math.sin(yaw))) === 1; const w = quarter ? def.sz : def.sx, d = quarter ? def.sx : def.sz, h = Math.max(def.h, 0.08);
+      ghost.visible = true; ghost.scale.set(w, h, d); ghost.position.set(x, h / 2, z); ghost.material.color.set(ok ? '#6fe0a0' : '#ff6b6b');
+    },
+    showBanners(on) { bannersOn = on; for (const o of lots.values()) o.banner.visible = on && !!o.banner.material.map; },
+    pickFurniture(ndcX, ndcY, camera) {
+      const hit = ndcRay(ndcX, ndcY, camera).intersectObjects(furnRoot.children, true)[0]; if (!hit) return null;
+      let o = hit.object; while (o && !o.userData.fid) o = o.parent; return o?.userData.fid ?? null;
+    },
+    floorPoint(ndcX, ndcY, camera) {
+      const r = ndcRay(ndcX, ndcY, camera), p = new THREE.Vector3();
+      return r.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), p) ? { x: p.x, z: p.z } : null;
     },
     /** The lot under a screen point (ndc -1..1), or null. */
     pickLot(ndcX, ndcY, camera) {
@@ -290,7 +322,7 @@ export function createWorld3D(world, scene) {
       }
       // door swings open for tenants who are close
       for (const d of doors) {
-        const near = hasAccess && Math.hypot(me.x - d.b.cx, me.z - (d.b.cz + (d.b.sz / 2) * (d.b.doorSide === '+z' ? 1 : -1))) < 3.2;
+        const near = hasAccess(d.b.gate) && Math.hypot(me.x - d.b.cx, me.z - (d.b.cz + (d.b.sz / 2) * (d.b.doorSide === '+z' ? 1 : -1))) < 3.2;
         d.open += ((near ? 1 : 0) - d.open) * Math.min(1, dt * 6);
         d.hinge.rotation.y = -d.open * 1.75 * (d.b.doorSide === '+z' ? -1 : 1);
       }
