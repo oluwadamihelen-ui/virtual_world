@@ -98,7 +98,7 @@ Legend: ✅ done and verified by automated tests · 🟡 done but unverified/par
 | Game server: ticket-only WebSocket entry, authoritative movement on shared physics, tenant-only door, proximity-validated interactions, proximity chat/emotes, block/report, NPC residents, interest-managed snapshots, position persistence | ✅ | `realtime.test.ts` (16) |
 | Browser client: login/register, character creator with live 3D preview, 3D neighborhood with day/night, avatars, name tags, chat bubbles, emotes, goal cards, context cards, Phone (wallet/jobs/goals), Map, touch joystick, reconnect | ✅ (software-rendered Chromium) | screenshots + flows in `docs/WEB_CLIENT.md` |
 | Real-GPU performance, Safari, low-end phones | ⬜ untested | |
-| WebSocket load test (e.g. 40 clients) | ⬜ | next |
+| WebSocket load test | ✅ one run: 40 players clean, 150 players degrade slightly (see `docs/LOAD_TESTING.md`) | `scripts/wsload.mjs` |
 | Per-tenant instanced interiors, more buildings/districts, sound, real art | ⬜ | |
 | Unreal Engine client | ⏸ paused by decision | docs kept |
 

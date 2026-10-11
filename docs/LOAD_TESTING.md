@@ -42,3 +42,16 @@ The fix: purchases of **unlimited** NPC stock no longer lock the stock row (ther
 
 ## Suggested pre-playtest thresholds (proposals, to be agreed and re-measured on target hardware)
 p95 purchase < 150 ms and zero 5xx at 40 players for 30 minutes; zero ledger-integrity violations in a 2-hour soak; restore from backup < 30 min.
+
+## WebSocket load test (`scripts/wsload.mjs`)
+Bots sign up, join through the real ticket flow, walk randomly (20 inputs/s), chat, and call the Vault over the game socket every ~5 s. Start the server with `RATE_LIMIT_DISABLED=1` (never in production), then:
+`BASE=http://localhost:3200 node scripts/wsload.mjs --players 40 --seconds 30`
+
+Measured once on a 4-core cloud container, with the bots, the server and PostgreSQL **all on the same machine** (so the bots compete for CPU), all bots in one city:
+
+| Players | Joined | Errors | Snapshots/s per player (target 10) | Ping p50 / p95 / p99 | Vault call p50 / p95 |
+|---|---|---|---|---|---|
+| 40 | 40/40 | 0 | 9.8 | 0 / 6 / 8 ms | 6 / 21 ms |
+| 150 | 150/150 | 0 | 8.9 | 8 / 65 / 88 ms | 95 / 255 ms |
+
+Reading it: 40 players is comfortable. At 150 the simulation starts to fall behind slightly (8.9 of 10 snapshots/s) and database-backed calls slow down. This is a single run on one machine, not a capacity guarantee; network latency, real clients and a separate database host are not represented. Next steps if more is needed: cache the per-tick summary lookups, batch position saves, and split cities across processes.
