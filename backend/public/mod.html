@@ -36,11 +36,12 @@ async function act(id,body){const note=document.getElementById('n'+id).value.tri
  if(body.action!=='dismiss'&&note.length<3)return alert('Please write a short note (3+ characters) explaining the decision.');
  const r=await api('POST','/v1/mod/reports/'+id+'/resolve',{...body,note});if(!r.ok)alert('Failed: '+(r.j.error||r.status));load()}
 async function load(){
+ const ev=(e)=>!e?'':`<details><summary>Context captured at report time</summary>${e.datingBio?`<div><b>Dating bio:</b> ${esc(e.datingBio)}</div>`:''}${(e.messages||[]).map(m=>`<div class="mut">${m.by==='target'?'⚠ target':'reporter'}: ${esc(m.text)}</div>`).join('')||'<div class=mut>No direct messages between them.</div>'}${(e.transfers||[]).map(t=>`<div class="mut">${t.by} sent ${t.amount} MVC</div>`).join('')}</details>`;
  const r=await api('GET','/v1/mod/reports?status=open');const box=$('reports');
  if(!r.ok){box.textContent='Could not load ('+r.status+').';return}
  if(!r.j.reports.length){box.textContent='No open reports. 🎉';}else{box.innerHTML='';
   for(const x of r.j.reports){const d=document.createElement('div');d.className='rep';
-   d.innerHTML=`<b>${esc(x.target)}</b> reported by ${esc(x.reporter)} <span class="mut">· ${esc(x.category)} · ${new Date(x.createdAt).toLocaleString()}</span><div>${esc(x.detail)||'<span class=mut>(no details)</span>'}</div><input id="n${x.reportId}" placeholder="Decision note (required for sanctions)">`;
+   d.innerHTML=`<b>${esc(x.target)}</b> reported by ${esc(x.reporter)} <span class="mut">· ${esc(x.category)} · ${new Date(x.createdAt).toLocaleString()}</span><div>${esc(x.detail)||'<span class=mut>(no details)</span>'}</div>${ev(x.evidence)}<input id="n${x.reportId}" placeholder="Decision note (required for sanctions)">`;
    const add=(t,body,cls)=>{const b=document.createElement('button');b.textContent=t;if(cls)b.className=cls;b.onclick=()=>act(x.reportId,body);d.append(b)};
    add('Dismiss',{action:'dismiss'},'alt');add('Warn',{action:'warn'});add('Mute 1h',{action:'mute',hours:1});add('Mute 24h',{action:'mute',hours:24});add('Suspend 24h',{action:'suspend',hours:24},'bad');add('Suspend 7d',{action:'suspend',hours:168},'bad');
    if(role==='admin')add('Ban',{action:'ban'},'bad');

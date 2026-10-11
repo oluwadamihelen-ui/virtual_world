@@ -12,9 +12,20 @@ export async function fileReport(ctx: AppContext, reporterCharacterId: string, t
   if (reporterCharacterId === targetCharacterId) throw badRequest('cannot_report_self');
   const t = await ctx.pool.query('SELECT 1 FROM characters WHERE id=$1', [targetCharacterId]);
   if (t.rowCount === 0) throw notFound('character_not_found');
+  // Snapshot only what involves the reported pair: their last direct messages, recent transfers between them, and the target's dating bio.
+  const dms = (await ctx.pool.query(
+    `SELECT from_id=$1::uuid AS by_reporter, body, created_at FROM direct_messages
+      WHERE (from_id=$1 AND to_id=$2) OR (from_id=$2 AND to_id=$1) ORDER BY id DESC LIMIT 15`, [reporterCharacterId, targetCharacterId])).rows
+    .reverse().map((m) => ({ by: m.by_reporter ? 'reporter' : 'target', text: m.body, at: m.created_at }));
+  const pay = (await ctx.pool.query(
+    `SELECT t.amount, t.actor_character_id=$1::uuid AS by_reporter, t.created_at FROM ledger_transactions t
+      WHERE t.type='p2p_transfer' AND ((t.actor_character_id=$1::uuid AND t.reference_id=$2::uuid::text) OR (t.actor_character_id=$2::uuid AND t.reference_id=$1::uuid::text))
+      ORDER BY t.created_at DESC LIMIT 5`, [reporterCharacterId, targetCharacterId])).rows
+    .map((x) => ({ by: x.by_reporter ? 'reporter' : 'target', amount: Number(x.amount), at: x.created_at }));
+  const bio = (await ctx.pool.query('SELECT bio FROM dating_profiles WHERE character_id=$1', [targetCharacterId])).rows[0]?.bio ?? null;
   const r = await ctx.pool.query(
-    `INSERT INTO reports (reporter_character_id,target_character_id,category,detail,created_at) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-    [reporterCharacterId, targetCharacterId, category, detail ?? null, ctx.now()]);
+    `INSERT INTO reports (reporter_character_id,target_character_id,category,detail,evidence,created_at) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+    [reporterCharacterId, targetCharacterId, category, detail ?? null, JSON.stringify({ messages: dms, transfers: pay, datingBio: bio }), ctx.now()]);
   return { reportId: r.rows[0].id as string };
 }
 
@@ -23,7 +34,7 @@ export async function listReports(ctx: AppContext, status: string) {
     `SELECT r.*, rc.display_name AS reporter_name, tc.display_name AS target_name FROM reports r
        JOIN characters rc ON rc.id=r.reporter_character_id JOIN characters tc ON tc.id=r.target_character_id
       WHERE r.status=$1 ORDER BY r.created_at LIMIT 100`, [status]);
-  return r.rows.map((x) => ({ reportId: x.id, reporter: x.reporter_name, target: x.target_name, targetCharacterId: x.target_character_id, category: x.category, detail: x.detail, status: x.status, createdAt: x.created_at }));
+  return r.rows.map((x) => ({ reportId: x.id, reporter: x.reporter_name, target: x.target_name, targetCharacterId: x.target_character_id, category: x.category, detail: x.detail, evidence: x.evidence ?? null, status: x.status, createdAt: x.created_at }));
 }
 
 export type Resolution = { action: 'dismiss' } | { action: 'warn'; note: string } | { action: 'suspend'; hours: number; note: string } | { action: 'mute'; hours: number; note: string } | { action: 'ban'; note: string };

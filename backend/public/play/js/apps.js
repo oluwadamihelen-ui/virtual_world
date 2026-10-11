@@ -109,7 +109,7 @@ export function phoneApps(ctx) {
       };
       el.querySelector('#tGo').onclick = go; el.querySelector('#tIn').onkeydown = (e) => { if (e.key === 'Enter') go(); e.stopPropagation(); }; el.querySelector('#tIn').onkeyup = (e) => e.stopPropagation();
       const bl = el.querySelector('#tBlock'); if (bl) bl.onclick = () => { ctx.send({ t: 'block', targetId: other }); messagesApp(ph); };
-      const rp = el.querySelector('#tReport'); if (rp) rp.onclick = () => { ctx.send({ t: 'report', targetId: other, category: 'harassment', detail: 'Reported from Chatter' }); };
+      const rp = el.querySelector('#tReport'); if (rp) rp.onclick = () => U.reportDialog(name, (category, detail) => ctx.send({ t: 'report', targetId: other, category, detail }));
       G().onNotify = (m) => { if (m.kind === 'message' && m.fromId === other) draw(); };
     });
   }
@@ -132,7 +132,7 @@ export function phoneApps(ctx) {
           <div class="row2"><button class="btn ghost" id="pass">Pass</button><button class="btn" id="like">${icon('heart')} Like</button></div><button class="btn small ghost" id="rep" style="justify-self:center">Report or block</button>`;
         const act = async (like) => { const r = await call('love', 'swipe', { id: p.id, like }); if (!r) return; if (r.matched) { U.toast('ok', `It's a match with ${r.name}!`); body.innerHTML = `<div class="pcard"><div style="font-size:40px">💞</div><b style="font-size:20px">It's a match!</b><div>You and ${esc(r.name)} like each other.</div><button class="btn mint" id="sayHi">Say hello</button><button class="btn ghost" id="nx">Keep browsing</button></div>`; body.querySelector('#sayHi').onclick = () => messagesApp(ph, { id: r.id, name: r.name }); body.querySelector('#nx').onclick = show; } else show(); };
         body.querySelector('#pass').onclick = () => act(false); body.querySelector('#like').onclick = () => act(true);
-        body.querySelector('#rep').onclick = () => { ctx.send({ t: 'report', targetId: p.id, category: 'inappropriate_name', detail: 'Reported from Spark profile' }); ctx.send({ t: 'block', targetId: p.id }); show(); };
+        body.querySelector('#rep').onclick = () => U.reportDialog(p.name, (category, detail) => { ctx.send({ t: 'report', targetId: p.id, category, detail }); ctx.send({ t: 'block', targetId: p.id }); show(); });
       };
       show();
     } else if (tab === 'matches') {

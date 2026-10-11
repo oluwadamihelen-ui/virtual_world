@@ -319,3 +319,16 @@ export function showTravel({ toName, icon: em, mode, arrivesAt, seconds, now }) 
   }, 200);
   return () => { clearInterval(t); el.remove(); };
 }
+
+/** Small modal asking why a player is being reported. onSend(category, detail). */
+export function reportDialog(name, onSend) {
+  const host = document.createElement('div'); host.className = 'overlay'; host.style.zIndex = 60;
+  host.innerHTML = `<div class="panel" style="max-width:380px"><h3 style="margin:0 0 8px">Report ${esc(name)}</h3><div class="field" style="display:grid;gap:8px">
+    <select id="rpCat"><option value="harassment">Harassment or bullying</option><option value="scam">Scam or fraud</option><option value="inappropriate_name">Inappropriate name or profile</option><option value="cheating">Cheating</option><option value="other">Something else</option></select>
+    <textarea id="rpDet" rows="3" maxlength="300" placeholder="What happened? (optional)"></textarea>
+    <small style="opacity:.7">A moderator sees your report and the recent messages between you two.</small>
+    <div style="display:flex;gap:8px"><button class="btn" id="rpGo">Send report</button><button class="btn ghost" id="rpNo">Cancel</button></div></div></div>`;
+  document.body.append(host);
+  host.querySelector('#rpNo').onclick = () => host.remove();
+  host.querySelector('#rpGo').onclick = () => { onSend(host.querySelector('#rpCat').value, host.querySelector('#rpDet').value.trim() || undefined); host.remove(); };
+}

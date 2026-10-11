@@ -204,3 +204,20 @@ describe('odds (play-money betting, adults only)', () => {
     await integrity();
   });
 });
+
+describe('reports carry context for moderators', () => {
+  it('snapshots the DMs, transfers and dating bio of the reported pair only', async () => {
+    const a = await adult('Reporter'), b = await adult('Offender'), c = await adult('Bystander');
+    await app(b, 'love', 'save', { bio: 'hello world friend', lookingFor: 'Friendship', interests: [] });
+    await app(b, 'messages', 'send', { to: 'Reporter', text: 'send me money now' });
+    await app(a, 'messages', 'send', { to: 'Offender', text: 'no' });
+    await app(c, 'messages', 'send', { to: 'Offender', text: 'unrelated private chat' });
+    const rep = (await import('../src/modules/moderation/moderation.js'));
+    await rep.fileReport(w.ctx, a.characterId, b.characterId, 'scam', 'asks for money');
+    const list = await rep.listReports(w.ctx, 'open');
+    const ev: any = list[0]!.evidence;
+    expect(ev.messages.map((m: any) => m.text)).toEqual(['send me money now', 'no']);
+    expect(ev.datingBio).toBe('hello world friend');
+    expect(JSON.stringify(ev)).not.toContain('unrelated');
+  });
+});

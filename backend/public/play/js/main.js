@@ -206,7 +206,7 @@ function onChat(m) {
 function playerMenu(ent, ev) {
   U.showMenu(ev.clientX, ev.clientY, ent.name, [
     { label: 'Block', run: () => S.conn.send({ t: 'block', targetId: ent.id }) },
-    { label: 'Report…', run: () => S.conn.send({ t: 'report', targetId: ent.id, category: 'harassment', detail: 'Reported from the game menu' }) },
+    { label: 'Report…', run: () => U.reportDialog(ent.name ?? 'this player', (category, detail) => S.conn.send({ t: 'report', targetId: ent.id, category, detail })) },
   ]);
 }
 

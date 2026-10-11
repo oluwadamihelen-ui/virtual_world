@@ -24,6 +24,9 @@
 - Loans: limit grows with reputation (500 + 100 per point, up to 5,000), flat 10% fee, 72 h term, one at a time. If overdue, up to 30% of the **wallet** is collected at most once an hour. Items and homes are never taken. Wallet cannot go below zero.
 - Every movement is a double-entry ledger transaction; `verifyLedgerIntegrity` is asserted in the tests.
 
+## Reports
+The report dialog (player menu, Chatter, Spark) asks for a reason. The report stores a snapshot of context between the two players so a moderator can decide without access to anyone's other private messages.
+
 ## Other
 - Chat filter, rate limits, block, report and moderator tools exist (see ARCHITECTURE).
-- **Not built:** parental controls, ID/age verification, an audit trail for the apps' messages beyond the database, moderator review of direct messages or profiles (reports file against the player; there is no UI to read a DM), account deletion for the whole account. A privacy policy, terms and a legal review (data protection, children's online safety, gambling, lending) are required before real users.
+- **Not built:** parental controls, ID/age verification, an audit trail for the apps' messages beyond the database, a general moderator tool for reading direct messages (moderators only see the last 15 messages between the two players, plus the target's dating bio and recent transfers, captured when a report is filed; the moderator page `/mod.html` shows it), account deletion for the whole account. A privacy policy, terms and a legal review (data protection, children's online safety, gambling, lending) are required before real users.
