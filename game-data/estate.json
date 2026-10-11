@@ -1,0 +1,114 @@
+{
+  "rooms": {
+    "beds": 1,
+    "sizeSqm": 28,
+    "furnitureSlots": 4,
+    "rent": 500,
+    "count": 8,
+    "rentOnly": true,
+    "blurb": "A compact furnished room. Cheap, close to everything."
+  },
+  "apartments": [
+    {
+      "name": "Apartment A1",
+      "beds": 2,
+      "sizeSqm": 68,
+      "rent": 900,
+      "price": 16000,
+      "furnitureSlots": 8,
+      "capacity": 2,
+      "blurb": "Two bedrooms with a balcony."
+    },
+    {
+      "name": "Apartment A2",
+      "beds": 2,
+      "sizeSqm": 74,
+      "rent": 1000,
+      "price": 18000,
+      "furnitureSlots": 8,
+      "capacity": 2,
+      "blurb": "Bright corner flat on a higher floor."
+    },
+    {
+      "name": "Apartment B1",
+      "beds": 3,
+      "sizeSqm": 96,
+      "rent": 1400,
+      "price": 26000,
+      "furnitureSlots": 10,
+      "capacity": 4,
+      "blurb": "Three bedrooms for a family or friends."
+    },
+    {
+      "name": "Penthouse P1",
+      "beds": 3,
+      "sizeSqm": 130,
+      "rent": 2400,
+      "price": 48000,
+      "furnitureSlots": 12,
+      "capacity": 4,
+      "blurb": "Top floor with the best view in the building."
+    }
+  ],
+  "houses": {
+    "house_a": {
+      "name": "Garden House",
+      "beds": 3,
+      "sizeSqm": 140,
+      "rent": 2200,
+      "price": 42000,
+      "furnitureSlots": 10,
+      "capacity": 4,
+      "blurb": "A cosy house with a small garden."
+    },
+    "house_b": {
+      "name": "Family Home",
+      "beds": 4,
+      "sizeSqm": 190,
+      "rent": 3000,
+      "price": 60000,
+      "furnitureSlots": 12,
+      "capacity": 6,
+      "blurb": "Room for everyone, with a driveway."
+    },
+    "house_c": {
+      "name": "Corner Villa",
+      "beds": 5,
+      "sizeSqm": 260,
+      "rent": 4500,
+      "price": 95000,
+      "furnitureSlots": 14,
+      "capacity": 8,
+      "blurb": "The largest home on the street."
+    }
+  },
+  "land": {
+    "land_a": {
+      "sizeSqm": 300,
+      "price": 9000
+    },
+    "land_b": {
+      "sizeSqm": 300,
+      "price": 9000
+    },
+    "land_c": {
+      "sizeSqm": 450,
+      "price": 14000
+    },
+    "land_d": {
+      "sizeSqm": 450,
+      "price": 14000
+    }
+  },
+  "build": {
+    "cost": 15000,
+    "name": "Starter Home",
+    "beds": 2,
+    "sizeSqm": 90,
+    "furnitureSlots": 6,
+    "capacity": 3,
+    "rentRatio": 0.05
+  },
+  "sellBackPercent": 70,
+  "maxLandPlots": 3
+}

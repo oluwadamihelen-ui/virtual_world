@@ -36,6 +36,7 @@ export async function rent(ctx: AppContext, characterId: string, propertyId: str
     if (c.replay) return { ...c.response, replayed: true };
 
     if (prop.status !== 'available') throw conflict('property_unavailable', 'This property is already taken');
+    if (prop.type === 'land' || !(prop.rent_per_period > 0)) throw conflict('not_for_rent', 'This property is not for rent.');
     const mine = (await tx.query(`SELECT count(*)::int n FROM tenancies WHERE character_id=$1 AND status = ANY($2)`, [characterId, LIVE])).rows[0].n;
     if (mine >= e.maxActiveTenanciesPerCharacter) throw conflict('tenancy_limit', 'You already rent a property');
 
@@ -60,12 +61,12 @@ export interface RentResult { txId: string; tenancyId: string; propertyId: strin
 
 export async function currentTenancy(tx: Pick<Tx, 'query'>, characterId: string) {
   const r = await tx.query(
-    `SELECT t.*, p.name AS property_name, p.furniture_slots, p.district AS property_district FROM tenancies t JOIN properties p ON p.id=t.property_id
+    `SELECT t.*, p.name AS property_name, p.furniture_slots, p.district AS property_district, p.type AS property_type, p.beds AS property_beds FROM tenancies t JOIN properties p ON p.id=t.property_id
       WHERE t.character_id=$1 AND t.status = ANY($2) ORDER BY t.started_at DESC LIMIT 1`, [characterId, LIVE]);
   const t = r.rows[0];
   if (!t) return null;
   return {
-    tenancyId: t.id as string, propertyId: t.property_id as string, propertyName: t.property_name as string, district: t.property_district as string, status: t.status as string,
+    tenancyId: t.id as string, propertyId: t.property_id as string, propertyName: t.property_name as string, district: t.property_district as string, status: t.status as string, kind: t.kind as string, propertyType: t.property_type as string, beds: t.property_beds as number,
     rentAmount: t.rent_amount as number, paidUntil: (t.paid_until as Date).toISOString(),
     graceUntil: t.grace_until ? (t.grace_until as Date).toISOString() : null, furnitureSlots: t.furniture_slots as number,
   };
@@ -85,9 +86,9 @@ export async function checkAccess(ctx: AppContext, propertyId: string, character
   return r.rowCount ? { allowed: true, tenancyStatus: r.rows[0].status as string } : { allowed: false, reason: 'no_active_tenancy' };
 }
 
-async function endTenancy(tx: Tx, t: { id: string; property_id: string; character_id: string }, reason: string, now: Date) {
+export async function endTenancy(tx: Tx, t: { id: string; property_id: string; character_id: string }, reason: string, now: Date) {
   await tx.query(`UPDATE tenancies SET status='ended', ended_at=$2, end_reason=$3 WHERE id=$1`, [t.id, now, reason]);
-  await tx.query(`UPDATE properties SET status='available' WHERE id=$1`, [t.property_id]);
+  await tx.query(`UPDATE properties SET status = CASE WHEN owner_id IS NULL THEN 'available' ELSE 'owned' END WHERE id=$1`, [t.property_id]);
   // Nothing is destroyed: placed furniture goes back to the tenant's inventory.
   const f = await tx.query('DELETE FROM placed_furniture WHERE tenancy_id=$1 RETURNING item_id', [t.id]);
   for (const row of f.rows) await addItem(tx, t.character_id, row.item_id, 1);
@@ -101,7 +102,7 @@ export async function processTenancy(ctx: AppContext, tenancyId: string): Promis
   return withTx(ctx.pool, async (tx) => {
     const now = ctx.now();
     const e = ctx.data.economy;
-    const t = (await tx.query(`SELECT * FROM tenancies WHERE id=$1 AND status = ANY($2) FOR UPDATE`, [tenancyId, LIVE])).rows[0];
+    const t = (await tx.query(`SELECT * FROM tenancies WHERE id=$1 AND status = ANY($2) AND kind='rent' FOR UPDATE`, [tenancyId, LIVE])).rows[0];
     if (!t) return 'ended_or_missing';
     try { await assertCanAct(ctx, tx, t.character_id); } catch { return 'skipped_sanctioned'; }
 
@@ -145,7 +146,7 @@ export async function processTenancy(ctx: AppContext, tenancyId: string): Promis
 /** Process every tenancy that is due. Called on a timer by the server and on player join. */
 export async function sweepTenancies(ctx: AppContext, characterId?: string): Promise<number> {
   const r = await ctx.pool.query(
-    `SELECT id FROM tenancies WHERE status = ANY($1) AND paid_until <= $2 AND ($3::uuid IS NULL OR character_id=$3)`,
+    `SELECT id FROM tenancies WHERE kind='rent' AND status = ANY($1) AND paid_until <= $2 AND ($3::uuid IS NULL OR character_id=$3)`,
     [LIVE, ctx.now(), characterId ?? null],
   );
   for (const row of r.rows) await processTenancy(ctx, row.id);

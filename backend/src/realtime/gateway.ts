@@ -366,7 +366,16 @@ export class Gateway {
     if (summary.tenancy.district !== p.city) {
       throw new AppError(409, 'home_elsewhere', `Your home is in ${this.ctx.data.cityById.get(summary.tenancy.district)?.name}. Open the map to travel there.`);
     }
-    const apt = this.worldOf(p).buildings.find((b: any) => b.id === 'apt');
+    const world = this.worldOf(p);
+    const lotId = (await this.ctx.pool.query('SELECT lot_id FROM properties WHERE id=$1', [summary.tenancy.propertyId])).rows[0]?.lot_id as string | undefined;
+    const lot = (world.lots ?? []).find((l: any) => l.id === lotId);
+    if (lot && lot.kind !== 'apartments') {
+      // Houses (and land you built on) have no walk-in interior yet: you arrive at your front gate, on the road side.
+      p.x = lot.cx; p.z = lot.cz + (lot.cz < 0 ? lot.sz / 2 + 1.4 : -(lot.sz / 2 + 1.4)); p.moving = false; p.dirty = true;
+      this.toast(p, 'ok', `Welcome home to ${summary.tenancy.propertyName}.`);
+      return;
+    }
+    const apt = world.buildings.find((b: any) => b.id === 'apt');
     p.access.add('apartment');
     p.x = apt.cx; p.z = apt.cz + (apt.doorSide === '+z' ? -1.5 : 1.5); p.moving = false; p.dirty = true;
     this.toast(p, 'ok', 'Welcome home.');
@@ -414,7 +423,10 @@ export class Gateway {
         this.send(o, msg);
         if (msg.kind === 'money') void this.refresh(o).catch(() => {});
       }
-      if (m.app === 'bank' || m.app === 'odds') void this.refresh(p).catch(() => {});
+      if (m.app === 'estate') {
+        await this.refresh(p);
+        if (r.goHome) await this.onHome(p).catch(() => {});   // move in immediately: walk straight into the new home
+      } else if (m.app === 'bank' || m.app === 'odds') void this.refresh(p).catch(() => {});
     } catch (err) {
       this.send(p, { t: 'app', rid: m.rid, ok: false, code: err instanceof AppError ? err.code : 'error', message: this.friendly(err) });
     }

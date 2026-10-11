@@ -45,6 +45,7 @@ const Geo = z.object({
   cities: z.array(z.object({
     id: z.string(), country: z.string(), name: z.string(), lat: z.number(), lon: z.number(), priceIndex: z.number().positive(), blurb: z.string(),
     mirror: z.enum(['none', 'x', 'z', 'xz']).optional(),
+    metro: z.string(), hub: z.boolean().default(false),
     landmark: z.enum(['sea', 'rock', 'harbour', 'walls', 'jungle', 'hills', 'tower']).optional(),
     theme: z.object({ ground: z.string(), road: z.string(), buildings: z.array(z.string()), roofs: z.array(z.string()) }).optional(),
     names: z.record(z.string(), z.string()).optional(),
@@ -55,6 +56,7 @@ const Geo = z.object({
     secPerKm: z.number().optional(), internationalFee: z.number().optional(),
   })),
   minTravelSeconds: z.number().positive(),
+  walkMaxKm: z.number().positive().default(4),
 });
 const Phone = z.object({
   minAgeToMessage: z.number().int(),
@@ -76,6 +78,16 @@ const Shop = z.object({
 const Property = z.object({
   id: z.string(), type: z.string(), district: z.string(), name: z.string(),
   rentPerPeriod: z.number().int().nonnegative(), capacity: z.number().int().positive(), furnitureSlots: z.number().int().nonnegative(),
+  lot: z.string().optional(), salePrice: z.number().int().positive().nullable().optional(), beds: z.number().int().optional(), sizeSqm: z.number().int().optional(),
+  blurb: z.string().optional(), buildCost: z.number().int().positive().nullable().optional(),
+});
+const Unit = z.object({ name: z.string(), beds: z.number().int(), sizeSqm: z.number().int(), rent: z.number().int().positive(), price: z.number().int().positive(), furnitureSlots: z.number().int(), capacity: z.number().int().positive(), blurb: z.string() });
+const Estate = z.object({
+  rooms: z.object({ beds: z.number().int(), sizeSqm: z.number().int(), furnitureSlots: z.number().int(), rent: z.number().int().positive(), count: z.number().int(), blurb: z.string() }).passthrough(),
+  apartments: z.array(Unit), houses: z.record(z.string(), Unit),
+  land: z.record(z.string(), z.object({ sizeSqm: z.number().int(), price: z.number().int().positive() })),
+  build: z.object({ cost: z.number().int().positive(), name: z.string(), beds: z.number().int(), sizeSqm: z.number().int(), furnitureSlots: z.number().int(), capacity: z.number().int(), rentRatio: z.number().positive() }),
+  sellBackPercent: z.number().min(0).max(100), maxLandPlots: z.number().int().positive(),
 });
 const Job = z.object({
   id: z.string(), name: z.string(), employer: z.string(), district: z.string(),
@@ -95,7 +107,7 @@ function parseAll(read: (f: string) => unknown) {
   const economy = Economy.parse(read('economy.json'));
   const items = z.array(Item).parse(read('items.json'));
   const shops = z.array(Shop).parse(read('shops.json'));
-  const properties = z.array(Property).parse(read('properties.json'));
+  const properties = z.array(Property).parse(read('properties.json')).map((p) => ({ lot: 'apt', beds: p.type === 'apartment' ? 2 : 1, sizeSqm: p.type === 'apartment' ? 68 : 28, salePrice: p.type === 'apartment' ? 16000 : null, blurb: p.type === 'apartment' ? 'Two bedrooms with a balcony.' : 'A compact furnished room. Cheap, close to everything.', ...p }));
   const jobs = z.array(Job).parse(read('jobs.json'));
   const appearance = Appearance.parse(read('appearance.json'));
   const businesses = Businesses.parse(read('businesses.json'));
@@ -104,6 +116,7 @@ function parseAll(read: (f: string) => unknown) {
   const world = World.parse(read('world.json'));
   const geo = Geo.parse(read('geo.json'));
   const phone = Phone.parse(read('phone.json'));
+  const estate = Estate.parse(read('estate.json'));
   // Cross-reference validation: catch typos in data at boot rather than at purchase time.
   const itemIds = new Set(items.map((i) => i.id));
   for (const s of shops) for (const st of s.stock) {
@@ -117,6 +130,7 @@ function parseAll(read: (f: string) => unknown) {
   for (const c of geo.countries) if (!geo.currencies[c.currency]) throw new Error(`geo.json: unknown currency ${c.currency}`);
   for (const c of geo.cities) if (!countryIds.has(c.country)) throw new Error(`geo.json: city ${c.id} has unknown country ${c.country}`);
   if (!geo.cities.some((c) => c.id === geo.startCity)) throw new Error('geo.json: startCity not found');
+  const price = (n: number, idx: number) => Math.max(50, Math.round((n * idx) / 50) * 50);
   const worlds = new Map<string, any>();
   const baseShop = shops.find((s) => s.id === 'shop_corner_grocery')!;
   const allShops = [...shops];
@@ -126,14 +140,24 @@ function parseAll(read: (f: string) => unknown) {
     if (city.id === 'lagos') continue;
     allShops.push({ ...baseShop, id: cityShopId(city.id), name: `${city.names?.grocery ?? 'Corner Grocery'}`, district: city.id,
       stock: baseShop.stock.map((st) => ({ ...st, price: Math.max(1, Math.round(st.price * city.priceIndex)) })) });
-    for (let n = 1; n <= 8; n++) {
+    for (let n = 1; n <= estate.rooms.count; n++) {
       allProps.push({ id: `prop_${city.id}_room_${n}`, type: 'room', district: city.id, name: `Room ${n}, ${city.names?.apt ?? 'Apartments'}`,
-        rentPerPeriod: Math.max(1, Math.round(500 * city.priceIndex)), capacity: 1, furnitureSlots: 4 });
+        rentPerPeriod: price(estate.rooms.rent, city.priceIndex), capacity: 1, furnitureSlots: estate.rooms.furnitureSlots, lot: 'apt', beds: estate.rooms.beds, sizeSqm: estate.rooms.sizeSqm, blurb: estate.rooms.blurb, salePrice: null });
     }
+  }
+  // Apartments, houses and land are generated for every city from game-data/estate.json, scaled by the city's price index.
+  for (const city of geo.cities) {
+    const idx = city.priceIndex, base = city.names?.apt ?? 'Maple Court';
+    estate.apartments.forEach((u, i) => allProps.push({ id: `prop_${city.id}_apt_${i + 1}`, type: 'apartment', district: city.id, name: `${u.name}, ${base}`, rentPerPeriod: price(u.rent, idx),
+      capacity: u.capacity, furnitureSlots: u.furnitureSlots, lot: 'apt', beds: u.beds, sizeSqm: u.sizeSqm, blurb: u.blurb, salePrice: price(u.price, idx) }));
+    for (const [lot, u] of Object.entries(estate.houses)) allProps.push({ id: `prop_${city.id}_${lot}`, type: 'house', district: city.id, name: `${u.name}, ${city.name}`, rentPerPeriod: price(u.rent, idx),
+      capacity: u.capacity, furnitureSlots: u.furnitureSlots, lot, beds: u.beds, sizeSqm: u.sizeSqm, blurb: u.blurb, salePrice: price(u.price, idx) });
+    for (const [lot, u] of Object.entries(estate.land)) allProps.push({ id: `prop_${city.id}_${lot}`, type: 'land', district: city.id, name: `Plot ${lot.slice(-1).toUpperCase()}, ${city.name}`, rentPerPeriod: 0,
+      capacity: 1, furnitureSlots: 0, lot, beds: 0, sizeSqm: u.sizeSqm, blurb: `${u.sizeSqm} sqm of empty land. Build your own home on it.`, salePrice: price(u.price, idx), buildCost: price(estate.build.cost, idx) });
   }
   const cityById = new Map(geo.cities.map((c) => [c.id, c]));
   const countryById = new Map(geo.countries.map((c) => [c.id, c]));
-  return { economy, items, shops: allShops, properties: allProps, jobs, appearance, businesses, chat, achievements, world, geo, phone, worlds, cityById, countryById, itemIds };
+  return { economy, items, shops: allShops, properties: allProps, jobs, appearance, businesses, chat, achievements, world, geo, phone, estate, worlds, cityById, countryById, itemIds };
 }
 
 export function loadGameData(dir: string): GameData {

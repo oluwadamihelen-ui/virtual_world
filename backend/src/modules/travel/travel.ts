@@ -24,15 +24,18 @@ export function quote(ctx: AppContext, fromId: string, toId: string): TravelOpti
   const km = distanceKm(from, to);
   const international = from.country !== to.country;
   const cur = currencyOfCity(ctx.data, fromId);
-  return ctx.data.geo.transport.filter((m) => m.intercity).map((m) => {
+  const sameMetro = from.metro === to.metro && fromId !== toId;
+  const opts = ctx.data.geo.transport.filter((m) => m.intercity || (m.id === 'walk' && sameMetro)).map((m) => {
     let reason: string | undefined;
-    if (m.domesticOnly && international) reason = 'No road or bus link across the border yet';
+    if (m.id === 'walk' && km > ctx.data.geo.walkMaxKm) reason = `Too far to walk (${km} km)`;
+    else if (m.domesticOnly && international) reason = 'No road or bus link across the border yet';
     else if (m.maxKm && km > m.maxKm) reason = 'Too far for this';
     else if (m.minKm && km < m.minKm) reason = 'Too close to fly';
-    const fare = Math.max(1, Math.round((m.base ?? 0) + (m.perKm ?? 0) * km + (international ? (m.internationalFee ?? 0) : 0)));
-    const seconds = Math.min(90, Math.max(ctx.data.geo.minTravelSeconds, Math.round(km * (m.secPerKm ?? 0.1))));
-    return { mode: m.id, name: m.name, icon: m.icon, available: !reason, reason, km, fare, fareText: formatLocal(fare, cur), seconds };
+    const fare = m.id === 'walk' ? 0 : Math.max(1, Math.round((m.base ?? 0) + (m.perKm ?? 0) * km + (international ? (m.internationalFee ?? 0) : 0)));
+    const seconds = Math.min(90, Math.max(ctx.data.geo.minTravelSeconds, Math.round(km * (m.secPerKm ?? (m.id === 'walk' ? 6 : 0.1)))));
+    return { mode: m.id, name: m.name, icon: m.icon, available: !reason, reason, km, fare, fareText: fare ? formatLocal(fare, cur) : 'Free', seconds };
   });
+  return opts;
 }
 
 export interface TripResult { tripId: string; to: string; mode: string; fare: number; seconds: number; arrivesAt: string; replayed: boolean }

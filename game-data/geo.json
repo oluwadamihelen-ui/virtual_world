@@ -63,7 +63,9 @@
       "priceIndex": 1.0,
       "mirror": "none",
       "blurb": "The big, loud, brilliant coastal city. Maple Court is in Yaba.",
-      "landmark": "sea"
+      "landmark": "sea",
+      "hub": true,
+      "metro": "lagos"
     },
     {
       "id": "abuja",
@@ -99,7 +101,9 @@
         "jobs": "Federal Job Centre",
         "bank": "Central Bank Branch"
       },
-      "landmark": "rock"
+      "landmark": "rock",
+      "hub": true,
+      "metro": "abuja"
     },
     {
       "id": "portharcourt",
@@ -135,7 +139,9 @@
         "jobs": "Rivers Job Centre",
         "bank": "Harbour Bank"
       },
-      "landmark": "harbour"
+      "landmark": "harbour",
+      "hub": true,
+      "metro": "portharcourt"
     },
     {
       "id": "kano",
@@ -171,7 +177,9 @@
         "jobs": "Kano Job Centre",
         "bank": "Trade Bank"
       },
-      "landmark": "walls"
+      "landmark": "walls",
+      "hub": true,
+      "metro": "kano"
     },
     {
       "id": "accra",
@@ -207,7 +215,9 @@
         "jobs": "Accra Job Centre",
         "bank": "Gold Coast Bank"
       },
-      "landmark": "sea"
+      "landmark": "sea",
+      "hub": true,
+      "metro": "accra"
     },
     {
       "id": "kumasi",
@@ -243,7 +253,9 @@
         "jobs": "Kumasi Job Centre",
         "bank": "Heritage Bank"
       },
-      "landmark": "jungle"
+      "landmark": "jungle",
+      "hub": true,
+      "metro": "kumasi"
     },
     {
       "id": "nairobi",
@@ -279,7 +291,9 @@
         "jobs": "Nairobi Job Centre",
         "bank": "Rift Bank"
       },
-      "landmark": "hills"
+      "landmark": "hills",
+      "hub": true,
+      "metro": "nairobi"
     },
     {
       "id": "london",
@@ -315,6 +329,459 @@
         "jobs": "Jobcentre Plus",
         "bank": "High Street Bank"
       },
+      "landmark": "tower",
+      "hub": true,
+      "metro": "london"
+    },
+    {
+      "id": "lekki",
+      "country": "NG",
+      "name": "Lekki",
+      "lat": 6.4698,
+      "lon": 3.5852,
+      "priceIndex": 1.8,
+      "blurb": "Beachside estates, new malls and long evening traffic.",
+      "mirror": "x",
+      "theme": {
+        "ground": "#7fc47a",
+        "road": "#464b55",
+        "buildings": [
+          "#5fb1a3",
+          "#e9c46a",
+          "#c77d9a",
+          "#7aa7e0",
+          "#e08b5a"
+        ],
+        "roofs": [
+          "#3d8377",
+          "#b5933a",
+          "#9b4f6e",
+          "#4c76b0",
+          "#b0602f"
+        ]
+      },
+      "names": {
+        "apt": "Lekki Gardens Estate",
+        "grocery": "Phase 1 Mini-Mart",
+        "cafe": "Admiralty Cafe",
+        "jobs": "Lekki Job Centre",
+        "bank": "Atlantic Bank"
+      },
+      "metro": "lagos",
+      "hub": false,
+      "landmark": "sea"
+    },
+    {
+      "id": "ikeja",
+      "country": "NG",
+      "name": "Ikeja",
+      "lat": 6.6018,
+      "lon": 3.3515,
+      "priceIndex": 1.1,
+      "blurb": "The state capital: offices, markets and the airport road.",
+      "mirror": "z",
+      "theme": {
+        "ground": "#9bd28a",
+        "road": "#4a4f5c",
+        "buildings": [
+          "#6aa6d8",
+          "#e7a15a",
+          "#b983c4",
+          "#5fbf9a",
+          "#d9776b"
+        ],
+        "roofs": [
+          "#3f78a8",
+          "#b87a35",
+          "#8b5a99",
+          "#3a9576",
+          "#a8503f"
+        ]
+      },
+      "names": {
+        "apt": "Alausa Heights",
+        "grocery": "Allen Avenue Store",
+        "cafe": "Computer Village Cafe",
+        "jobs": "Ikeja Job Centre",
+        "bank": "Mainland Bank"
+      },
+      "metro": "lagos",
+      "hub": false
+    },
+    {
+      "id": "victoriaisland",
+      "country": "NG",
+      "name": "Victoria Island",
+      "lat": 6.4281,
+      "lon": 3.4219,
+      "priceIndex": 2.2,
+      "blurb": "Towers, banks and the priciest views on the island.",
+      "mirror": "xz",
+      "theme": {
+        "ground": "#8ab98a",
+        "road": "#3f434d",
+        "buildings": [
+          "#8da0cb",
+          "#c9a27e",
+          "#7bb6a3",
+          "#d4806f",
+          "#b9a7d6"
+        ],
+        "roofs": [
+          "#5d6f9b",
+          "#9a7650",
+          "#4f8574",
+          "#a35446",
+          "#8573a4"
+        ]
+      },
+      "names": {
+        "apt": "Eko Atlantic Residences",
+        "grocery": "Adeola Odeku Grocer",
+        "cafe": "Sky Lounge Cafe",
+        "jobs": "VI Job Centre",
+        "bank": "Island Trust Bank"
+      },
+      "metro": "lagos",
+      "hub": false,
+      "landmark": "sea"
+    },
+    {
+      "id": "surulere",
+      "country": "NG",
+      "name": "Surulere",
+      "lat": 6.4969,
+      "lon": 3.356,
+      "priceIndex": 0.8,
+      "blurb": "Football, lively streets and good value homes.",
+      "mirror": "none",
+      "theme": {
+        "ground": "#d9c88f",
+        "road": "#55524f",
+        "buildings": [
+          "#e3b27a",
+          "#d98a6b",
+          "#8ec3c0",
+          "#c7d36f",
+          "#a58bd1"
+        ],
+        "roofs": [
+          "#a86f3d",
+          "#a85a41",
+          "#4f8f8c",
+          "#8f9c3a",
+          "#745ba3"
+        ]
+      },
+      "names": {
+        "apt": "Bode Thomas Flats",
+        "grocery": "Adeniran Store",
+        "cafe": "Stadium Cafe",
+        "jobs": "Surulere Job Centre",
+        "bank": "People's Bank"
+      },
+      "metro": "lagos",
+      "hub": false
+    },
+    {
+      "id": "ikoyi",
+      "country": "NG",
+      "name": "Ikoyi",
+      "lat": 6.4549,
+      "lon": 3.4246,
+      "priceIndex": 2.4,
+      "blurb": "Leafy, quiet and exclusive.",
+      "mirror": "z",
+      "theme": {
+        "ground": "#8ab98a",
+        "road": "#3f434d",
+        "buildings": [
+          "#8da0cb",
+          "#c9a27e",
+          "#7bb6a3",
+          "#d4806f",
+          "#b9a7d6"
+        ],
+        "roofs": [
+          "#5d6f9b",
+          "#9a7650",
+          "#4f8574",
+          "#a35446",
+          "#8573a4"
+        ]
+      },
+      "names": {
+        "apt": "Bourdillon Court",
+        "grocery": "Falomo Provisions",
+        "cafe": "Banana Island Cafe",
+        "jobs": "Ikoyi Job Centre",
+        "bank": "Heritage Private Bank"
+      },
+      "metro": "lagos",
+      "hub": false,
+      "landmark": "sea"
+    },
+    {
+      "id": "maitama",
+      "country": "NG",
+      "name": "Maitama",
+      "lat": 9.0952,
+      "lon": 7.4909,
+      "priceIndex": 2.0,
+      "blurb": "Embassies, wide avenues and big gardens.",
+      "mirror": "x",
+      "theme": {
+        "ground": "#7fc47a",
+        "road": "#464b55",
+        "buildings": [
+          "#5fb1a3",
+          "#e9c46a",
+          "#c77d9a",
+          "#7aa7e0",
+          "#e08b5a"
+        ],
+        "roofs": [
+          "#3d8377",
+          "#b5933a",
+          "#9b4f6e",
+          "#4c76b0",
+          "#b0602f"
+        ]
+      },
+      "names": {
+        "apt": "Maitama Terraces",
+        "grocery": "Ademola Grocer",
+        "cafe": "Diplomat Cafe",
+        "jobs": "Maitama Job Centre",
+        "bank": "Capital Trust Bank"
+      },
+      "metro": "abuja",
+      "hub": false,
+      "landmark": "rock"
+    },
+    {
+      "id": "gwarinpa",
+      "country": "NG",
+      "name": "Gwarinpa",
+      "lat": 9.113,
+      "lon": 7.4,
+      "priceIndex": 0.9,
+      "blurb": "One of Africa's largest housing estates.",
+      "mirror": "xz",
+      "theme": {
+        "ground": "#d9c88f",
+        "road": "#55524f",
+        "buildings": [
+          "#e3b27a",
+          "#d98a6b",
+          "#8ec3c0",
+          "#c7d36f",
+          "#a58bd1"
+        ],
+        "roofs": [
+          "#a86f3d",
+          "#a85a41",
+          "#4f8f8c",
+          "#8f9c3a",
+          "#745ba3"
+        ]
+      },
+      "names": {
+        "apt": "Gwarinpa Estate Flats",
+        "grocery": "Estate Market",
+        "cafe": "Kado Cafe",
+        "jobs": "Gwarinpa Job Centre",
+        "bank": "Estate Bank"
+      },
+      "metro": "abuja",
+      "hub": false
+    },
+    {
+      "id": "eastlegon",
+      "country": "GH",
+      "name": "East Legon",
+      "lat": 5.6358,
+      "lon": -0.1573,
+      "priceIndex": 1.5,
+      "blurb": "Modern homes near the university and the airport.",
+      "mirror": "xz",
+      "theme": {
+        "ground": "#7fc47a",
+        "road": "#464b55",
+        "buildings": [
+          "#5fb1a3",
+          "#e9c46a",
+          "#c77d9a",
+          "#7aa7e0",
+          "#e08b5a"
+        ],
+        "roofs": [
+          "#3d8377",
+          "#b5933a",
+          "#9b4f6e",
+          "#4c76b0",
+          "#b0602f"
+        ]
+      },
+      "names": {
+        "apt": "East Legon Residences",
+        "grocery": "Adjiringanor Store",
+        "cafe": "Legon Cafe",
+        "jobs": "East Legon Job Centre",
+        "bank": "Cedi Bank"
+      },
+      "metro": "accra",
+      "hub": false
+    },
+    {
+      "id": "westlands",
+      "country": "KE",
+      "name": "Westlands",
+      "lat": -1.2676,
+      "lon": 36.8108,
+      "priceIndex": 1.5,
+      "blurb": "Nightlife, offices and shopping centres.",
+      "mirror": "none",
+      "theme": {
+        "ground": "#8ab98a",
+        "road": "#3f434d",
+        "buildings": [
+          "#8da0cb",
+          "#c9a27e",
+          "#7bb6a3",
+          "#d4806f",
+          "#b9a7d6"
+        ],
+        "roofs": [
+          "#5d6f9b",
+          "#9a7650",
+          "#4f8574",
+          "#a35446",
+          "#8573a4"
+        ]
+      },
+      "names": {
+        "apt": "Westlands Heights",
+        "grocery": "Sarit Corner Shop",
+        "cafe": "Brew Cafe",
+        "jobs": "Westlands Job Centre",
+        "bank": "Savanna Bank"
+      },
+      "metro": "nairobi",
+      "hub": false
+    },
+    {
+      "id": "karen",
+      "country": "KE",
+      "name": "Karen",
+      "lat": -1.3183,
+      "lon": 36.7071,
+      "priceIndex": 1.9,
+      "blurb": "Green, spacious and close to the national park.",
+      "mirror": "x",
+      "theme": {
+        "ground": "#7fc47a",
+        "road": "#464b55",
+        "buildings": [
+          "#5fb1a3",
+          "#e9c46a",
+          "#c77d9a",
+          "#7aa7e0",
+          "#e08b5a"
+        ],
+        "roofs": [
+          "#3d8377",
+          "#b5933a",
+          "#9b4f6e",
+          "#4c76b0",
+          "#b0602f"
+        ]
+      },
+      "names": {
+        "apt": "Karen Gardens",
+        "grocery": "Hardy Grocer",
+        "cafe": "Giraffe Cafe",
+        "jobs": "Karen Job Centre",
+        "bank": "Acacia Bank"
+      },
+      "metro": "nairobi",
+      "hub": false,
+      "landmark": "hills"
+    },
+    {
+      "id": "canarywharf",
+      "country": "GB",
+      "name": "Canary Wharf",
+      "lat": 51.5054,
+      "lon": -0.0235,
+      "priceIndex": 2.0,
+      "blurb": "Glass towers by the water.",
+      "mirror": "z",
+      "theme": {
+        "ground": "#8ab98a",
+        "road": "#3f434d",
+        "buildings": [
+          "#8da0cb",
+          "#c9a27e",
+          "#7bb6a3",
+          "#d4806f",
+          "#b9a7d6"
+        ],
+        "roofs": [
+          "#5d6f9b",
+          "#9a7650",
+          "#4f8574",
+          "#a35446",
+          "#8573a4"
+        ]
+      },
+      "names": {
+        "apt": "Wharf Residences",
+        "grocery": "Marketplace Express",
+        "cafe": "Docklands Cafe",
+        "jobs": "Jobcentre Plus (Docklands)",
+        "bank": "Thames Bank"
+      },
+      "metro": "london",
+      "hub": false,
+      "landmark": "harbour"
+    },
+    {
+      "id": "camden",
+      "country": "GB",
+      "name": "Camden",
+      "lat": 51.539,
+      "lon": -0.1426,
+      "priceIndex": 1.7,
+      "blurb": "Markets, music and canal-side flats.",
+      "mirror": "xz",
+      "theme": {
+        "ground": "#9bd28a",
+        "road": "#4a4f5c",
+        "buildings": [
+          "#6aa6d8",
+          "#e7a15a",
+          "#b983c4",
+          "#5fbf9a",
+          "#d9776b"
+        ],
+        "roofs": [
+          "#3f78a8",
+          "#b87a35",
+          "#8b5a99",
+          "#3a9576",
+          "#a8503f"
+        ]
+      },
+      "names": {
+        "apt": "Camden Lock Flats",
+        "grocery": "Stables Corner Shop",
+        "cafe": "Canal Cafe",
+        "jobs": "Jobcentre Plus (Camden)",
+        "bank": "Northern Bank"
+      },
+      "metro": "london",
+      "hub": false,
       "landmark": "tower"
     }
   ],
@@ -359,5 +826,6 @@
       "internationalFee": 60
     }
   ],
-  "minTravelSeconds": 6
+  "minTravelSeconds": 6,
+  "walkMaxKm": 4
 }

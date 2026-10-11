@@ -6,10 +6,13 @@ import * as bank from './bank.js';
 import * as messages from './messages.js';
 import * as dating from './dating.js';
 import * as betting from './betting.js';
+import * as estate from '../housing/estate.js';
+import * as housing from '../housing/housing.js';
 
 export interface AppCaller { id: string; name: string; city: string }
 export interface Notify { to: string; msg: Record<string, unknown> }
-export interface AppReply { data: unknown; notify?: Notify[] }
+/** goHome: the action changed where the player lives and they should be taken inside their new home. */
+export interface AppReply { data: unknown; notify?: Notify[]; goHome?: boolean }
 
 const Key = z.string().min(8).max(64);
 const Body = {
@@ -32,6 +35,16 @@ const Body = {
     discover: z.object({}),
     swipe: z.object({ id: z.string().uuid(), like: z.boolean() }),
     unmatch: z.object({ id: z.string().uuid() }),
+  },
+  estate: {
+    list: z.object({}),
+    overview: z.object({}),
+    rent: z.object({ id: z.string().max(80), key: Key }),
+    buy: z.object({ id: z.string().max(80), key: Key }),
+    build: z.object({ id: z.string().max(80), key: Key }),
+    sell: z.object({ id: z.string().max(80), key: Key }),
+    movein: z.object({ id: z.string().max(80) }),
+    leave: z.object({}),
   },
   odds: {
     state: z.object({}),
@@ -85,6 +98,20 @@ export async function handleApp(ctx: AppContext, who: AppCaller, app: string, ac
       return { data: r, notify: r.matched ? [{ to: b.id, msg: { t: 'notify', kind: 'match', from: who.name } }] : [] };
     }
     case 'love.unmatch': await dating.unmatch(ctx, who.id, b.id); return { data: { ok: true } };
+    case 'estate.list': return { data: await estate.listCity(ctx, who.id, who.city) };
+    case 'estate.overview': return { data: { areas: await estate.overview(ctx) } };
+    case 'estate.rent': {
+      const p = (await ctx.pool.query('SELECT district FROM properties WHERE id=$1', [b.id])).rows[0];
+      if (!p) throw badRequest('property_not_found');
+      if (p.district !== who.city) throw badRequest('wrong_city', 'That property is in another city.');
+      const r = await housing.rent(ctx, who.id, b.id, b.key);
+      return { data: r, goHome: !r.replayed };
+    }
+    case 'estate.buy': { const r = await estate.buy(ctx, who.id, who.city, b.id, b.key); return { data: r, goHome: !!r.movedIn && !r.replayed }; }
+    case 'estate.build': { const r = await estate.build(ctx, who.id, who.city, b.id, b.key); return { data: r, goHome: !!r.movedIn && !r.replayed }; }
+    case 'estate.sell': return { data: await estate.sell(ctx, who.id, who.city, b.id, b.key) };
+    case 'estate.movein': { const r = await estate.moveIn(ctx, who.id, who.city, b.id); return { data: r, goHome: true }; }
+    case 'estate.leave': return { data: await estate.leave(ctx, who.id) };
     case 'odds.state': return { data: await betting.overview(ctx, who.id) };
     case 'odds.bet': return { data: await betting.place(ctx, who.id, b.slot, b.pick, b.stake, b.key) };
     case 'odds.pause': return { data: await betting.takeBreak(ctx, who.id, b.hours) };

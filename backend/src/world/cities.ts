@@ -8,6 +8,7 @@ export interface GeoCity {
   mirror?: 'none' | 'x' | 'z' | 'xz';
   theme?: { ground: string; road: string; buildings: string[]; roofs: string[] };
   names?: Record<string, string>;
+  metro?: string;
 }
 
 const ORDER = ['apt', 'grocery', 'cafe', 'jobs', 'bank'];
@@ -26,7 +27,9 @@ export function generateWorld(base: any, city: GeoCity): any {
       if (i >= 0) { b.wall = city.theme.buildings[i % city.theme.buildings.length]; b.roof = city.theme.roofs[i % city.theme.roofs.length]; }
     }
   }
+  const houseWalls = city.theme ? city.theme.buildings : null;
   for (const b of w.buildings) {
+    if (b.kind === 'house' && houseWalls) { const k = (b.id.charCodeAt(b.id.length - 1) + city.id.length) % houseWalls.length; b.wall = houseWalls[k]; b.roof = city.theme!.roofs[k]; }
     if (names[b.id]) b.name = names[b.id];
     if (b.sign) b.sign = `${b.name} - coming soon`;
   }
@@ -40,6 +43,7 @@ export function generateWorld(base: any, city: GeoCity): any {
   if (mx || mz) {
     const fx = (x: number) => (mx ? -x : x), fz = (z: number) => (mz ? -z : z);
     for (const b of w.buildings) { b.cx = fx(b.cx); b.cz = fz(b.cz); if (mz && b.doorSide) b.doorSide = b.doorSide === '+z' ? '-z' : '+z'; }
+    for (const l of w.lots ?? []) { l.cx = fx(l.cx); l.cz = fz(l.cz); }
     for (const f of w.furniture) { f.x = fx(f.x); f.z = fz(f.z); }
     for (const p of w.props) {
       p.x = fx(p.x); p.z = fz(p.z);
