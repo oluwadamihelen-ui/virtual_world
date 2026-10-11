@@ -1,0 +1,44 @@
+{
+  "_note": "Placeholder prototype values: tune through playtesting (docs/ECONOMY_TUNING.md). Money is MVC. Times are real hours or minutes.",
+  "health": {
+    "max": 100, "start": 90, "decayPerHour": 3, "maxDecayHours": 16,
+    "shiftCost": 6, "minToWork": 25, "slowBelow": 20, "slowMult": 0.6,
+    "treatments": [
+      { "id": "tablets",  "name": "Pharmacy tablets",   "emoji": "💊", "fee": 40,  "restore": 20,  "note": "Anywhere. Quick fix.", "discountAt": [], "discountPercent": 0, "requiresAt": [] },
+      { "id": "checkup",  "name": "Clinic check-up",    "emoji": "🩺", "fee": 120, "restore": 45,  "note": "Anywhere. 40% off inside a clinic or hospital.", "discountAt": ["clinic", "hospital"], "discountPercent": 40, "requiresAt": [] },
+      { "id": "hospital", "name": "Hospital treatment", "emoji": "🏥", "fee": 300, "restore": 100, "note": "Full recovery. You must be inside a hospital or clinic.", "discountAt": [], "discountPercent": 0, "requiresAt": ["clinic", "hospital"] }
+    ]
+  },
+  "courses": [
+    { "id": "course_service", "name": "Customer service", "emoji": "🛎️", "blurb": "Serve people well. Unlocks the Bank Teller job.", "fee": 600, "minutes": 5, "credential": "cert_service", "skill": "hospitality", "xp": 30, "minReputation": 0 },
+    { "id": "course_driving", "name": "Driving school", "emoji": "🚦", "blurb": "Get your driving licence. Needed to buy or drive a car, and for the Delivery Driver job.", "fee": 900, "minutes": 8, "credential": "driving_licence", "skill": "logistics", "xp": 20, "minReputation": 0 },
+    { "id": "course_admin", "name": "Business administration", "emoji": "📊", "blurb": "A diploma for office work. Unlocks the Office Manager job.", "fee": 1800, "minutes": 15, "credential": "dip_admin", "skill": "admin", "xp": 60, "minReputation": 1 }
+  ],
+  "credentials": {
+    "cert_service": "Customer service certificate",
+    "driving_licence": "Driving licence",
+    "dip_admin": "Business administration diploma"
+  },
+  "cars": {
+    "requiresCredential": "driving_licence", "maxOwned": 3, "fuelPricePerLitre": 1.5,
+    "garageDiscountAt": ["garage"], "garageDiscountPercent": 30,
+    "incidentPerKm": 0.06, "incidentDamage": [12, 28], "slowBelowCondition": 30, "slowMult": 0.7,
+    "resaleMin": 0.5, "resaleMax": 0.85,
+    "models": [
+      { "id": "hatch", "name": "Used hatchback", "emoji": "🚗", "color": "#e9a23b", "price": 8000,  "speedMult": 2.8, "tank": 60, "litresPerKm": 1.2, "wearPerKm": 0.5, "repairPerPoint": 3 },
+      { "id": "sedan", "name": "Family sedan",   "emoji": "🚙", "color": "#4a7fd6", "price": 20000, "speedMult": 3.2, "tank": 70, "litresPerKm": 1.3, "wearPerKm": 0.4, "repairPerPoint": 5 },
+      { "id": "suv",   "name": "SUV",            "emoji": "🚐", "color": "#2f3a4a", "price": 45000, "speedMult": 3.0, "tank": 90, "litresPerKm": 1.8, "wearPerKm": 0.3, "repairPerPoint": 8 },
+      { "id": "sport", "name": "Sports coupe",   "emoji": "🏎️", "color": "#d6332f", "price": 90000, "speedMult": 3.8, "tank": 55, "litresPerKm": 2.2, "wearPerKm": 0.5, "repairPerPoint": 14 }
+    ]
+  },
+  "assurance": {
+    "periodHours": 168, "waitingHours": 12,
+    "plans": [
+      { "id": "health_basic", "kind": "health", "name": "Health cover",      "premium": 50,  "coverPercent": 70, "blurb": "Pays 70% of any treatment bill." },
+      { "id": "health_plus",  "kind": "health", "name": "Health cover Plus", "premium": 110, "coverPercent": 90, "blurb": "Pays 90% of any treatment bill." },
+      { "id": "car_basic",    "kind": "car", "name": "Car cover",       "premiumPercentOfPrice": 0.4, "coverPercent": 70, "blurb": "Pays 70% of repair bills for one car." },
+      { "id": "car_comp",     "kind": "car", "name": "Comprehensive car cover", "premiumPercentOfPrice": 0.8, "coverPercent": 90, "blurb": "Pays 90% of repair bills for one car." }
+    ],
+    "comingSoon": ["Home cover"]
+  }
+}

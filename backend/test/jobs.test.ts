@@ -71,6 +71,7 @@ describe('jobs', () => {
     expect(fifth.status).toBe(409);
     expect(fifth.body.error).toBe('shift_limit_reached');
     adv(25 * 3600);
+    await w.ctx.pool.query('UPDATE character_health SET value=90 WHERE character_id=$1', [p.characterId]);   // a day later they would be worn out; health has its own tests
     expect((await fullShift(p.characterId)).status).toBe(200);
     expect((await w.gameReq('GET', `/v1/game/characters/${p.characterId}/summary`)).body.balance).toBe(2000 + 5 * 250);
   });

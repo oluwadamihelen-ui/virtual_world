@@ -19,6 +19,10 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{text-align:left;p
 <div id="app" hidden>
  <div class="card"><b id="me"></b> <button class="alt" id="out">Sign out</button> <button class="alt" id="refresh">Refresh</button></div>
  <div class="card"><h2>Open reports</h2><div id="reports" class="mut">…</div></div>
+ <div class="card" id="tops" hidden><h2>Admin: manual top-ups (bank transfers)</h2>
+  <p class="mut">Check your bank statement for the amount <b>and the reference</b> before you approve. Approving adds the MVC to the player's wallet once; it cannot be undone from here.</p>
+  <select id="topStatus"><option value="review">Waiting for you (player says they paid)</option><option value="pending">Not yet reported by the player</option><option value="paid">Approved</option><option value="rejected">Declined</option></select>
+  <div id="topList" class="mut">…</div></div>
  <div class="card" id="adm" hidden><h2>Admin: ledger integrity</h2><button id="chk">Check now</button> <span id="integ"></span>
   <h2 style="margin-top:12px">Audit log (latest 100)</h2><div id="audit"></div></div>
 </div>
@@ -30,7 +34,7 @@ $('go').onclick=async()=>{$('lmsg').textContent='';
  const r=await fetch('/v1/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:$('em').value,password:$('pw').value})});
  const j=await r.json();if(!r.ok)return $('lmsg').textContent='Sign-in failed.';
  if(!['moderator','admin'].includes(j.role))return $('lmsg').textContent='This account is not a moderator.';
- tok=j.token;role=j.role;$('pw').value='';$('login').hidden=true;$('app').hidden=false;$('me').textContent='Signed in as '+j.role;$('adm').hidden=role!=='admin';load()};
+ tok=j.token;role=j.role;$('pw').value='';$('login').hidden=true;$('app').hidden=false;$('me').textContent='Signed in as '+j.role;$('adm').hidden=role!=='admin';$('tops').hidden=role!=='admin';load()};
 $('out').onclick=()=>{tok=null;location.reload()};$('refresh').onclick=()=>load();
 async function act(id,body){const note=document.getElementById('n'+id).value.trim();
  if(body.action!=='dismiss'&&note.length<3)return alert('Please write a short note (3+ characters) explaining the decision.');
@@ -46,6 +50,14 @@ async function load(){
    add('Dismiss',{action:'dismiss'},'alt');add('Warn',{action:'warn'});add('Mute 1h',{action:'mute',hours:1});add('Mute 24h',{action:'mute',hours:24});add('Suspend 24h',{action:'suspend',hours:24},'bad');add('Suspend 7d',{action:'suspend',hours:168},'bad');
    if(role==='admin')add('Ban',{action:'ban'},'bad');
    box.append(d)}}
- if(role==='admin'){const a=await api('GET','/v1/admin/audit');$('audit').innerHTML='<table><tr><th>When</th><th>Action</th><th>Target</th><th>Detail</th></tr>'+(a.j.entries||[]).map(e=>`<tr><td>${new Date(e.created_at).toLocaleString()}</td><td>${esc(e.action)}</td><td>${esc(e.target_type)} ${esc(String(e.target_id||'').slice(0,8))}</td><td>${esc(JSON.stringify(e.detail))}</td></tr>`).join('')+'</table>'}}
+ if(role==='admin'){loadTops();const a=await api('GET','/v1/admin/audit');$('audit').innerHTML='<table><tr><th>When</th><th>Action</th><th>Target</th><th>Detail</th></tr>'+(a.j.entries||[]).map(e=>`<tr><td>${new Date(e.created_at).toLocaleString()}</td><td>${esc(e.action)}</td><td>${esc(e.target_type)} ${esc(String(e.target_id||'').slice(0,8))}</td><td>${esc(JSON.stringify(e.detail))}</td></tr>`).join('')+'</table>'}}
+const money=(c,m)=>(c==='USD'?'$':'₦')+(m/100).toLocaleString('en-US');
+async function loadTops(){const st=$('topStatus').value;const r=await api('GET','/v1/admin/topups?status='+st);const box=$('topList');
+ if(!r.ok){box.textContent='Could not load ('+r.status+').';return}
+ if(!r.j.orders.length){box.textContent='Nothing here.';return}
+ box.innerHTML='<table><tr><th>When</th><th>Player</th><th>Pay</th><th>Gets</th><th>Reference</th><th>Sender / note</th><th></th></tr>'+r.j.orders.map(o=>`<tr><td>${new Date(o.createdAt).toLocaleString()}</td><td>${esc(o.player)}<div class="mut">${esc(o.email)}</div></td><td><b>${money(o.currency,o.amountMinor)}</b></td><td>${o.mvc.toLocaleString('en-US')} MVC</td><td><code>${esc(o.reference)}</code></td><td>${esc(o.senderName||'')}<div class="mut">${esc(o.note||'')}</div></td><td>${['review','pending'].includes(o.status)?`<input id="tn${o.id}" placeholder="note (needed to decline)"><button data-a="${o.id}">Approve</button><button class="bad" data-d="${o.id}">Decline</button>`:esc(o.status)}</td></tr>`).join('')+'</table>';
+ box.querySelectorAll('[data-a]').forEach(b=>b.onclick=async()=>{if(!confirm('Approve this top-up? Confirm the money is in your bank account with this reference.'))return;const x=await api('POST','/v1/admin/topups/'+b.dataset.a+'/decide',{approve:true,note:''});if(!x.ok)alert('Failed: '+(x.j.error||x.status));loadTops()});
+ box.querySelectorAll('[data-d]').forEach(b=>b.onclick=async()=>{const n=document.getElementById('tn'+b.dataset.d).value.trim();if(n.length<3)return alert('Write a short reason (3+ characters).');const x=await api('POST','/v1/admin/topups/'+b.dataset.d+'/decide',{approve:false,note:n});if(!x.ok)alert('Failed: '+(x.j.error||x.status));loadTops()})}
+$('topStatus').onchange=loadTops;
 $('chk').onclick=async()=>{const r=await api('GET','/v1/admin/ledger-integrity');$('integ').innerHTML=r.j.ok?'<span class=ok>✔ ledger is consistent</span>':'<span class=err>✘ PROBLEM: '+esc(JSON.stringify(r.j))+'</span>'};
 </script></body></html>

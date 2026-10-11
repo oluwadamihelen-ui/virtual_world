@@ -122,7 +122,8 @@ function onServer(m) {
     case 'pong': if (G) G.ping = Math.round(performance.now() - m.c); return;
     case 'app': { const f = G?.pending.get(m.rid); if (f) { G.pending.delete(m.rid); f(m); } return; }
     case 'notify': return G && onNotify(m);
-    case 'ride': if (G) G.ride = m.on ? { mult: m.mult, until: performance.now() + m.seconds * 1000 } : null; return;
+    case 'ride': if (G) { G.ride = m.on ? { mult: m.mult, until: m.seconds ? performance.now() + m.seconds * 1000 : Infinity, car: m.car ?? null } : null; setCar(G.me, m.on && m.car ? m.car.color : 0); carHud(m.on && m.car ? m.car : null); } return;
+    case 'car': if (G?.ride?.car) { G.ride.mult = m.mult; G.ride.car = { ...G.ride.car, fuel: m.fuel, cond: m.cond }; carHud(G.ride.car); } return;
     case 'area': if (G) onArea(m); return;
     case 'arrived': if (G) { G.traveling = false; G.hideTravel?.(); G.hideTravel = null; G.auto = null; } return;
     case 'world': if (G) { G.w.world = m.world; setWorld(m.world, true); paintLots(); syncFurniture(); } return;
@@ -190,8 +191,35 @@ function updateVoiceUi() {
   G.me.tag.classList.toggle('speaking', v.speaking.has(G.w.you.id));
   for (const [id, e] of G.ents) e.tag.classList.toggle('speaking', v.speaking.has(id));
 }
+/** A simple car around an avatar while it is driving (color = 0 removes it). Everyone sees it: the server sends the color in snapshots. */
+function setCar(ent, color) {
+  ent.veh = color || 0;
+  if (ent.carMesh) { ent.av.group.remove(ent.carMesh); ent.carMesh = null; }
+  if (!color) return;
+  const g = new THREE.Group(), body = new THREE.MeshStandardMaterial({ color, roughness: 0.5 }), dark = new THREE.MeshStandardMaterial({ color: '#1b1f27' }), glass = new THREE.MeshStandardMaterial({ color: '#9fc7e8', roughness: 0.2 });
+  const box = (w, h, d, m, x, y, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); g.add(b); return b; };
+  box(1.9, 0.6, 4.1, body, 0, 0.62, 0); box(1.7, 0.55, 2.0, glass, 0, 1.2, -0.35); box(1.8, 0.1, 2.1, body, 0, 1.52, -0.35);
+  for (const [x, z] of [[-0.95, 1.3], [0.95, 1.3], [-0.95, -1.3], [0.95, -1.3]]) { const w = box(0.28, 0.7, 0.7, dark, x, 0.35, z); w.rotation.z = 0; }
+  box(0.5, 0.18, 0.06, new THREE.MeshStandardMaterial({ color: '#fff4c2', emissive: '#ffe08a', emissiveIntensity: 0.6 }), -0.6, 0.75, 2.07); box(0.5, 0.18, 0.06, new THREE.MeshStandardMaterial({ color: '#fff4c2', emissive: '#ffe08a', emissiveIntensity: 0.6 }), 0.6, 0.75, 2.07);
+  g.position.y = -0.0; ent.carMesh = g; ent.av.group.add(g);
+}
+/** Dashboard while driving: fuel, condition and a stop button. */
+function carHud(car) {
+  let el = document.getElementById('carHud');
+  if (!car) { el?.remove(); return; }
+  if (!el) { el = document.createElement('div'); el.id = 'carHud'; el.className = 'carhud'; document.getElementById('ui').append(el); }
+  el.innerHTML = `<b>${U.esc(car.name)}</b><span>⛽ ${Number(car.fuel).toFixed(1)} L</span><span>🔧 ${Math.round(car.cond)}%</span><button id="carStop">Park</button>`;
+  el.querySelector('#carStop').onclick = () => S.conn.send({ t: 'drive', on: false });
+}
+function refreshHp() {
+  const h = G.summary.health; if (!h) return;
+  let el = document.getElementById('hp');
+  if (!el) { el = document.createElement('div'); el.id = 'hp'; el.className = 'hp'; el.title = 'Health. Open the Health app (phone) to get treated.'; document.getElementById('walletCard')?.after(el); el.onclick = () => openPhone('health'); }
+  const c = h.value >= 70 ? '#5be0a8' : h.value >= 25 ? '#f4b942' : '#ff6b6b';
+  el.innerHTML = `<span>❤ ${U.esc(h.label)}</span><i style="width:${Math.round(h.value)}%;background:${c}"></i>`;
+}
 function refreshHud() {
-  const s = G.summary;
+  const s = G.summary; refreshHp();
   U.setWallet({ name: G.me.name, mvcAmount: s.balance, cityName: G.city.name, country: G.currency });
   U.setGoals(GOALS, s.achievements, s.reputation);
   const c = gameClock(now()); U.setClock(c.hour, c.dayIndex, `${G.city.name} · ${G.online} online`);
@@ -228,8 +256,9 @@ function onSnap(m) {
     G.ents.set(s.id, ent);
   }
   for (const id of m.gone) { const e = G.ents.get(id); if (e) { scene.remove(e.av.group); e.tag.remove(); G.ents.delete(id); } }
-  for (const [id, x, z, ry, mv, emote] of m.ps) {
+  for (const [id, x, z, ry, mv, emote, veh] of m.ps) {
     const e = G.ents.get(id); if (!e) continue;
+    if ((e.veh ?? 0) !== veh) setCar(e, veh);
     e.tx = x; e.tz = z; e.tr = ry; e.moving = !!mv;
     if (e.first) { e.x = x; e.z = z; e.ry = ry; e.first = false; }
     if (emote && emote !== e.lastEmote) { e.av.setEmote(emote); } e.lastEmote = emote;
@@ -433,7 +462,7 @@ const sendWait = (msg) => new Promise((resolve) => {
 
 function openPhone(openApp, arg) {
   const c = gameClock(now());
-  const ctx = { G: () => G, S, U, send: (m) => S.conn.send(m), ask: sendWait, fmt: U.fmt, openMap: () => openMap(), openEstate: () => openEstateOverview(), openPlace: (poi) => { U.closePanel(); openPlaceSheet({ kind: 'poi', ...poi }); }, rideHelp: () => { U.closePanel(); if (!G.cityView) toggleCityView(); U.toast('info', 'Tap any floating place label, then choose bike, bus or taxi.'); }, furnish: () => { U.closePanel(); toggleFurnish(); }, openChat: null, onSummary: (fn) => { if (G) G.onSummary = fn; } };
+  const ctx = { G: () => G, S, U, send: (m) => S.conn.send(m), ask: sendWait, fmt: U.fmt, openMap: () => openMap(), closePhone: () => U.closePanel(), openEstate: () => openEstateOverview(), openPlace: (poi) => { U.closePanel(); openPlaceSheet({ kind: 'poi', ...poi }); }, rideHelp: () => { U.closePanel(); if (!G.cityView) toggleCityView(); U.toast('info', 'Tap any floating place label, then choose bike, bus or taxi.'); }, furnish: () => { U.closePanel(); toggleFurnish(); }, openChat: null, onSummary: (fn) => { if (G) G.onSummary = fn; } };
   const phone = U.openPhone({ apps: phoneApps(ctx), hour: c.hour, cityName: `${G.city.name}, ${G.currency.countryName}`, onClose: () => { U.closePanel(); if (G) { G.onSummary = null; G.onNotify = null; G.phoneWait = null; } } });
   if (openApp) phoneApps(ctx).find((a) => a.id === openApp)?.open(phone, arg);
 }
@@ -501,7 +530,7 @@ function frame(t) {
     const hasGate = (g) => G.access.has(g);
     const dir = G.cur ?? { dx: 0, dz: 0, run: false };
     if (G.ride && performance.now() > G.ride.until) G.ride = null;
-    stepPlayer(G.me, dir, dt, S.colliders, hasGate, S.world.bounds, G.ride?.mult ?? 1);
+    stepPlayer(G.me, dir, dt, S.colliders, hasGate, S.world.bounds, (G.ride?.mult ?? 1) * (G.summary.health?.slow ? G.w.slowMult ?? 0.6 : 1));
     G.me.av.group.position.set(G.me.x, 0, G.me.z);
     let dy = G.me.ry - G.me.av.group.rotation.y; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); G.me.av.group.rotation.y += dy * Math.min(1, dt * 14);
     G.me.av.update(dt, G.me.moving);

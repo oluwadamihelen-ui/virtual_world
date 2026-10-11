@@ -3,6 +3,8 @@ import { withTx, type Tx } from '../../db.js';
 import { conflict, notFound } from '../../errors.js';
 import { assertCanAct } from '../identity/service.js';
 import { awardAchievement } from '../social/social.js';
+import * as health from '../life/health.js';
+import * as courses from '../life/courses.js';
 import { transfer, playerAccount, systemAccount, balanceOf } from '../economy/ledger.js';
 
 const HOUR = 3600_000;
@@ -10,7 +12,7 @@ const STALE_SHIFT_HOURS = 2;
 
 export const listJobs = (ctx: AppContext) => ctx.data.jobs.map((j) => ({
   jobId: j.id, name: j.name, employer: j.employer, district: j.district, wagePerShift: j.wagePerShift,
-  tasksPerShift: j.tasksPerShift, minSecondsPerTask: j.minSecondsPerTask, requirements: j.requirements,
+  tasksPerShift: j.tasksPerShift, minSecondsPerTask: j.minSecondsPerTask, requirements: j.requirements, credentialName: j.requirements.credential ? ctx.data.life.credentials[j.requirements.credential] : null,
 }));
 
 function jobOrThrow(ctx: AppContext, jobId: string) {
@@ -27,6 +29,11 @@ export async function startShift(ctx: AppContext, characterId: string, jobId: st
     const ch = (await tx.query('SELECT reputation FROM characters WHERE id=$1 FOR UPDATE', [characterId])).rows[0];
     const now = ctx.now();
     if (ch.reputation < job.requirements.minReputation) throw conflict('requirements_not_met', 'You do not meet this job\'s requirements');
+    if (job.requirements.credential) {
+      await courses.completeDue(ctx, tx, characterId);
+      if (!(await courses.hasCredential(ctx, tx, characterId, job.requirements.credential))) throw conflict('qualification_needed', `This job needs the ${ctx.data.life.credentials[job.requirements.credential]}. Study for it in the Courses app.`);
+    }
+    await health.assertFitForWork(ctx, tx, characterId);
 
     // Abandon a stale unfinished shift (player disconnected mid-shift); no wage, no penalty beyond losing progress.
     await tx.query(`UPDATE shifts SET status='abandoned' WHERE character_id=$1 AND status='in_progress' AND started_at < $2`,
@@ -93,6 +100,7 @@ export async function completeShift(ctx: AppContext, characterId: string, shiftI
     await tx.query(
       `INSERT INTO skills (character_id,skill_id,xp) VALUES ($1,$2,$3) ON CONFLICT (character_id,skill_id) DO UPDATE SET xp = skills.xp + EXCLUDED.xp`,
       [characterId, job.skill.id, job.skill.xpPerShift]);
+    await health.tireFromShift(ctx, tx, characterId);
     await awardAchievement(ctx, tx, characterId, 'first_shift');
     return { shiftId, wage: job.wagePerShift, balance: await balanceOf(tx, characterId), replayed: false };
   });

@@ -9,11 +9,16 @@ import * as betting from './betting.js';
 import * as estate from '../housing/estate.js';
 import * as housing from '../housing/housing.js';
 import * as furnish from '../housing/furnish.js';
+import * as health from '../life/health.js';
+import * as courses from '../life/courses.js';
+import * as cars from '../life/cars.js';
+import * as assurance from '../life/assurance.js';
 import * as topup from '../topup/topup.js';
 import * as social from '../social/social.js';
 import { updateAreaValues } from '../housing/values.js';
 
-export interface AppCaller { id: string; name: string; city: string }
+/** at: the type of public building the player is standing in ('hospital', 'garage'...), or null outdoors. */
+export interface AppCaller { id: string; name: string; city: string; at?: string | null }
 export interface Notify { to: string; msg: Record<string, unknown> }
 /** goHome: the action changed where the player lives and they should be taken inside their new home. */
 export interface AppReply { data: unknown; notify?: Notify[]; goHome?: boolean }
@@ -66,6 +71,21 @@ const Body = {
     check: z.object({ id: z.string().uuid() }),
     submit: z.object({ id: z.string().uuid(), senderName: z.string().min(2).max(80), note: z.string().max(200).optional() }),
     ref: z.object({ ref: z.string().max(40) }),
+  },
+  health: { info: z.object({}), treat: z.object({ id: z.string().max(40), key: Key }) },
+  courses: { info: z.object({}), enrol: z.object({ id: z.string().max(40), key: Key }) },
+  cars: {
+    info: z.object({}),
+    buy: z.object({ model: z.string().max(40), key: Key }),
+    sell: z.object({ id: z.string().uuid(), key: Key }),
+    activate: z.object({ id: z.string().uuid() }),
+    refuel: z.object({ id: z.string().uuid(), litres: z.union([z.literal('full'), z.number().positive().max(200)]), key: Key }),
+    repair: z.object({ id: z.string().uuid(), key: Key }),
+  },
+  assurance: {
+    info: z.object({}),
+    buy: z.object({ plan: z.string().max(40), car: z.string().uuid().optional(), key: Key }),
+    cancel: z.object({ id: z.string().uuid() }),
   },
   contacts: {
     list: z.object({}),
@@ -157,6 +177,19 @@ export async function handleApp(ctx: AppContext, who: AppCaller, app: string, ac
       if (!o) throw badRequest('order_not_found');
       return { data: await topup.check(ctx, who.id, o.id) };
     }
+    case 'health.info': return { data: await health.overview(ctx, who.id, who.at ?? null) };
+    case 'health.treat': return { data: await health.treat(ctx, who.id, b.id, b.key, who.at ?? null) };
+    case 'courses.info': return { data: await courses.overview(ctx, who.id) };
+    case 'courses.enrol': return { data: await courses.enrol(ctx, who.id, b.id, b.key) };
+    case 'cars.info': return { data: await cars.garage(ctx, who.id, who.at ?? null) };
+    case 'cars.buy': return { data: await cars.buy(ctx, who.id, b.model, b.key) };
+    case 'cars.sell': return { data: await cars.sell(ctx, who.id, b.id, b.key) };
+    case 'cars.activate': return { data: await cars.activate(ctx, who.id, b.id) };
+    case 'cars.refuel': return { data: await cars.refuel(ctx, who.id, b.id, b.litres, b.key, who.at ?? null) };
+    case 'cars.repair': return { data: await cars.repair(ctx, who.id, b.id, b.key, who.at ?? null) };
+    case 'assurance.info': return { data: await assurance.overview(ctx, who.id) };
+    case 'assurance.buy': return { data: await assurance.buy(ctx, who.id, b.plan, b.car, b.key) };
+    case 'assurance.cancel': return { data: await assurance.cancel(ctx, who.id, b.id) };
     case 'contacts.list': return { data: { blocked: await social.listBlocks(ctx, who.id), chats: await messages.inbox(ctx, who.id) } };
     case 'contacts.unblock': await social.unblock(ctx, who.id, b.id); return { data: { ok: true } };
     case 'odds.state': return { data: await betting.overview(ctx, who.id) };

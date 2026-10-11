@@ -66,6 +66,16 @@ const Geo = z.object({
     car: z.object({ name: z.string(), icon: z.string(), base: z.number(), perMeter: z.number(), secPerMeter: z.number(), minSeconds: z.number(), maxSeconds: z.number(), minMeters: z.number() }),
   }),
 });
+const Life = z.object({
+  health: z.object({ max: z.number(), start: z.number(), decayPerHour: z.number(), maxDecayHours: z.number(), shiftCost: z.number(), minToWork: z.number(), slowBelow: z.number(), slowMult: z.number(),
+    treatments: z.array(z.object({ id: z.string(), name: z.string(), emoji: z.string(), fee: z.number().int().positive(), restore: z.number(), note: z.string(), discountAt: z.array(z.string()), discountPercent: z.number(), requiresAt: z.array(z.string()) })) }),
+  courses: z.array(z.object({ id: z.string(), name: z.string(), emoji: z.string(), blurb: z.string(), fee: z.number().int().positive(), minutes: z.number().positive(), credential: z.string(), skill: z.string(), xp: z.number().int(), minReputation: z.number().int() })),
+  credentials: z.record(z.string(), z.string()),
+  cars: z.object({ requiresCredential: z.string(), maxOwned: z.number().int(), fuelPricePerLitre: z.number(), garageDiscountAt: z.array(z.string()), garageDiscountPercent: z.number(), incidentPerKm: z.number(), incidentDamage: z.tuple([z.number(), z.number()]), slowBelowCondition: z.number(), slowMult: z.number(), resaleMin: z.number(), resaleMax: z.number(),
+    models: z.array(z.object({ id: z.string(), name: z.string(), emoji: z.string(), color: z.string(), price: z.number().int().positive(), speedMult: z.number(), tank: z.number(), litresPerKm: z.number(), wearPerKm: z.number(), repairPerPoint: z.number() })) }),
+  assurance: z.object({ periodHours: z.number(), waitingHours: z.number(), comingSoon: z.array(z.string()),
+    plans: z.array(z.object({ id: z.string(), kind: z.enum(['health', 'car']), name: z.string(), premium: z.number().int().optional(), premiumPercentOfPrice: z.number().optional(), coverPercent: z.number(), blurb: z.string() })) }),
+});
 const Topup = z.object({
   packs: z.array(z.object({ id: z.string(), name: z.string(), emoji: z.string(), mvc: z.number().int().positive(), ngn: z.number().positive(), usd: z.number().positive(), best: z.boolean().optional() })).min(1),
   providers: z.array(z.object({ id: z.enum(['paystack', 'flutterwave', 'korapay']), name: z.string(), how: z.string(), currencies: z.array(z.enum(['NGN', 'USD'])) })),
@@ -110,7 +120,7 @@ const Job = z.object({
   id: z.string(), name: z.string(), employer: z.string(), district: z.string(),
   wagePerShift: z.number().int().positive(), tasksPerShift: z.number().int().positive(),
   minSecondsPerTask: z.number().nonnegative(), maxShiftsPer24h: z.number().int().positive(),
-  requirements: z.object({ minReputation: z.number().int() }),
+  requirements: z.object({ minReputation: z.number().int(), credential: z.string().optional() }),
   skill: z.object({ id: z.string(), xpPerShift: z.number().int().nonnegative() }),
 });
 const Appearance = z.object({
@@ -134,6 +144,9 @@ function parseAll(read: (f: string) => unknown) {
   const geo = Geo.parse(read('geo.json'));
   const phone = Phone.parse(read('phone.json'));
   const topup = Topup.parse(read('topup.json'));
+  const life = Life.parse(read('life.json'));
+  for (const c of life.courses) if (!life.credentials[c.credential]) throw new Error(`life.json: course ${c.id} grants unknown credential ${c.credential}`);
+  for (const j of jobs) if (j.requirements.credential && !life.credentials[j.requirements.credential]) throw new Error(`jobs.json: ${j.id} needs unknown credential ${j.requirements.credential}`);
   const metroFile = read('metros.json') as MetroFile;
   const estate = Estate.parse(read('estate.json'));
   // Cross-reference validation: catch typos in data at boot rather than at purchase time.
@@ -194,7 +207,7 @@ function parseAll(read: (f: string) => unknown) {
   }
   const cityById = new Map(geo.cities.map((c) => [c.id, c]));
   const countryById = new Map(geo.countries.map((c) => [c.id, c]));
-  return { economy, items, shops: allShops, properties: allProps, jobs, appearance, businesses, chat, achievements, world, geo, phone, topup, estate, worlds, metroWorlds, cityById, countryById, itemIds };
+  return { economy, items, shops: allShops, properties: allProps, jobs, appearance, businesses, chat, achievements, world, geo, phone, topup, life, estate, worlds, metroWorlds, cityById, countryById, itemIds };
 }
 
 export function loadGameData(dir: string): GameData {

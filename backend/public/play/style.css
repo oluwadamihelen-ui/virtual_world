@@ -190,3 +190,8 @@ body.panelopen .stack,body.panelopen .chatlog,body.panelopen .journal{visibility
 .rail button.on{color:var(--mint);outline:1px solid var(--mint)}.rail button.live{background:var(--mint);color:#06231f}
 .tag.speaking .name{box-shadow:0 0 0 2px var(--mint),0 0 14px 2px rgba(111,224,160,.7)}
 .btn:disabled{opacity:.45;filter:grayscale(.7);cursor:not-allowed}
+
+.hp{position:fixed;left:10px;top:calc(var(--safe-t) + 136px);width:150px;padding:5px 10px 9px;border-radius:10px;background:rgba(13,42,47,.82);border:1px solid var(--line);font-size:12px;font-weight:700;cursor:pointer;overflow:hidden}
+.hp i{position:absolute;left:0;bottom:0;height:4px;border-radius:0 2px 2px 0}
+.carhud{position:absolute;left:50%;top:14px;transform:translateX(-50%);display:flex;gap:12px;align-items:center;padding:8px 14px;border-radius:12px;background:rgba(13,42,47,.9);border:1px solid var(--line);font-size:13px;z-index:5}
+.carhud button{background:var(--coral);color:#2a0d05;border:0;border-radius:8px;padding:5px 12px;font-weight:800;cursor:pointer}

@@ -19,7 +19,7 @@ Phone > **Top up**: four packs at fixed rates (`game-data/topup.json`), a Naira 
 2. The provider calls our webhook (`POST /v1/webhooks/paystack|flutterwave|korapay`). We check the signature, but we **never trust the webhook's amount or status**: we only read the reference from it, then ask the provider's API (with our secret key) whether it was paid, how much and in what currency.
 3. Only if the confirmed amount covers the price and the currency matches, the MVC is credited from the system account `faucet:topup` through the ledger with the idempotency key `topup:<order id>`. Webhook retries, the player's own "Check payment", and the return page can all fire together and it is still credited once. A short payment goes to "review" and nothing is credited.
 4. When the player returns from the provider (`/topup/return` then `/play/?topup=<ref>`) and while the Top up screen is open, the game also checks the payment itself, so it works even if a webhook is delayed.
-5. **Manual bank transfer:** the player gets the reference and your bank details, transfers, then taps "I have paid" with the sender name. An admin sees it at `GET /v1/admin/topups?status=review` and approves or declines with `POST /v1/admin/topups/:id/decide {approve, note}` (admin role only; every decision is audited). There is no admin screen for this yet, only the API.
+5. **Manual bank transfer:** the player gets the reference and your bank details, transfers, then taps "I have paid" with the sender name. An admin sees it at `GET /v1/admin/topups?status=review` and approves or declines with `POST /v1/admin/topups/:id/decide {approve, note}` (admin role only; every decision is audited). The admin screen is the moderator console at `/mod` (sign in as an admin): the "manual top-ups" card lists transfers waiting for you with player, amount, reference, sender name and note; **Approve** (asks you to confirm) or **Decline** (needs a short reason). Moderators who are not admins cannot see it.
 
 ## Rules
 - Adults only (18+); suspended or banned accounts cannot buy.
@@ -45,6 +45,6 @@ Phone > **Top up**: four packs at fixed rates (`game-data/topup.json`), a Naira 
 
 ## Not built yet (decide before launch)
 - **Chargebacks and refunds** (taking MVC back or banning abusers). Today a refund at the provider does not touch the ledger.
-- Receipts by email, an admin page for manual approvals, and provider payouts/accounting reports.
+- Receipts by email and provider payouts/accounting reports.
 - **Legal and policy:** selling virtual currency to real people has consumer-protection, tax and (for minors) age rules that depend on country. Get advice before enabling real keys. This is not legal advice.
 - **Economy:** every top-up creates money. Re-read `docs/ECONOMY_TUNING.md` so prices and rents stay balanced when players can buy MVC.

@@ -15,6 +15,9 @@ import * as moderation from '../modules/moderation/moderation.js';
 import * as ledger from '../modules/economy/ledger.js';
 import * as travel from '../modules/travel/travel.js';
 import * as localTravel from '../modules/travel/local.js';
+import * as cars from '../modules/life/cars.js';
+import * as courses from '../modules/life/courses.js';
+import * as health from '../modules/life/health.js';
 import { characterAgeBand } from '../modules/identity/service.js';
 import { handleApp, phoneInfo } from '../modules/phone/index.js';
 import { currencyOfCity, formatMoney } from '../modules/economy/currency.js';
@@ -62,6 +65,7 @@ const Msg = z.discriminatedUnion('t', [
   z.object({ t: z.literal('app'), rid: z.string().max(40), app: z.string().max(20), a: z.string().max(30), d: z.record(z.string(), z.unknown()).optional() }),
   z.object({ t: z.literal('transit'), mode: z.enum(['bus', 'car']), x: z.number().min(-2000).max(2000), z: z.number().min(-2000).max(2000), name: z.string().max(60).optional() }),
   z.object({ t: z.literal('ride'), on: z.boolean() }),
+  z.object({ t: z.literal('drive'), on: z.boolean() }),
   z.object({ t: z.literal('voice'), on: z.boolean() }),
   z.object({ t: z.literal('vsig'), to: z.string().uuid(), kind: z.enum(['offer', 'answer', 'ice']), data: z.record(z.string(), z.unknown()) }),
   z.object({ t: z.literal('ping'), c: z.number().optional() }),
@@ -69,13 +73,15 @@ const Msg = z.discriminatedUnion('t', [
 
 interface Body { x: number; z: number; ry: number; moving: boolean }
 interface Player extends Body {
-  id: string; city: string; metro: string; travel: { to: string; until: number; mode: string; point?: { x: number; z: number } } | null; ride: { until: number; mult: number } | null; name: string; appearance: unknown; ws: WebSocket; ip: string;
+  id: string; city: string; metro: string; travel: { to: string; until: number; mode: string; point?: { x: number; z: number } } | null; ride: { until: number; mult: number; car?: CarState } | null; slow: boolean; name: string; appearance: unknown; ws: WebSocket; ip: string;
   input: { dx: number; dz: number; run: boolean }; seq: number; lastInputAt: number;
   access: Set<string>; busy: boolean; lastActAt: number; lastEmoteAt: number;
   known: Set<string>; budget: number; budgetAt: number; strikes: number; dirty: boolean; lastSave: number;
   emote: string | null; emoteUntil: number;
   voice: { on: boolean; since: number; checked: number; sig: string; peers: Set<string> };
 }
+/** A car being driven: wear is tracked in memory while moving and saved when the drive ends (and with the periodic save). */
+interface CarState { id: string; modelId: string; name: string; color: string; fuel: number; cond: number; litresPerKm: number; wearPerKm: number; baseMult: number; lastX: number; lastZ: number; incKm: number; unsaved: boolean }
 interface CityRuntime { id: string; world: any; colliders: Colliders; npcs: Npc[]; builtLoaded: boolean }
 interface Npc extends Body {
   id: string; name: string; role: string; appearance: unknown; route: { x: number; z: number }[]; leg: number; dir: 1 | -1; loop: boolean;
@@ -232,7 +238,7 @@ export class Gateway {
       const saved = summary.location.posRev >= 2 && !(summary.location.x === 0 && summary.location.z === 0)
         && !isBlocked(summary.location.x, summary.location.z, this.rt(city).colliders, (g) => access.has(g), world.bounds);
       const p: Player = {
-        id, city, metro, ride: null, travel: summary.travel ? { to: summary.travel.to, until: new Date(summary.travel.arrivesAt).getTime(), mode: 'flight' } : null,
+        id, city, metro, ride: null, slow: !!summary.health?.slow, travel: summary.travel ? { to: summary.travel.to, until: new Date(summary.travel.arrivesAt).getTime(), mode: 'flight' } : null,
         name: summary.displayName, appearance: summary.appearance, ws, ip,
         x: saved ? summary.location.x : spawn.x, z: saved ? summary.location.z : spawn.z, ry: 0, moving: false,
         input: { dx: 0, dz: 0, run: false }, seq: 0, lastInputAt: Date.now(), access, busy: false, lastActAt: 0, lastEmoteAt: 0,
@@ -258,7 +264,7 @@ export class Gateway {
     await this.ensureBuilt(p.city);
     const city = this.ctx.data.cityById.get(p.city)!;
     this.send(p, {
-      t: 'welcome', voiceIce: VOICE_ICE, you: { id: p.id, name: p.name, appearance: p.appearance, x: p.x, z: p.z }, world: this.worldOf(p),
+      t: 'welcome', voiceIce: VOICE_ICE, slowMult: this.ctx.data.life.health.slowMult, you: { id: p.id, name: p.name, appearance: p.appearance, x: p.x, z: p.z }, world: this.worldOf(p),
       city: { id: city.id, name: city.name, country: city.country, blurb: city.blurb, metro: city.metro }, currency: currencyOfCity(this.ctx.data, p.city),
       geo: this.publicGeo(), summary, door: await this.doorInfo(p, summary), serverNow: Date.now(), tickHz: TICK_HZ,
       achievements: this.ctx.data.achievements, jobs: jobs.listJobs(this.ctx), localTransport: this.ctx.data.geo.localTransport, furnitureCatalog: this.ctx.data.items.filter((i) => i.furniture).map((i) => ({ id: i.id, name: i.name, ...i.furniture })), phone: await phoneInfo(this.ctx, p.id), ...extra,
@@ -266,6 +272,7 @@ export class Gateway {
   }
 
   private async onClose(p: Player) {
+    this.stopDrive(p);
     if (p.travel?.point) { p.x = p.travel.point.x; p.z = p.travel.point.z; p.dirty = true; const d = districtAt(this.rt(p.city).world, p.x, p.z); if (d) p.city = d; p.travel = null; }   // paid for a bus: you arrive even if you left
     this.connsByIp.set(p.ip, Math.max(0, (this.connsByIp.get(p.ip) ?? 1) - 1));
     if (this.players.get(p.id) === p) {
@@ -278,6 +285,7 @@ export class Gateway {
     p.dirty = false; p.lastSave = Date.now();
     if (p.travel) return; // position is meaningless mid-journey
     await this.ctx.pool.query('UPDATE characters SET district=$2,city=$2,pos_x=$3,pos_y=0,pos_z=$4,pos_rev=2 WHERE id=$1 AND travel_to IS NULL', [p.id, p.city, p.x, p.z]);
+    const c = p.ride?.car; if (c?.unsaved) { c.unsaved = false; await cars.saveWear(this.ctx, c.id, c.fuel, c.cond); }
   }
 
   // ------------------------------------------------------------------ messages
@@ -305,6 +313,7 @@ export class Gateway {
         case 'travel': return await this.onTravel(p, m.to, m.mode);
         case 'transit': return await this.onTransit(p, m);
         case 'ride': return await this.onRide(p, m.on);
+        case 'drive': return await this.onDrive(p, m.on);
         case 'chat': if (p.travel) return; return await this.onChat(p, m.text);
         case 'emote': return this.onEmote(p, m.e);
         case 'interact': if (p.travel) throw new AppError(409, 'travelling', 'You are on a journey.'); return await this.onInteract(p, m.zone, m.item);
@@ -435,7 +444,7 @@ export class Gateway {
 
   private async refresh(p: Player) {
     const summary = await characterSummary(this.ctx, p.id);
-    p.access = this.accessFor(summary, p.metro);
+    p.access = this.accessFor(summary, p.metro); p.slow = !!summary.health?.slow;
     this.send(p, { t: 'summary', summary, door: await this.doorInfo(p, summary) });
     return summary;
   }
@@ -533,6 +542,7 @@ export class Gateway {
   // ------------------------------------------------------------------ travel
   private async onTravel(p: Player, to: string, mode: string) {
     if (p.travel) throw new AppError(409, 'already_travelling', 'You are already on a journey.');
+    this.stopDrive(p);
     const t = await travel.startTrip(this.ctx, p.id, to, mode, randomUUID());
     p.travel = { to, until: new Date(t.arrivesAt).getTime(), mode };
     p.input = { dx: 0, dz: 0, run: false }; p.moving = false;
@@ -545,6 +555,7 @@ export class Gateway {
   /** City bus or taxi to a point in the same city: pay by distance, a short journey, then you are dropped at the door. */
   private async onTransit(p: Player, m: { mode: 'bus' | 'car'; x: number; z: number; name?: string }) {
     if (p.travel) throw new AppError(409, 'already_travelling', 'You are already on a journey.');
+    this.stopDrive(p);
     const rt = this.rt(p.city);
     const b = rt.world.bounds;
     if (m.x < b.minX + 1 || m.x > b.maxX - 1 || m.z < b.minZ + 1 || m.z > b.maxZ - 1 || isBlocked(m.x, m.z, rt.colliders, (g) => p.access.has(g), b)) throw new AppError(400, 'bad_destination', 'The bus cannot go there.');
@@ -560,9 +571,68 @@ export class Gateway {
   }
 
   /** Rent a bike: a fee, then a speed boost for a few minutes (the server applies it, so it cannot be faked). */
-  private async onRide(p: Player, on: boolean) {
-    if (!on) { if (p.ride) { p.ride = null; this.send(p, { t: 'ride', on: false }); } return; }
+  // ------------------------------------------------------------------ cars and health (server-side: speed, fuel, wear and crashes are decided here)
+  rng: () => number = Math.random;                    // tests replace this to make crashes predictable
+  private buildingTypeOf(p: Player): string | null {
+    const b = this.rt(p.metro).world.buildings.find((x: any) => x.enterable && Math.abs(p.x - x.cx) < x.sx / 2 && Math.abs(p.z - x.cz) < x.sz / 2);
+    return b && b.kind === 'public' ? (b.short ?? null) : null;
+  }
+  /** End a drive: save the car's fuel and wear and drop back to walking. */
+  private stopDrive(p: Player, why?: string) {
+    const c = p.ride?.car; if (!c) return;
+    p.ride = null; this.send(p, { t: 'ride', on: false }); if (why) this.toast(p, 'info', why);
+    void cars.saveWear(this.ctx, c.id, c.fuel, c.cond).catch(() => {});
+  }
+  private driveStep(p: Player) {
+    const c = p.ride!.car!, cfg = this.ctx.data.life.cars;
+    const d = dist2(c.lastX, c.lastZ, p.x, p.z); c.lastX = p.x; c.lastZ = p.z;
+    if (this.buildingOf(p)) return this.stopDrive(p, 'You parked outside. Cars cannot go indoors.');
+    if (d <= 0) return;
+    const km = d / 1000; c.fuel = Math.max(0, c.fuel - km * c.litresPerKm); c.cond = Math.max(0, c.cond - km * c.wearPerKm); c.incKm += km; c.unsaved = true;
+    if (c.fuel <= 0) return this.stopDrive(p, 'Out of fuel! Refuel in the Cars app.');
+    if (c.incKm >= 0.25) {
+      c.incKm = 0;
+      if (this.rng() < cfg.incidentPerKm * 0.25) {
+        const dmg = cfg.incidentDamage[0] + this.rng() * (cfg.incidentDamage[1] - cfg.incidentDamage[0]); c.cond = Math.max(0, c.cond - dmg);
+        this.toast(p, 'error', `You hit something! The car lost ${Math.round(dmg)} points of condition. Repair it in the Cars app (insurance helps).`);
+      }
+    }
+    if (c.cond <= 0) return this.stopDrive(p, 'The car broke down. Repair it in the Cars app.');
+    p.ride!.mult = c.baseMult * (c.cond < cfg.slowBelowCondition ? cfg.slowMult : 1);
+    if (this.tick % 20 === 0) this.send(p, { t: 'car', fuel: +c.fuel.toFixed(1), cond: +c.cond.toFixed(1), mult: p.ride!.mult });
+  }
+  private async onDrive(p: Player, on: boolean) {
+    if (!on) return this.stopDrive(p);
     if (p.travel) throw new AppError(409, 'travelling', 'You are on a journey.');
+    if (p.ride?.car) return;
+    if (p.ride) throw new AppError(409, 'on_bike', 'Finish your bike ride first.');
+    if (this.buildingOf(p)) throw new AppError(409, 'indoors', 'Step outside to get in your car.');
+    const ac = await cars.activeCar(this.ctx, p.id);
+    if (!ac) throw new AppError(409, 'no_car', 'You do not have a car yet. Open the Cars app.');
+    const lic = this.ctx.data.life.cars.requiresCredential;
+    if (!(await courses.hasCredential(this.ctx, this.ctx.pool, p.id, lic))) throw new AppError(409, 'licence_needed', 'You need a driving licence. Study for it in the Courses app.');
+    const fuel = Number(ac.row.fuel), cond = Number(ac.row.condition);
+    if (fuel < 0.3) throw new AppError(409, 'no_fuel', 'The tank is empty. Refuel in the Cars app.');
+    if (cond < 1) throw new AppError(409, 'broken', 'The car needs repairs. Open the Cars app.');
+    const m = ac.model, cfg = this.ctx.data.life.cars;
+    p.ride = { until: Number.MAX_SAFE_INTEGER, mult: m.speedMult * (cond < cfg.slowBelowCondition ? cfg.slowMult : 1),
+      car: { id: ac.row.id, modelId: m.id, name: m.name, color: m.color, fuel, cond, litresPerKm: m.litresPerKm, wearPerKm: m.wearPerKm, baseMult: m.speedMult, lastX: p.x, lastZ: p.z, incKm: 0, unsaved: false } };
+    this.send(p, { t: 'ride', on: true, mult: p.ride.mult, car: { name: m.name, color: m.color, fuel, cond, tank: m.tank } });
+  }
+  /** Health decays with time, so every minute re-read it (this also saves the decay) and slow down anyone who is exhausted. */
+  private async refreshHealth() {
+    for (const p of [...this.players.values()]) {
+      const v = await health.current(this.ctx, this.ctx.pool, p.id).catch(() => null);
+      if (v == null) continue;
+      const slow = v < this.ctx.data.life.health.slowBelow;
+      if (slow !== p.slow) { p.slow = slow; this.toast(p, slow ? 'error' : 'ok', slow ? 'You feel exhausted and move slower. Rest or visit the Health app.' : 'You feel better.'); }
+    }
+  }
+
+  private async onRide(p: Player, on: boolean) {
+    if (!on) { if (p.ride && !p.ride.car) { p.ride = null; this.send(p, { t: 'ride', on: false }); } return; }
+    if (p.travel) throw new AppError(409, 'travelling', 'You are on a journey.');
+    if (p.ride?.car) throw new AppError(409, 'driving', 'You are driving your car.');
     if (p.ride && p.ride.until > this.ctx.now().getTime()) return;     // already riding: no second charge
     const r = await localTravel.chargeBike(this.ctx, p.id, randomUUID());
     p.ride = { until: this.ctx.now().getTime() + r.seconds * 1000, mult: r.speedMult };
@@ -609,7 +679,7 @@ export class Gateway {
   private async onApp(p: Player, m: { rid: string; app: string; a: string; d?: Record<string, unknown> }) {
     if (p.travel) throw new AppError(409, 'travelling', 'You are on a journey.');
     try {
-      const r = await handleApp(this.ctx, { id: p.id, name: p.name, city: p.city }, m.app, m.a, m.d);
+      const r = await handleApp(this.ctx, { id: p.id, name: p.name, city: p.city, at: this.buildingTypeOf(p) }, m.app, m.a, m.d);
       this.send(p, { t: 'app', rid: m.rid, ok: true, data: r.data });
       for (const n of r.notify ?? []) {
         const o = this.players.get(n.to);
@@ -624,6 +694,9 @@ export class Gateway {
         await this.refresh(p);
         if (r.goHome) await this.onHome(p).catch(() => {});   // move in immediately: walk straight into the new home
       } else if (m.app === 'store' || m.app === 'home') {
+        await this.refresh(p);
+      } else if (m.app === 'cars' || m.app === 'health' || m.app === 'courses' || m.app === 'assurance') {
+        if (m.app === 'cars' && p.ride?.car && (m.a === 'sell' || m.a === 'activate')) this.stopDrive(p);
         await this.refresh(p);
       } else if (m.app === 'bank' || m.app === 'odds' || m.app === 'topup') void this.refresh(p).catch(() => {});
     } catch (err) {
@@ -650,13 +723,15 @@ export class Gateway {
     const now = Date.now();
     this.tick++;
     if (this.tick % 20 === 0) void this.refreshVoice().catch(() => {});
+    if (this.tick % 1200 === 0) void this.refreshHealth().catch(() => {});
     for (const p of this.players.values()) {
       if (p.travel) { if (this.ctx.now().getTime() >= p.travel.until) void this.arrive(p); continue; }
       const rt = this.rt(p.city);
       const input = now - p.lastInputAt > INPUT_STALE_MS ? { dx: 0, dz: 0, run: false } : p.input;
       const before = p.x * 1e3 + p.z;
       if (p.ride && this.ctx.now().getTime() > p.ride.until) { p.ride = null; this.send(p, { t: 'ride', on: false }); }
-      stepPlayer(p, input, dt, rt.colliders, (g) => p.access.has(g), rt.world.bounds, p.ride?.mult ?? 1);
+      stepPlayer(p, input, dt, rt.colliders, (g) => p.access.has(g), rt.world.bounds, (p.ride?.mult ?? 1) * (p.slow ? this.ctx.data.life.health.slowMult : 1));
+      if (p.ride?.car) this.driveStep(p);
       if (p.x * 1e3 + p.z !== before) p.dirty = true;
       const d = districtAt(rt.world, p.x, p.z); if (d && d !== p.city) this.setArea(p, d);   // walking across a district border changes the area
       if (p.emote && now > p.emoteUntil) p.emote = null;
@@ -695,7 +770,7 @@ export class Gateway {
       if (o.id === p.id || dist2(p.x, p.z, o.x, o.z) > INTEREST_RADIUS) return;
       seen.add(o.id);
       if (!p.known.has(o.id)) { p.known.add(o.id); spawns.push({ id: o.id, name: npc ? null : o.name, role: npc ? (o as any).role : undefined, appearance: o.appearance, npc }); }
-      ps.push([o.id, +o.x.toFixed(2), +o.z.toFixed(2), +o.ry.toFixed(2), o.moving ? 1 : 0, emote ?? 0]);
+      ps.push([o.id, +o.x.toFixed(2), +o.z.toFixed(2), +o.ry.toFixed(2), o.moving ? 1 : 0, emote ?? 0, (o as any).ride?.car?.color ?? 0]);
     };
     let online = 0;
     for (const o of this.players.values()) {

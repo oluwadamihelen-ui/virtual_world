@@ -280,6 +280,66 @@ export function phoneApps(ctx) {
       el.querySelectorAll('[data-poi]').forEach((b) => b.onclick = () => ctx.openPlace(list.find((x) => x.p.id === b.dataset.poi).p));
     });
   }
+  // ------------------------------------------------------------------ Health, Courses, Cars, Assurance
+  const bar = (pct, color) => `<div style="height:9px;border-radius:5px;background:rgba(255,255,255,.18);overflow:hidden"><div style="height:100%;width:${Math.max(0, Math.min(100, pct))}%;background:${color}"></div></div>`;
+  const hpColor = (v) => (v >= 70 ? '#5be0a8' : v >= 25 ? '#f4b942' : '#ff6b6b');
+  const left = (iso) => { const s = Math.max(0, Math.round((new Date(iso) - Date.now()) / 1000)); return s >= 3600 ? `${Math.floor(s / 3600)} h ${Math.floor(s % 3600 / 60)} min` : s >= 60 ? `${Math.floor(s / 60)} min ${s % 60} s` : `${s} s`; };
+  async function healthApp(ph) {
+    ph.app('Health', '<p>Loading…</p>');
+    const d = await call('health', 'info'); if (!d) return;
+    const v = d.state;
+    ph.setBody(`<div class="card2"><div style="display:flex;justify-content:space-between"><b>❤️ ${esc(v.label)}</b><b>${Math.round(v.value)} / ${v.max}</b></div>${bar(v.value, hpColor(v.value))}
+      <div class="hint">You lose about ${d.decayPerHour} points an hour and ${d.shiftCost} per shift. Below ${d.minToWork} you cannot start a shift; below 20 you walk slowly.${d.at ? ` You are in a ${esc(d.at)}.` : ''}</div></div>
+      <div class="card2"><b>${d.coverPercent ? `🛡️ Insurance pays ${d.coverPercent}% of treatments` : 'No health insurance'}</b> <button class="btn small" id="hAssure">${d.coverPercent ? 'Manage' : 'Get cover'}</button></div>
+      <div class="list">${d.treatments.map((t) => `<div class="li"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:26px">${t.emoji}</span><div><b>${esc(t.name)}</b><small>+${t.restore >= 100 ? 'full' : t.restore} health · ${esc(t.note)}</small></div></div><div style="text-align:right"><b>${fmt(t.youPay)}</b>${t.youPay < t.fee ? `<br><small style="text-decoration:line-through;opacity:.7">${fmt(t.fee)}</small>` : ''}<br><button class="btn small mint" data-t="${t.id}" ${t.available ? '' : 'disabled'}>Treat</button></div></div>`).join('')}</div>`, (el) => {
+      el.querySelector('#hAssure').onclick = () => assuranceApp(ph);
+      el.querySelectorAll('[data-t]').forEach((b) => b.onclick = async () => { const r = await call('health', 'treat', { id: b.dataset.t, key: newKey() }); if (r) { U.toast('ok', `Treated. You paid ${fmt(r.paid)}${r.covered ? `, insurance paid ${fmt(r.covered)}` : ''}.`); healthApp(ph); } });
+    });
+  }
+  async function coursesApp(ph) {
+    ph.app('Courses', '<p>Loading…</p>');
+    const d = await call('courses', 'info'); if (!d) return;
+    ph.setBody(`${d.studying ? `<div class="card2"><b>📖 Studying: ${esc(d.courses.find((c) => c.id === d.studying.courseId)?.name ?? '')}</b><div class="hint" id="cLeft">Ready in ${left(d.studying.readyAt)}. You can log off; it keeps counting.</div></div>` : ''}
+      <div class="list">${d.courses.map((c) => `<div class="li"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:26px">${c.emoji}</span><div><b>${esc(c.name)}</b><small>${esc(c.blurb)} · ${c.minutes} min</small></div></div><div style="text-align:right">${c.state === 'done' ? '<span class="pill">Qualified ✓</span>' : c.state === 'studying' ? '<span class="pill">Studying…</span>' : c.state === 'locked' ? `<small>Needs reputation ${c.minReputation}</small>` : `<b>${fmt(c.fee)}</b><br><button class="btn small mint" data-c="${c.id}" ${d.studying ? 'disabled' : ''}>Enrol</button>`}</div></div>`).join('')}</div>
+      <b>Jobs these unlock</b><div class="list">${d.jobsUnlocked.map((j) => `<div class="li"><div><b>${esc(j.name)}</b><small>needs: ${esc(j.needs)}</small></div><div class="pos">+${fmt(j.wage)}</div></div>`).join('')}</div>`, (el) => {
+      el.querySelectorAll('[data-c]').forEach((b) => b.onclick = async () => { const r = await call('courses', 'enrol', { id: b.dataset.c, key: newKey() }); if (r) { U.toast('ok', 'Enrolled. Your qualification arrives when the course ends.'); coursesApp(ph); } });
+    });
+  }
+  async function carsApp(ph) {
+    ph.app('Cars', '<p>Loading…</p>');
+    const d = await call('cars', 'info'); if (!d) return;
+    const driving = !!G().ride?.car;
+    ph.setBody(`${d.licence ? '' : `<div class="card2"><b>🚦 You need a ${esc(d.licenceName)}</b><div class="hint">Study for it in the Courses app before you can buy or drive a car.</div><button class="btn small mint" id="cCourses">Open Courses</button></div>`}
+      ${d.garageDiscount ? `<div class="hint">You are at a garage: ${d.garageDiscount}% off fuel and repairs.</div>` : ''}
+      <b>Your garage (${d.owned.length}/${d.maxOwned})</b><div class="list">${d.owned.map((c) => `<div class="card2"><div style="display:flex;justify-content:space-between"><b>${c.emoji} ${esc(c.name)} <small style="opacity:.7">${esc(c.plate)}</small></b>${c.active ? '<span class="pill">Active</span>' : ''}${c.insured ? '<span class="pill">Insured</span>' : ''}</div>
+        <small>Fuel ${c.fuel} / ${c.tank} L · range ${c.range} km</small>${bar(c.fuel / c.tank * 100, '#4aa8ff')}<small>Condition ${Math.round(c.condition)}%</small>${bar(c.condition, hpColor(c.condition))}
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">${c.active ? `<button class="btn small mint" data-drive="${c.id}" ${d.licence ? '' : 'disabled'}>${driving ? 'Driving…' : 'Drive'}</button>` : `<button class="btn small" data-act="${c.id}">Make active</button>`}
+        <button class="btn small" data-fuel="${c.id}">Refuel (${fmt(Math.round((c.tank - c.fuel) * d.fuelPrice * (1 - d.garageDiscount / 100)))})</button><button class="btn small" data-rep="${c.id}" ${c.condition >= 99.5 ? 'disabled' : ''}>Repair (${fmt(c.repairFee)})</button>
+        ${c.insured ? '' : `<button class="btn small" data-ins="1">Insure</button>`}<button class="btn small" data-sell="${c.id}">Sell ${fmt(c.value)}</button></div></div>`).join('') || '<p class="hint">No cars yet.</p>'}</div>
+      <b>Showroom</b><div class="list">${d.showroom.map((m) => `<div class="li"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:26px">${m.emoji}</span><div><b>${esc(m.name)}</b><small>${m.speedMult}× walking speed · ${m.kmPerFullTank} km per tank</small></div></div><div style="text-align:right"><b>${fmt(m.price)}</b><br><button class="btn small mint" data-buy="${m.id}" ${d.licence ? '' : 'disabled'}>Buy</button></div></div>`).join('')}</div>
+      <div class="hint">Cars burn fuel and wear as you drive, and you can crash. Garages (the buildings) are cheaper for fuel and repairs. Selling gives back a share of the price that depends on condition. Cars cannot go indoors.</div>`, (el) => {
+      el.querySelector('#cCourses')?.addEventListener('click', () => coursesApp(ph));
+      const act = (sel, fn) => el.querySelectorAll(sel).forEach((b) => b.onclick = () => fn(b));
+      act('[data-ins]', () => assuranceApp(ph));
+      act('[data-drive]', () => { if (driving) return; ctx.send({ t: 'drive', on: true }); ctx.closePhone?.(); });
+      act('[data-act]', async (b) => { if (await call('cars', 'activate', { id: b.dataset.act })) carsApp(ph); });
+      act('[data-fuel]', async (b) => { const r = await call('cars', 'refuel', { id: b.dataset.fuel, litres: 'full', key: newKey() }); if (r) { U.toast('ok', `Added ${r.added} L for ${fmt(r.fee)}.`); carsApp(ph); } });
+      act('[data-rep]', async (b) => { const r = await call('cars', 'repair', { id: b.dataset.rep, key: newKey() }); if (r) { U.toast('ok', `Repaired for ${fmt(r.fee)}${r.insurerPaid ? ` (insurance paid ${fmt(r.insurerPaid)})` : ''}.`); carsApp(ph); } });
+      act('[data-sell]', async (b) => { if (!confirm('Sell this car?')) return; const r = await call('cars', 'sell', { id: b.dataset.sell, key: newKey() }); if (r) { U.toast('ok', `Sold for ${fmt(r.value)}.`); carsApp(ph); } });
+      act('[data-buy]', async (b) => { const r = await call('cars', 'buy', { model: b.dataset.buy, key: newKey() }); if (r) { U.toast('ok', 'Congratulations on your new car!'); carsApp(ph); } });
+    });
+  }
+  async function assuranceApp(ph) {
+    ph.app('Assurance', '<p>Loading…</p>');
+    const d = await call('assurance', 'info'); if (!d) return;
+    ph.setBody(`<div class="hint">Cover starts ${d.waitingHours} hours after you buy it. Premiums are charged every ${Math.round(d.periodHours / 24)} days from your wallet; if you cannot pay, the cover lapses.</div>
+      <b>Your policies</b><div class="list">${d.policies.map((p) => `<div class="li"><div><b>${esc(p.name)}</b><small>${p.car ? esc(p.car) + ' · ' : ''}pays ${p.coverPercent}% · ${fmt(p.premium)} every ${Math.round(d.periodHours / 24)} days</small><small>${p.status === 'lapsed' ? '⚠️ Lapsed (unpaid)' : p.coverStartsAt ? `Cover starts in ${left(p.coverStartsAt)}` : 'Active'}</small></div><button class="btn small" data-x="${p.id}">Cancel</button></div>`).join('') || '<p class="hint">No cover yet.</p>'}</div>
+      <b>Plans</b><div class="list">${d.plans.map((p) => `<div class="card2"><b>${esc(p.name)}</b> <span class="pill">pays ${p.coverPercent}%</span><div class="hint">${esc(p.blurb)}</div>${p.kind === 'health' ? `<button class="btn small mint" data-p="${p.id}">Buy · ${fmt(p.premium)}/wk</button>` : (p.forCars.length ? p.forCars.map((c) => `<button class="btn small mint" data-p="${p.id}" data-car="${c.carId}">${esc(c.label)} · ${fmt(c.premium)}/wk</button>`).join(' ') : '<small>Buy a car first.</small>')}</div>`).join('')}</div>
+      ${d.comingSoon.length ? `<div class="hint">Coming soon: ${d.comingSoon.map(esc).join(', ')}.</div>` : ''}`, (el) => {
+      el.querySelectorAll('[data-x]').forEach((b) => b.onclick = async () => { if (confirm('Cancel this policy? Premiums already paid are not refunded.') && await call('assurance', 'cancel', { id: b.dataset.x })) assuranceApp(ph); });
+      el.querySelectorAll('[data-p]').forEach((b) => b.onclick = async () => { const r = await call('assurance', 'buy', { plan: b.dataset.p, car: b.dataset.car, key: newKey() }); if (r) { U.toast('ok', `Covered. First premium ${fmt(r.premium)} paid.`); assuranceApp(ph); } });
+    });
+  }
   const soon = (id, name, emoji, color, blurb) => ({ id, name, emoji, color, soon: true, open: (ph) => ph.app(name, `<div class="card2" style="text-align:center"><div style="font-size:44px">${emoji}</div><b>${esc(name)} is coming soon</b><p class="hint">${esc(blurb)}</p></div>`) });
   return [
     { id: 'bank', name: 'Vault', icon: 'bank', color: GRAD.bank, open: (ph) => bankApp(ph) },
@@ -305,10 +365,10 @@ export function phoneApps(ctx) {
     { id: 'ride', name: 'Ride', emoji: '🚕', color: 'linear-gradient(135deg,#f59e0b,#fde047)', isNew: true, open: () => ctx.rideHelp() },
     { id: 'invest', name: 'Invest', emoji: '📈', color: 'linear-gradient(135deg,#65a30d,#bef264)', isNew: true, open: () => ctx.openEstate() },
     { id: 'help', name: 'Help & guide', emoji: '💡', color: 'linear-gradient(135deg,#eab308,#fde68a)', isNew: true, open: (ph) => helpApp(ph) },
-    soon('cars', 'Cars', '🚗', 'linear-gradient(135deg,#3b82f6,#1e40af)', 'Buy, own and drive a car around the city instead of paying for taxis.'),
-    soon('health', 'Health', '💊', 'linear-gradient(135deg,#f43f5e,#fb7185)', 'Energy and wellbeing, clinics and hospitals that treat you.'),
-    soon('courses', 'Courses', '🎓', 'linear-gradient(135deg,#2563eb,#1e3a8a)', 'Study to unlock better jobs and higher pay.'),
-    soon('assurance', 'Assurance', '🛡️', 'linear-gradient(135deg,#0f766e,#14b8a6)', 'Insure your home and belongings.'),
+    { id: 'health', name: 'Health', emoji: '💊', color: 'linear-gradient(135deg,#f43f5e,#fb7185)', isNew: true, open: (ph) => healthApp(ph) },
+    { id: 'courses', name: 'Courses', emoji: '🎓', color: 'linear-gradient(135deg,#2563eb,#1e3a8a)', isNew: true, open: (ph) => coursesApp(ph) },
+    { id: 'cars', name: 'Cars', emoji: '🚗', color: 'linear-gradient(135deg,#3b82f6,#1e40af)', isNew: true, open: (ph) => carsApp(ph) },
+    { id: 'assurance', name: 'Assurance', emoji: '🛡️', color: 'linear-gradient(135deg,#0f766e,#14b8a6)', isNew: true, open: (ph) => assuranceApp(ph) },
     soon('police', 'Police', '🚓', 'linear-gradient(135deg,#1d4ed8,#312e81)', 'Report crimes in the world and track the cases.'),
     soon('court', 'Court', '⚖️', 'linear-gradient(135deg,#78350f,#b45309)', 'Settle disputes between players.'),
     soon('gov', 'City Gov', '🏛️', 'linear-gradient(135deg,#15803d,#4ade80)', 'Permits, taxes and city announcements.'),

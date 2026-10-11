@@ -66,5 +66,59 @@
       "id": "admin",
       "xpPerShift": 15
     }
+  },
+  {
+    "id": "job_bank_teller",
+    "name": "Bank Teller",
+    "employer": "Meridian Bank (NPC)",
+    "district": "central",
+    "wagePerShift": 480,
+    "tasksPerShift": 6,
+    "minSecondsPerTask": 20,
+    "maxShiftsPer24h": 3,
+    "requirements": {
+      "minReputation": 0,
+      "credential": "cert_service"
+    },
+    "skill": {
+      "id": "hospitality",
+      "xpPerShift": 14
+    }
+  },
+  {
+    "id": "job_driver_pro",
+    "name": "Delivery Driver",
+    "employer": "Meridian Express (NPC)",
+    "district": "central",
+    "wagePerShift": 560,
+    "tasksPerShift": 6,
+    "minSecondsPerTask": 20,
+    "maxShiftsPer24h": 3,
+    "requirements": {
+      "minReputation": 0,
+      "credential": "driving_licence"
+    },
+    "skill": {
+      "id": "logistics",
+      "xpPerShift": 14
+    }
+  },
+  {
+    "id": "job_office_manager",
+    "name": "Office Manager",
+    "employer": "Meridian Offices (NPC)",
+    "district": "central",
+    "wagePerShift": 700,
+    "tasksPerShift": 7,
+    "minSecondsPerTask": 20,
+    "maxShiftsPer24h": 3,
+    "requirements": {
+      "minReputation": 1,
+      "credential": "dip_admin"
+    },
+    "skill": {
+      "id": "admin",
+      "xpPerShift": 16
+    }
   }
 ]
