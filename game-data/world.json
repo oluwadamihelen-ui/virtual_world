@@ -93,41 +93,53 @@
     {
       "id": "house_a",
       "name": "House",
-      "cx": 5.5,
+      "cx": 4.5,
       "cz": -13.5,
       "sx": 7,
       "sz": 6,
       "height": 3.0,
       "wall": "#e9c46a",
       "roof": "#b5833a",
-      "enterable": false,
-      "kind": "house"
+      "enterable": true,
+      "kind": "house",
+      "doorSide": "+z",
+      "doorWidth": 1.6,
+      "gate": "house_a",
+      "floor": "#d8c8a6"
     },
     {
       "id": "house_b",
       "name": "House",
-      "cx": 14,
+      "cx": 15,
       "cz": -13.5,
       "sx": 7,
       "sz": 6,
       "height": 3.0,
       "wall": "#9bc1bc",
       "roof": "#5d8a85",
-      "enterable": false,
-      "kind": "house"
+      "enterable": true,
+      "kind": "house",
+      "doorSide": "+z",
+      "doorWidth": 1.6,
+      "gate": "house_b",
+      "floor": "#d8c8a6"
     },
     {
       "id": "house_c",
       "name": "House",
-      "cx": 9.5,
+      "cx": 9.75,
       "cz": -21.5,
       "sx": 8,
       "sz": 6,
       "height": 3.0,
       "wall": "#e29578",
       "roof": "#b45f45",
-      "enterable": false,
-      "kind": "house"
+      "enterable": true,
+      "kind": "house",
+      "doorSide": "+z",
+      "doorWidth": 1.6,
+      "gate": "house_c",
+      "floor": "#d8c8a6"
     }
   ],
   "furniture": [
@@ -170,36 +182,6 @@
       "sz": 0.6,
       "h": 2.0,
       "color": "#b9794a"
-    },
-    {
-      "id": "bed",
-      "building": "apt",
-      "x": -12.6,
-      "z": -17.4,
-      "sx": 2.0,
-      "sz": 1.3,
-      "h": 0.6,
-      "color": "#f1f1fb"
-    },
-    {
-      "id": "sofa",
-      "building": "apt",
-      "x": -4.5,
-      "z": -17.0,
-      "sx": 2.3,
-      "sz": 0.95,
-      "h": 0.8,
-      "color": "#a33b3b"
-    },
-    {
-      "id": "table",
-      "building": "apt",
-      "x": -8.5,
-      "z": -16.3,
-      "sx": 1.2,
-      "sz": 1.2,
-      "h": 0.7,
-      "color": "#8a5a2b"
     }
   ],
   "props": [
@@ -400,7 +382,8 @@
       "x": -8,
       "z": -7.0,
       "radius": 2.6,
-      "label": "Maple Court Apartments"
+      "label": "Maple Court Apartments",
+      "lot": "apt"
     },
     {
       "id": "grocery_counter",
@@ -431,6 +414,36 @@
       "radius": 2.4,
       "label": "Stock room work station",
       "jobId": "job_grocery_assistant"
+    },
+    {
+      "id": "house_a_home_door",
+      "kind": "door",
+      "building": "house_a",
+      "lot": "house_a",
+      "x": 4.5,
+      "z": -9.0,
+      "radius": 2.4,
+      "label": "House"
+    },
+    {
+      "id": "house_b_home_door",
+      "kind": "door",
+      "building": "house_b",
+      "lot": "house_b",
+      "x": 15,
+      "z": -9.0,
+      "radius": 2.4,
+      "label": "House"
+    },
+    {
+      "id": "house_c_home_door",
+      "kind": "door",
+      "building": "house_c",
+      "lot": "house_c",
+      "x": 9.75,
+      "z": -17.0,
+      "radius": 2.4,
+      "label": "House"
     }
   ],
   "npcRoutes": [
@@ -547,7 +560,7 @@
       "id": "house_a",
       "kind": "house",
       "label": "House",
-      "cx": 5.5,
+      "cx": 4.5,
       "cz": -13.5,
       "sx": 7,
       "sz": 6,
@@ -557,7 +570,7 @@
       "id": "house_b",
       "kind": "house",
       "label": "House",
-      "cx": 14,
+      "cx": 15,
       "cz": -13.5,
       "sx": 7,
       "sz": 6,
@@ -567,7 +580,7 @@
       "id": "house_c",
       "kind": "house",
       "label": "House",
-      "cx": 9.5,
+      "cx": 9.75,
       "cz": -21.5,
       "sx": 8,
       "sz": 6,
@@ -580,7 +593,13 @@
       "cx": -13,
       "cz": 13,
       "sx": 8,
-      "sz": 8
+      "sz": 8,
+      "home": {
+        "sx": 6,
+        "sz": 5,
+        "doorWidth": 1.6,
+        "height": 3.0
+      }
     },
     {
       "id": "land_b",
@@ -589,7 +608,13 @@
       "cx": -4,
       "cz": 13,
       "sx": 8,
-      "sz": 8
+      "sz": 8,
+      "home": {
+        "sx": 6,
+        "sz": 5,
+        "doorWidth": 1.6,
+        "height": 3.0
+      }
     },
     {
       "id": "land_c",
@@ -598,7 +623,13 @@
       "cx": -13,
       "cz": 22,
       "sx": 8,
-      "sz": 6
+      "sz": 6,
+      "home": {
+        "sx": 6,
+        "sz": 5,
+        "doorWidth": 1.6,
+        "height": 3.0
+      }
     },
     {
       "id": "land_d",
@@ -607,7 +638,13 @@
       "cx": -4,
       "cz": 22,
       "sx": 8,
-      "sz": 6
+      "sz": 6,
+      "home": {
+        "sx": 6,
+        "sz": 5,
+        "doorWidth": 1.6,
+        "height": 3.0
+      }
     }
   ]
 }

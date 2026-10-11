@@ -4,10 +4,108 @@
     "name": "Corner Grocery",
     "district": "residential",
     "stock": [
-      { "itemId": "bottled_water", "price": 8, "quantity": null },
-      { "itemId": "sandwich", "price": 25, "quantity": null },
-      { "itemId": "desk_lamp", "price": 120, "quantity": 5 },
-      { "itemId": "starter_sofa", "price": 350, "quantity": 2 }
+      {
+        "itemId": "bottled_water",
+        "price": 8,
+        "quantity": null
+      },
+      {
+        "itemId": "sandwich",
+        "price": 25,
+        "quantity": null
+      },
+      {
+        "itemId": "desk_lamp",
+        "price": 120,
+        "quantity": 5
+      },
+      {
+        "itemId": "starter_sofa",
+        "price": 350,
+        "quantity": 2
+      }
+    ]
+  },
+  {
+    "id": "shop_home_store",
+    "name": "Home Store",
+    "district": "lagos",
+    "stock": [
+      {
+        "itemId": "single_bed",
+        "price": 300,
+        "quantity": null
+      },
+      {
+        "itemId": "double_bed",
+        "price": 520,
+        "quantity": null
+      },
+      {
+        "itemId": "starter_sofa",
+        "price": 350,
+        "quantity": null
+      },
+      {
+        "itemId": "armchair",
+        "price": 220,
+        "quantity": null
+      },
+      {
+        "itemId": "coffee_table",
+        "price": 120,
+        "quantity": null
+      },
+      {
+        "itemId": "dining_table",
+        "price": 260,
+        "quantity": null
+      },
+      {
+        "itemId": "dining_chair",
+        "price": 70,
+        "quantity": null
+      },
+      {
+        "itemId": "wardrobe",
+        "price": 340,
+        "quantity": null
+      },
+      {
+        "itemId": "bookshelf",
+        "price": 180,
+        "quantity": null
+      },
+      {
+        "itemId": "tv_stand",
+        "price": 480,
+        "quantity": null
+      },
+      {
+        "itemId": "fridge",
+        "price": 600,
+        "quantity": null
+      },
+      {
+        "itemId": "desk",
+        "price": 200,
+        "quantity": null
+      },
+      {
+        "itemId": "desk_lamp",
+        "price": 120,
+        "quantity": null
+      },
+      {
+        "itemId": "rug",
+        "price": 150,
+        "quantity": null
+      },
+      {
+        "itemId": "plant",
+        "price": 60,
+        "quantity": null
+      }
     ]
   }
 ]

@@ -5,6 +5,7 @@ import { assertCanAct } from '../identity/service.js';
 import { claim, post, finish, playerAccount, systemAccount } from '../economy/ledger.js';
 import { awardAchievement } from '../social/social.js';
 import { currentTenancy, endTenancy } from './housing.js';
+import { areaIndex, areaStats, priceNow, updateAreaValues } from './values.js';
 
 /**
  * Real estate: every home, apartment and plot of land can be inspected, rented or bought and (for homes) moved into at once.
@@ -14,23 +15,25 @@ import { currentTenancy, endTenancy } from './housing.js';
 const FOREVER = new Date('9999-01-01T00:00:00Z');
 const LIVE = ['active', 'grace'];
 const isHome = (type: string) => type !== 'land';
+const netOfFee = (ctx: AppContext, value: number) => Math.floor((value * (100 - ctx.data.estate.sellFeePercent)) / 100);
 
 export interface Listing {
   propertyId: string; lotId: string | null; type: string; name: string; beds: number; sizeSqm: number; blurb: string;
-  rent: number | null; price: number | null; buildCost: number | null; sellBack: number | null;
+  rent: number | null; price: number | null; buildCost: number | null; sellBack: number | null; boughtFor: number | null;
   state: 'available' | 'yours_renting' | 'yours_owned' | 'taken'; livingHere: boolean;
 }
 
-function toListing(ctx: AppContext, p: any, me: string, livingIn: string | null): Listing {
+function toListing(ctx: AppContext, p: any, me: string, livingIn: string | null, idx: number): Listing {
   const mineOwned = p.owner_id === me;
   const mineRent = p.status === 'occupied' && p.tenant_id === me;
   const state: Listing['state'] = mineOwned ? 'yours_owned' : mineRent ? 'yours_renting' : p.status === 'available' ? 'available' : 'taken';
   return {
     propertyId: p.id, lotId: p.lot_id, type: p.type, name: p.name, beds: p.beds, sizeSqm: p.size_sqm, blurb: p.blurb,
-    rent: p.type !== 'land' && Number(p.rent_per_period) > 0 ? Number(p.rent_per_period) : null,
-    price: p.sale_price ? Number(p.sale_price) : null,
+    rent: p.type !== 'land' && Number(p.rent_per_period) > 0 ? priceNow(Number(p.rent_per_period), idx) : null,
+    price: p.sale_price ? priceNow(Number(p.sale_price), idx) : null,
     buildCost: p.type === 'land' && p.build_cost ? Number(p.build_cost) : null,
-    sellBack: mineOwned && p.sale_price ? Math.floor((Number(p.sale_price) * ctx.data.estate.sellBackPercent) / 100) : null,
+    sellBack: mineOwned && p.sale_price ? netOfFee(ctx, priceNow(Number(p.sale_price), idx)) : null,
+    boughtFor: mineOwned && p.bought_for ? Number(p.bought_for) : null,
     state, livingHere: livingIn === p.id,
   };
 }
@@ -38,13 +41,15 @@ function toListing(ctx: AppContext, p: any, me: string, livingIn: string | null)
 /** Everything for sale or rent in one city, grouped by lot (building or plot), plus what this player already has there. */
 export async function listCity(ctx: AppContext, characterId: string, cityId: string) {
   if (!ctx.data.cityById.has(cityId)) throw notFound('city_not_found');
+  const stats = (await areaStats(ctx, cityId))[0]!;
+  const idx = stats.idx;
   const rows = (await ctx.pool.query(
     `SELECT p.*, (SELECT t.character_id FROM tenancies t WHERE t.property_id=p.id AND t.status = ANY($2) AND t.kind='rent' LIMIT 1) AS tenant_id
        FROM properties p WHERE p.district=$1 ORDER BY p.lot_id, p.sale_price NULLS FIRST, p.id`, [cityId, LIVE])).rows;
   const home = await currentTenancy(ctx.pool, characterId);
   const lots = new Map<string, Listing[]>();
   for (const r of rows) {
-    const l = toListing(ctx, r, characterId, home?.propertyId ?? null);
+    const l = toListing(ctx, r, characterId, home?.propertyId ?? null, idx);
     const key = l.lotId ?? 'other';
     if (!lots.has(key)) lots.set(key, []);
     lots.get(key)!.push(l);
@@ -58,12 +63,27 @@ export async function listCity(ctx: AppContext, characterId: string, cityId: str
     const mine = rooms.filter((r) => r.state.startsWith('yours'));
     return { lotId, listings: [...apartments, ...mine, ...free.slice(0, 6)], rooms: { total: rooms.length, available: free.length, cheapestRent: free.length ? Math.min(...free.map((r) => r.rent ?? 0)) : null } };
   });
-  const owned = (await ctx.pool.query(`SELECT id, name, type FROM properties WHERE owner_id=$1 ORDER BY name`, [characterId])).rows;
-  return { cityId, rentPeriodHours: ctx.data.economy.rentPeriodHours, lots: out, owned: owned.map((o) => ({ propertyId: o.id as string, name: o.name as string, type: o.type as string })), home, limits: { maxLandPlots: ctx.data.estate.maxLandPlots, sellBackPercent: ctx.data.estate.sellBackPercent } };
+  return { cityId, rentPeriodHours: ctx.data.economy.rentPeriodHours, area: stats, lots: out, portfolio: await portfolio(ctx, characterId), home,
+    limits: { maxLandPlots: ctx.data.estate.maxLandPlots, sellFeePercent: ctx.data.estate.sellFeePercent } };
 }
 
-/** One row per city/area for the "where should I live?" overview. */
+/** What a player owns across every area, with paid-in cost, market value now, and profit if sold today (after the fee). */
+export async function portfolio(ctx: AppContext, characterId: string) {
+  const owned = (await ctx.pool.query(`SELECT * FROM properties WHERE owner_id=$1 ORDER BY district, name`, [characterId])).rows;
+  const out = [];
+  let paid = 0, value = 0;
+  for (const p of owned) {
+    const idx = await areaIndex(ctx.pool, p.district);
+    const v = priceNow(Number(p.sale_price), idx), net = netOfFee(ctx, v), cost = Number(p.bought_for ?? v);
+    paid += cost; value += net;
+    out.push({ propertyId: p.id as string, name: p.name as string, type: p.type as string, cityId: p.district as string, cityName: ctx.data.cityById.get(p.district)?.name ?? p.district, paid: cost, value: v, sellNet: net, profit: net - cost, profitPct: cost ? (net - cost) / cost : 0 });
+  }
+  return { items: out, paid, value, profit: value - paid };
+}
+
+/** One row per city/area for the "where should I live or invest?" overview, with value trend and population. */
 export async function overview(ctx: AppContext) {
+  const stats = new Map((await areaStats(ctx)).map((a) => [a.area, a]));
   const r = await ctx.pool.query(
     `SELECT district,
        count(*) FILTER (WHERE status='available' AND type IN ('room','apartment','house')) AS homes_free,
@@ -72,10 +92,12 @@ export async function overview(ctx: AppContext) {
        min(sale_price) FILTER (WHERE status='available' AND type='land') AS cheapest_land,
        count(*) FILTER (WHERE status='available' AND type='land') AS plots_free
      FROM properties GROUP BY district`);
-  return r.rows.map((x) => ({
-    cityId: x.district as string, homesFree: Number(x.homes_free), cheapestRoom: x.cheapest_room == null ? null : Number(x.cheapest_room),
-    cheapestHome: x.cheapest_home == null ? null : Number(x.cheapest_home), cheapestLand: x.cheapest_land == null ? null : Number(x.cheapest_land), plotsFree: Number(x.plots_free),
-  }));
+  return r.rows.map((x) => {
+    const st = stats.get(x.district), idx = st?.idx ?? 1;
+    const p = (n: unknown) => (n == null ? null : priceNow(Number(n), idx));
+    return { cityId: x.district as string, homesFree: Number(x.homes_free), cheapestRoom: p(x.cheapest_room), cheapestHome: p(x.cheapest_home), cheapestLand: p(x.cheapest_land), plotsFree: Number(x.plots_free),
+      value: st ? { idx: st.idx, change24h: st.change24h, change7d: st.change7d, residents: st.residents, players: st.players, spark: st.spark } : null };
+  });
 }
 
 async function lockProperty(tx: Tx, propertyId: string, cityId: string) {
@@ -91,12 +113,13 @@ async function moveInOwned(tx: Tx, ctx: AppContext, characterId: string, propert
 }
 
 export async function buy(ctx: AppContext, characterId: string, cityId: string, propertyId: string, key: string) {
+  await updateAreaValues(ctx);
   return withTx(ctx.pool, async (tx) => {
     await assertCanAct(ctx, tx, characterId);
     await tx.query('SELECT 1 FROM characters WHERE id=$1 FOR UPDATE', [characterId]);
     const prop = await lockProperty(tx, propertyId, cityId);
     if (!prop.sale_price) throw conflict('not_for_sale', 'This property is not for sale.');
-    const price = Number(prop.sale_price);
+    const price = priceNow(Number(prop.sale_price), await areaIndex(tx, prop.district));
     const c = await claim<any>(tx, { key: `${characterId}:buy:${key}`, type: 'property_purchase', actorCharacterId: characterId, referenceType: 'property', referenceId: propertyId, amount: price, payload: { propertyId } });
     if (c.replay) return { ...c.response, replayed: true };
     if (prop.status !== 'available') throw conflict('property_unavailable', 'Someone already has this property.');
@@ -107,7 +130,7 @@ export async function buy(ctx: AppContext, characterId: string, cityId: string, 
       if (n >= ctx.data.estate.maxLandPlots) throw conflict('land_limit', `You can own at most ${ctx.data.estate.maxLandPlots} plots of land.`);
     }
     await post(tx, c.txId, [{ account: playerAccount(characterId), delta: -price }, { account: systemAccount('faucet:real_estate'), delta: price }]);
-    await tx.query(`UPDATE properties SET status='owned', owner_id=$2 WHERE id=$1`, [propertyId, characterId]);
+    await tx.query(`UPDATE properties SET status='owned', owner_id=$2, bought_for=$3 WHERE id=$1`, [propertyId, characterId, price]);
     const movedIn = isHome(prop.type);
     if (movedIn) { await moveInOwned(tx, ctx, characterId, propertyId); await awardAchievement(ctx, tx, characterId, 'first_home'); }
     const response = { propertyId, name: prop.name, type: prop.type, paid: price, movedIn, replayed: false };
@@ -118,6 +141,7 @@ export async function buy(ctx: AppContext, characterId: string, cityId: string, 
 
 /** Build a starter home on land you own; you move in at once if you have no other home. */
 export async function build(ctx: AppContext, characterId: string, cityId: string, propertyId: string, key: string) {
+  await updateAreaValues(ctx);
   const b = ctx.data.estate.build;
   return withTx(ctx.pool, async (tx) => {
     await assertCanAct(ctx, tx, characterId);
@@ -129,14 +153,15 @@ export async function build(ctx: AppContext, characterId: string, cityId: string
     const c = await claim<any>(tx, { key: `${characterId}:build:${key}`, type: 'property_build', actorCharacterId: characterId, referenceType: 'property', referenceId: propertyId, amount: cost, payload: { propertyId } });
     if (c.replay) return { ...c.response, replayed: true };
     await post(tx, c.txId, [{ account: playerAccount(characterId), delta: -cost }, { account: systemAccount('faucet:real_estate'), delta: cost }]);
-    const value = Number(prop.sale_price) + cost;
+    const idx = await areaIndex(tx, cityId);
+    const value = Number(prop.sale_price) + Math.round(cost / idx);   // base value rises by exactly the build cost at today's index
     const city = ctx.data.cityById.get(cityId)!;
     await tx.query(
-      `UPDATE properties SET type='house', built=true, name=$2, beds=$3, furniture_slots=$4, capacity=$5, sale_price=$6, rent_per_period=$7, blurb=$8, build_cost=NULL WHERE id=$1`,
-      [propertyId, `${b.name}, ${city.name}`, b.beds, b.furnitureSlots, b.capacity, value, Math.max(50, Math.round((value * b.rentRatio) / 50) * 50), 'A home you built yourself.']);
+      `UPDATE properties SET type='house', built=true, name=$2, beds=$3, furniture_slots=$4, capacity=$5, sale_price=$6, rent_per_period=$7, blurb=$8, build_cost=NULL, bought_for = COALESCE(bought_for,0) + $9 WHERE id=$1`,
+      [propertyId, `${b.name}, ${city.name}`, b.beds, b.furnitureSlots, b.capacity, value, Math.max(50, Math.round((value * b.rentRatio) / 50) * 50), 'A home you built yourself.', cost]);
     let movedIn = false;
     if ((await liveCount(tx, characterId)) < ctx.data.economy.maxActiveTenanciesPerCharacter) { await moveInOwned(tx, ctx, characterId, propertyId); movedIn = true; await awardAchievement(ctx, tx, characterId, 'first_home'); }
-    const response = { propertyId, paid: cost, movedIn, replayed: false };
+    const response = { propertyId, builtOn: prop.lot_id as string, paid: cost, movedIn, replayed: false };
     await finish(tx, c.txId, response);
     return response;
   });
@@ -170,19 +195,20 @@ export async function leave(ctx: AppContext, characterId: string) {
 
 /** Sell a property you own back to the market at the sell-back percentage. */
 export async function sell(ctx: AppContext, characterId: string, cityId: string, propertyId: string, key: string) {
+  await updateAreaValues(ctx);
   return withTx(ctx.pool, async (tx) => {
     await assertCanAct(ctx, tx, characterId);
     await tx.query('SELECT 1 FROM characters WHERE id=$1 FOR UPDATE', [characterId]);
     const prop = await lockProperty(tx, propertyId, cityId);
     if (prop.owner_id !== characterId) throw conflict('not_yours', 'You do not own this property.');
-    const payout = Math.floor((Number(prop.sale_price) * ctx.data.estate.sellBackPercent) / 100);
+    const payout = netOfFee(ctx, priceNow(Number(prop.sale_price), await areaIndex(tx, prop.district)));
     const c = await claim<any>(tx, { key: `${characterId}:sell:${key}`, type: 'property_sale', actorCharacterId: characterId, referenceType: 'property', referenceId: propertyId, amount: payout, payload: { propertyId } });
     if (c.replay) return { ...c.response, replayed: true };
     const t = (await tx.query(`SELECT * FROM tenancies WHERE property_id=$1 AND status = ANY($2) FOR UPDATE`, [propertyId, LIVE])).rows[0];
     if (t) await endTenancy(tx, t, 'sold', ctx.now());
-    await tx.query(`UPDATE properties SET status='available', owner_id=NULL WHERE id=$1`, [propertyId]);
+    await tx.query(`UPDATE properties SET status='available', owner_id=NULL, bought_for=NULL WHERE id=$1`, [propertyId]);
     await post(tx, c.txId, [{ account: systemAccount('faucet:real_estate'), delta: -payout }, { account: playerAccount(characterId), delta: payout }]);
-    const response = { propertyId, received: payout, replayed: false };
+    const response = { propertyId, received: payout, paid: Number(prop.bought_for ?? 0), profit: payout - Number(prop.bought_for ?? 0), replayed: false };
     await finish(tx, c.txId, response);
     return response;
   });

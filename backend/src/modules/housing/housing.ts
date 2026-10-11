@@ -5,6 +5,7 @@ import { assertCanAct } from '../identity/service.js';
 import { claim, post, finish, playerAccount, systemAccount } from '../economy/ledger.js';
 import { addItem, removeItem } from '../inventory/inventory.js';
 import { awardAchievement } from '../social/social.js';
+import { areaIndex, priceNow } from './values.js';
 
 const HOUR = 3600_000;
 const LIVE = ['active', 'grace'];
@@ -29,9 +30,10 @@ export async function rent(ctx: AppContext, characterId: string, propertyId: str
     const prop = (await tx.query('SELECT * FROM properties WHERE id=$1 FOR UPDATE', [propertyId])).rows[0];
     if (!prop) throw notFound('property_not_found');
 
+    const rentNow = priceNow(Number(prop.rent_per_period), await areaIndex(tx, prop.district));   // rent follows the area's value index
     const c = await claim<RentResult>(tx, {
       key: `${characterId}:rent:${idempotencyKey}`, type: 'rent_initial', actorCharacterId: characterId,
-      referenceType: 'property', referenceId: propertyId, amount: prop.rent_per_period, payload: { propertyId },
+      referenceType: 'property', referenceId: propertyId, amount: rentNow, payload: { propertyId },
     });
     if (c.replay) return { ...c.response, replayed: true };
 
@@ -41,18 +43,18 @@ export async function rent(ctx: AppContext, characterId: string, propertyId: str
     if (mine >= e.maxActiveTenanciesPerCharacter) throw conflict('tenancy_limit', 'You already rent a property');
 
     await post(tx, c.txId, [
-      { account: playerAccount(characterId), delta: -prop.rent_per_period },
-      { account: systemAccount('sink:landlord_npc'), delta: prop.rent_per_period },
+      { account: playerAccount(characterId), delta: -rentNow },
+      { account: systemAccount('sink:landlord_npc'), delta: rentNow },
     ]);
     const periodEnd = new Date(now.getTime() + e.rentPeriodHours * HOUR);
     const t = (await tx.query(
       `INSERT INTO tenancies (property_id,character_id,status,rent_amount,started_at,paid_until) VALUES ($1,$2,'active',$3,$4,$5) RETURNING id`,
-      [propertyId, characterId, prop.rent_per_period, now, periodEnd],
+      [propertyId, characterId, rentNow, now, periodEnd],
     )).rows[0];
-    await tx.query(`INSERT INTO rent_payments (tenancy_id,tx_id,amount,period_start,period_end,paid_at) VALUES ($1,$2,$3,$4,$5,$4)`, [t.id, c.txId, prop.rent_per_period, now, periodEnd]);
+    await tx.query(`INSERT INTO rent_payments (tenancy_id,tx_id,amount,period_start,period_end,paid_at) VALUES ($1,$2,$3,$4,$5,$4)`, [t.id, c.txId, rentNow, now, periodEnd]);
     await tx.query(`UPDATE properties SET status='occupied' WHERE id=$1`, [propertyId]);
     await awardAchievement(ctx, tx, characterId, 'first_home');
-    const response: RentResult = { txId: c.txId, tenancyId: t.id, propertyId, rentPaid: prop.rent_per_period, paidUntil: periodEnd.toISOString(), replayed: false };
+    const response: RentResult = { txId: c.txId, tenancyId: t.id, propertyId, rentPaid: rentNow, paidUntil: periodEnd.toISOString(), replayed: false };
     await finish(tx, c.txId, response);
     return response;
   });
@@ -61,12 +63,12 @@ export interface RentResult { txId: string; tenancyId: string; propertyId: strin
 
 export async function currentTenancy(tx: Pick<Tx, 'query'>, characterId: string) {
   const r = await tx.query(
-    `SELECT t.*, p.name AS property_name, p.furniture_slots, p.district AS property_district, p.type AS property_type, p.beds AS property_beds FROM tenancies t JOIN properties p ON p.id=t.property_id
+    `SELECT t.*, p.lot_id AS property_lot, p.name AS property_name, p.furniture_slots, p.district AS property_district, p.type AS property_type, p.beds AS property_beds FROM tenancies t JOIN properties p ON p.id=t.property_id
       WHERE t.character_id=$1 AND t.status = ANY($2) ORDER BY t.started_at DESC LIMIT 1`, [characterId, LIVE]);
   const t = r.rows[0];
   if (!t) return null;
   return {
-    tenancyId: t.id as string, propertyId: t.property_id as string, propertyName: t.property_name as string, district: t.property_district as string, status: t.status as string, kind: t.kind as string, propertyType: t.property_type as string, beds: t.property_beds as number,
+    tenancyId: t.id as string, propertyId: t.property_id as string, propertyName: t.property_name as string, district: t.property_district as string, status: t.status as string, lotId: t.property_lot as string | null, kind: t.kind as string, propertyType: t.property_type as string, beds: t.property_beds as number,
     rentAmount: t.rent_amount as number, paidUntil: (t.paid_until as Date).toISOString(),
     graceUntil: t.grace_until ? (t.grace_until as Date).toISOString() : null, furnitureSlots: t.furniture_slots as number,
   };

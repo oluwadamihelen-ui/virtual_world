@@ -8,6 +8,8 @@ import * as dating from './dating.js';
 import * as betting from './betting.js';
 import * as estate from '../housing/estate.js';
 import * as housing from '../housing/housing.js';
+import * as furnish from '../housing/furnish.js';
+import { updateAreaValues } from '../housing/values.js';
 
 export interface AppCaller { id: string; name: string; city: string }
 export interface Notify { to: string; msg: Record<string, unknown> }
@@ -45,6 +47,15 @@ const Body = {
     sell: z.object({ id: z.string().max(80), key: Key }),
     movein: z.object({ id: z.string().max(80) }),
     leave: z.object({}),
+  },
+  home: {
+    info: z.object({}),
+    place: z.object({ itemId: z.string().max(60), x: z.number(), z: z.number(), yaw: z.number() }),
+    pickup: z.object({ id: z.string().uuid() }),
+  },
+  store: {
+    list: z.object({}),
+    buy: z.object({ itemId: z.string().max(60), key: Key }),
   },
   odds: {
     state: z.object({}),
@@ -104,6 +115,7 @@ export async function handleApp(ctx: AppContext, who: AppCaller, app: string, ac
       const p = (await ctx.pool.query('SELECT district FROM properties WHERE id=$1', [b.id])).rows[0];
       if (!p) throw badRequest('property_not_found');
       if (p.district !== who.city) throw badRequest('wrong_city', 'That property is in another city.');
+      await updateAreaValues(ctx);
       const r = await housing.rent(ctx, who.id, b.id, b.key);
       return { data: r, goHome: !r.replayed };
     }
@@ -112,6 +124,11 @@ export async function handleApp(ctx: AppContext, who: AppCaller, app: string, ac
     case 'estate.sell': return { data: await estate.sell(ctx, who.id, who.city, b.id, b.key) };
     case 'estate.movein': { const r = await estate.moveIn(ctx, who.id, who.city, b.id); return { data: r, goHome: true }; }
     case 'estate.leave': return { data: await estate.leave(ctx, who.id) };
+    case 'home.info': return { data: await furnish.homeInfo(ctx, who.id) };
+    case 'home.place': return { data: await furnish.place(ctx, who.id, who.city, b.itemId, b.x, b.z, b.yaw) };
+    case 'home.pickup': return { data: await furnish.pickUp(ctx, who.id, b.id) };
+    case 'store.list': return { data: await furnish.storeList(ctx, who.city) };
+    case 'store.buy': return { data: await furnish.storeBuy(ctx, who.id, who.city, b.itemId, b.key) };
     case 'odds.state': return { data: await betting.overview(ctx, who.id) };
     case 'odds.bet': return { data: await betting.place(ctx, who.id, b.slot, b.pick, b.stake, b.key) };
     case 'odds.pause': return { data: await betting.takeBreak(ctx, who.id, b.hours) };

@@ -109,6 +109,31 @@
     "capacity": 3,
     "rentRatio": 0.05
   },
-  "sellBackPercent": 70,
-  "maxLandPlots": 3
+  "maxLandPlots": 3,
+  "sellFeePercent": 5,
+  "values": {
+    "startSettlers": 3,
+    "valuePerResident": 0.1,
+    "floor": 0.8,
+    "ceiling": 2.5,
+    "stepPerUpdate": 0.02,
+    "updateMinutes": 10,
+    "historyKeep": 400
+  },
+  "settlersPerDay": {
+    "default": 0.4,
+    "lekki": 0.9,
+    "victoriaisland": 0.5,
+    "ikoyi": 0.4,
+    "ikeja": 0.5,
+    "surulere": 0.35,
+    "maitama": 0.45,
+    "gwarinpa": 0.7,
+    "eastlegon": 0.8,
+    "westlands": 0.6,
+    "karen": 0.35,
+    "canarywharf": 0.5,
+    "camden": 0.4
+  },
+  "maxSettlers": 20
 }

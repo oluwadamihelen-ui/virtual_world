@@ -17,6 +17,7 @@ const Economy = z.object({
 }).passthrough();
 
 const Item = z.object({
+  furniture: z.object({ sx: z.number(), sz: z.number(), h: z.number(), parts: z.array(z.object({ w: z.number(), h: z.number(), d: z.number(), x: z.number(), y: z.number(), z: z.number(), c: z.string() })) }).optional(),
   id: z.string(), name: z.string(), category: z.string(),
   basePrice: z.number().int().positive().optional(), wholesalePrice: z.number().int().positive().optional(), npcDemand: z.number().positive().optional(),
 });
@@ -87,7 +88,9 @@ const Estate = z.object({
   apartments: z.array(Unit), houses: z.record(z.string(), Unit),
   land: z.record(z.string(), z.object({ sizeSqm: z.number().int(), price: z.number().int().positive() })),
   build: z.object({ cost: z.number().int().positive(), name: z.string(), beds: z.number().int(), sizeSqm: z.number().int(), furnitureSlots: z.number().int(), capacity: z.number().int(), rentRatio: z.number().positive() }),
-  sellBackPercent: z.number().min(0).max(100), maxLandPlots: z.number().int().positive(),
+  sellFeePercent: z.number().min(0).max(50), maxLandPlots: z.number().int().positive(),
+  values: z.object({ startSettlers: z.number(), valuePerResident: z.number().positive(), floor: z.number().positive(), ceiling: z.number().positive(), stepPerUpdate: z.number().positive(), updateMinutes: z.number().positive(), historyKeep: z.number().int().positive() }),
+  settlersPerDay: z.record(z.string(), z.number()), maxSettlers: z.number(),
 });
 const Job = z.object({
   id: z.string(), name: z.string(), employer: z.string(), district: z.string(),
@@ -133,9 +136,11 @@ function parseAll(read: (f: string) => unknown) {
   const price = (n: number, idx: number) => Math.max(50, Math.round((n * idx) / 50) * 50);
   const worlds = new Map<string, any>();
   const baseShop = shops.find((s) => s.id === 'shop_corner_grocery')!;
+  const homeShop = shops.find((s) => s.id === 'shop_home_store')!;
   const allShops = [...shops];
   const allProps = [...properties];
   for (const city of geo.cities) {
+    if (city.id !== 'lagos') allShops.push({ ...homeShop, id: `shop_${city.id}_home`, name: 'Home Store', district: city.id, stock: homeShop.stock.map((st) => ({ ...st, price: Math.max(1, Math.round(st.price * city.priceIndex)) })) });
     worlds.set(city.id, city.id === 'lagos' ? { ...world, cityId: 'lagos', landmark: city.landmark } : { ...generateWorld(world, city), landmark: city.landmark });
     if (city.id === 'lagos') continue;
     allShops.push({ ...baseShop, id: cityShopId(city.id), name: `${city.names?.grocery ?? 'Corner Grocery'}`, district: city.id,

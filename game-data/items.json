@@ -1,9 +1,795 @@
 [
-  { "id": "bottled_water", "name": "Bottled Water", "category": "grocery", "basePrice": 8,  "wholesalePrice": 4,  "npcDemand": 3 },
-  { "id": "sandwich",      "name": "Sandwich",      "category": "grocery", "basePrice": 25, "wholesalePrice": 12, "npcDemand": 2 },
-  { "id": "snack_bar",     "name": "Snack Bar",     "category": "grocery", "basePrice": 7,  "wholesalePrice": 3,  "npcDemand": 3 },
-  { "id": "coffee",        "name": "Coffee",        "category": "cafe",    "basePrice": 15, "wholesalePrice": 5,  "npcDemand": 4 },
-  { "id": "croissant",     "name": "Croissant",     "category": "cafe",    "basePrice": 12, "wholesalePrice": 5,  "npcDemand": 2 },
-  { "id": "desk_lamp",     "name": "Desk Lamp",     "category": "furniture" },
-  { "id": "starter_sofa",  "name": "Starter Sofa",  "category": "furniture" }
+  {
+    "id": "bottled_water",
+    "name": "Bottled Water",
+    "category": "grocery",
+    "basePrice": 8,
+    "wholesalePrice": 4,
+    "npcDemand": 3
+  },
+  {
+    "id": "sandwich",
+    "name": "Sandwich",
+    "category": "grocery",
+    "basePrice": 25,
+    "wholesalePrice": 12,
+    "npcDemand": 2
+  },
+  {
+    "id": "snack_bar",
+    "name": "Snack Bar",
+    "category": "grocery",
+    "basePrice": 7,
+    "wholesalePrice": 3,
+    "npcDemand": 3
+  },
+  {
+    "id": "coffee",
+    "name": "Coffee",
+    "category": "cafe",
+    "basePrice": 15,
+    "wholesalePrice": 5,
+    "npcDemand": 4
+  },
+  {
+    "id": "croissant",
+    "name": "Croissant",
+    "category": "cafe",
+    "basePrice": 12,
+    "wholesalePrice": 5,
+    "npcDemand": 2
+  },
+  {
+    "id": "single_bed",
+    "name": "Single Bed",
+    "category": "furniture",
+    "basePrice": 300,
+    "furniture": {
+      "sx": 1.0,
+      "sz": 2.0,
+      "h": 0.9,
+      "parts": [
+        {
+          "w": 1.0,
+          "h": 0.3,
+          "d": 2.0,
+          "x": 0,
+          "y": 0.15,
+          "z": 0,
+          "c": "#8a5a2b"
+        },
+        {
+          "w": 0.92,
+          "h": 0.2,
+          "d": 1.9,
+          "x": 0,
+          "y": 0.4,
+          "z": 0,
+          "c": "#f4f4fb"
+        },
+        {
+          "w": 0.7,
+          "h": 0.12,
+          "d": 0.35,
+          "x": 0,
+          "y": 0.56,
+          "z": -0.7,
+          "c": "#ffffff"
+        },
+        {
+          "w": 1.0,
+          "h": 0.8,
+          "d": 0.1,
+          "x": 0,
+          "y": 0.4,
+          "z": -0.95,
+          "c": "#5b3a1e"
+        }
+      ]
+    }
+  },
+  {
+    "id": "double_bed",
+    "name": "Double Bed",
+    "category": "furniture",
+    "basePrice": 520,
+    "furniture": {
+      "sx": 1.6,
+      "sz": 2.0,
+      "h": 0.9,
+      "parts": [
+        {
+          "w": 1.6,
+          "h": 0.3,
+          "d": 2.0,
+          "x": 0,
+          "y": 0.15,
+          "z": 0,
+          "c": "#8a5a2b"
+        },
+        {
+          "w": 1.5,
+          "h": 0.2,
+          "d": 1.9,
+          "x": 0,
+          "y": 0.4,
+          "z": 0,
+          "c": "#e6ecff"
+        },
+        {
+          "w": 0.65,
+          "h": 0.12,
+          "d": 0.35,
+          "x": -0.38,
+          "y": 0.56,
+          "z": -0.7,
+          "c": "#ffffff"
+        },
+        {
+          "w": 0.65,
+          "h": 0.12,
+          "d": 0.35,
+          "x": 0.38,
+          "y": 0.56,
+          "z": -0.7,
+          "c": "#ffffff"
+        },
+        {
+          "w": 1.6,
+          "h": 0.9,
+          "d": 0.1,
+          "x": 0,
+          "y": 0.45,
+          "z": -0.95,
+          "c": "#5b3a1e"
+        }
+      ]
+    }
+  },
+  {
+    "id": "starter_sofa",
+    "name": "Starter Sofa",
+    "category": "furniture",
+    "basePrice": 350,
+    "furniture": {
+      "sx": 2.1,
+      "sz": 0.9,
+      "h": 0.85,
+      "parts": [
+        {
+          "w": 2.1,
+          "h": 0.45,
+          "d": 0.9,
+          "x": 0,
+          "y": 0.225,
+          "z": 0,
+          "c": "#a33b3b"
+        },
+        {
+          "w": 2.1,
+          "h": 0.45,
+          "d": 0.2,
+          "x": 0,
+          "y": 0.65,
+          "z": -0.35,
+          "c": "#8c2f2f"
+        },
+        {
+          "w": 0.2,
+          "h": 0.3,
+          "d": 0.9,
+          "x": -0.95,
+          "y": 0.55,
+          "z": 0,
+          "c": "#8c2f2f"
+        },
+        {
+          "w": 0.2,
+          "h": 0.3,
+          "d": 0.9,
+          "x": 0.95,
+          "y": 0.55,
+          "z": 0,
+          "c": "#8c2f2f"
+        }
+      ]
+    }
+  },
+  {
+    "id": "armchair",
+    "name": "Armchair",
+    "category": "furniture",
+    "basePrice": 220,
+    "furniture": {
+      "sx": 0.9,
+      "sz": 0.9,
+      "h": 0.85,
+      "parts": [
+        {
+          "w": 0.9,
+          "h": 0.4,
+          "d": 0.9,
+          "x": 0,
+          "y": 0.2,
+          "z": 0,
+          "c": "#3f6fa3"
+        },
+        {
+          "w": 0.9,
+          "h": 0.45,
+          "d": 0.2,
+          "x": 0,
+          "y": 0.62,
+          "z": -0.35,
+          "c": "#345d8a"
+        },
+        {
+          "w": 0.15,
+          "h": 0.3,
+          "d": 0.9,
+          "x": -0.38,
+          "y": 0.5,
+          "z": 0,
+          "c": "#345d8a"
+        },
+        {
+          "w": 0.15,
+          "h": 0.3,
+          "d": 0.9,
+          "x": 0.38,
+          "y": 0.5,
+          "z": 0,
+          "c": "#345d8a"
+        }
+      ]
+    }
+  },
+  {
+    "id": "coffee_table",
+    "name": "Coffee Table",
+    "category": "furniture",
+    "basePrice": 120,
+    "furniture": {
+      "sx": 1.0,
+      "sz": 0.6,
+      "h": 0.45,
+      "parts": [
+        {
+          "w": 1.0,
+          "h": 0.06,
+          "d": 0.6,
+          "x": 0,
+          "y": 0.42,
+          "z": 0,
+          "c": "#8a5a2b"
+        },
+        {
+          "w": 0.06,
+          "h": 0.4,
+          "d": 0.06,
+          "x": -0.44,
+          "y": 0.2,
+          "z": -0.24,
+          "c": "#5b3a1e"
+        },
+        {
+          "w": 0.06,
+          "h": 0.4,
+          "d": 0.06,
+          "x": 0.44,
+          "y": 0.2,
+          "z": -0.24,
+          "c": "#5b3a1e"
+        },
+        {
+          "w": 0.06,
+          "h": 0.4,
+          "d": 0.06,
+          "x": -0.44,
+          "y": 0.2,
+          "z": 0.24,
+          "c": "#5b3a1e"
+        },
+        {
+          "w": 0.06,
+          "h": 0.4,
+          "d": 0.06,
+          "x": 0.44,
+          "y": 0.2,
+          "z": 0.24,
+          "c": "#5b3a1e"
+        }
+      ]
+    }
+  },
+  {
+    "id": "dining_table",
+    "name": "Dining Table",
+    "category": "furniture",
+    "basePrice": 260,
+    "furniture": {
+      "sx": 1.4,
+      "sz": 0.9,
+      "h": 0.75,
+      "parts": [
+        {
+          "w": 1.4,
+          "h": 0.08,
+          "d": 0.9,
+          "x": 0,
+          "y": 0.72,
+          "z": 0,
+          "c": "#8a5a2b"
+        },
+        {
+          "w": 0.08,
+          "h": 0.7,
+          "d": 0.08,
+          "x": -0.62,
+          "y": 0.35,
+          "z": -0.38,
+          "c": "#5b3a1e"
+        },
+        {
+          "w": 0.08,
+          "h": 0.7,
+          "d": 0.08,
+          "x": 0.62,
+          "y": 0.35,
+          "z": -0.38,
+          "c": "#5b3a1e"
+        },
+        {
+          "w": 0.08,
+          "h": 0.7,
+          "d": 0.08,
+          "x": -0.62,
+          "y": 0.35,
+          "z": 0.38,
+          "c": "#5b3a1e"
+        },
+        {
+          "w": 0.08,
+          "h": 0.7,
+          "d": 0.08,
+          "x": 0.62,
+          "y": 0.35,
+          "z": 0.38,
+          "c": "#5b3a1e"
+        }
+      ]
+    }
+  },
+  {
+    "id": "dining_chair",
+    "name": "Dining Chair",
+    "category": "furniture",
+    "basePrice": 70,
+    "furniture": {
+      "sx": 0.45,
+      "sz": 0.45,
+      "h": 0.9,
+      "parts": [
+        {
+          "w": 0.45,
+          "h": 0.06,
+          "d": 0.45,
+          "x": 0,
+          "y": 0.45,
+          "z": 0,
+          "c": "#8a5a2b"
+        },
+        {
+          "w": 0.45,
+          "h": 0.5,
+          "d": 0.06,
+          "x": 0,
+          "y": 0.7,
+          "z": -0.2,
+          "c": "#8a5a2b"
+        },
+        {
+          "w": 0.05,
+          "h": 0.45,
+          "d": 0.05,
+          "x": -0.19,
+          "y": 0.22,
+          "z": -0.19,
+          "c": "#5b3a1e"
+        },
+        {
+          "w": 0.05,
+          "h": 0.45,
+          "d": 0.05,
+          "x": 0.19,
+          "y": 0.22,
+          "z": -0.19,
+          "c": "#5b3a1e"
+        },
+        {
+          "w": 0.05,
+          "h": 0.45,
+          "d": 0.05,
+          "x": -0.19,
+          "y": 0.22,
+          "z": 0.19,
+          "c": "#5b3a1e"
+        },
+        {
+          "w": 0.05,
+          "h": 0.45,
+          "d": 0.05,
+          "x": 0.19,
+          "y": 0.22,
+          "z": 0.19,
+          "c": "#5b3a1e"
+        }
+      ]
+    }
+  },
+  {
+    "id": "wardrobe",
+    "name": "Wardrobe",
+    "category": "furniture",
+    "basePrice": 340,
+    "furniture": {
+      "sx": 1.1,
+      "sz": 0.55,
+      "h": 2.0,
+      "parts": [
+        {
+          "w": 1.1,
+          "h": 2.0,
+          "d": 0.55,
+          "x": 0,
+          "y": 1.0,
+          "z": 0,
+          "c": "#b98a5a"
+        },
+        {
+          "w": 0.02,
+          "h": 1.7,
+          "d": 0.02,
+          "x": 0,
+          "y": 1.0,
+          "z": 0.28,
+          "c": "#5b3a1e"
+        },
+        {
+          "w": 0.06,
+          "h": 0.2,
+          "d": 0.04,
+          "x": -0.1,
+          "y": 1.0,
+          "z": 0.29,
+          "c": "#e8c46a"
+        },
+        {
+          "w": 0.06,
+          "h": 0.2,
+          "d": 0.04,
+          "x": 0.1,
+          "y": 1.0,
+          "z": 0.29,
+          "c": "#e8c46a"
+        }
+      ]
+    }
+  },
+  {
+    "id": "bookshelf",
+    "name": "Bookshelf",
+    "category": "furniture",
+    "basePrice": 180,
+    "furniture": {
+      "sx": 0.9,
+      "sz": 0.35,
+      "h": 1.8,
+      "parts": [
+        {
+          "w": 0.9,
+          "h": 1.8,
+          "d": 0.35,
+          "x": 0,
+          "y": 0.9,
+          "z": 0,
+          "c": "#9c6a3a"
+        },
+        {
+          "w": 0.8,
+          "h": 0.28,
+          "d": 0.2,
+          "x": 0,
+          "y": 0.3,
+          "z": 0.08,
+          "c": "#e94f4f"
+        },
+        {
+          "w": 0.8,
+          "h": 0.28,
+          "d": 0.2,
+          "x": 0,
+          "y": 0.75,
+          "z": 0.08,
+          "c": "#4fa3e9"
+        },
+        {
+          "w": 0.8,
+          "h": 0.28,
+          "d": 0.2,
+          "x": 0,
+          "y": 1.2,
+          "z": 0.08,
+          "c": "#f2c94c"
+        },
+        {
+          "w": 0.8,
+          "h": 0.28,
+          "d": 0.2,
+          "x": 0,
+          "y": 1.62,
+          "z": 0.08,
+          "c": "#6fcf97"
+        }
+      ]
+    }
+  },
+  {
+    "id": "tv_stand",
+    "name": "TV & Stand",
+    "category": "furniture",
+    "basePrice": 480,
+    "furniture": {
+      "sx": 1.4,
+      "sz": 0.45,
+      "h": 1.0,
+      "parts": [
+        {
+          "w": 1.4,
+          "h": 0.45,
+          "d": 0.45,
+          "x": 0,
+          "y": 0.225,
+          "z": 0,
+          "c": "#2d2d33"
+        },
+        {
+          "w": 1.0,
+          "h": 0.6,
+          "d": 0.05,
+          "x": 0,
+          "y": 0.78,
+          "z": 0,
+          "c": "#101014"
+        },
+        {
+          "w": 0.3,
+          "h": 0.05,
+          "d": 0.2,
+          "x": 0,
+          "y": 0.47,
+          "z": 0,
+          "c": "#101014"
+        }
+      ]
+    }
+  },
+  {
+    "id": "fridge",
+    "name": "Fridge",
+    "category": "furniture",
+    "basePrice": 600,
+    "furniture": {
+      "sx": 0.7,
+      "sz": 0.7,
+      "h": 1.8,
+      "parts": [
+        {
+          "w": 0.7,
+          "h": 1.8,
+          "d": 0.7,
+          "x": 0,
+          "y": 0.9,
+          "z": 0,
+          "c": "#eef2f5"
+        },
+        {
+          "w": 0.04,
+          "h": 0.5,
+          "d": 0.04,
+          "x": 0.28,
+          "y": 1.2,
+          "z": 0.36,
+          "c": "#9aa4ad"
+        },
+        {
+          "w": 0.5,
+          "h": 0.02,
+          "d": 0.02,
+          "x": 0,
+          "y": 1.05,
+          "z": 0.36,
+          "c": "#c9d1d8"
+        }
+      ]
+    }
+  },
+  {
+    "id": "desk",
+    "name": "Desk & Laptop",
+    "category": "furniture",
+    "basePrice": 200,
+    "furniture": {
+      "sx": 1.2,
+      "sz": 0.6,
+      "h": 0.8,
+      "parts": [
+        {
+          "w": 1.2,
+          "h": 0.05,
+          "d": 0.6,
+          "x": 0,
+          "y": 0.74,
+          "z": 0,
+          "c": "#8a5a2b"
+        },
+        {
+          "w": 0.05,
+          "h": 0.72,
+          "d": 0.5,
+          "x": -0.55,
+          "y": 0.36,
+          "z": 0,
+          "c": "#5b3a1e"
+        },
+        {
+          "w": 0.05,
+          "h": 0.72,
+          "d": 0.5,
+          "x": 0.55,
+          "y": 0.36,
+          "z": 0,
+          "c": "#5b3a1e"
+        },
+        {
+          "w": 0.34,
+          "h": 0.02,
+          "d": 0.24,
+          "x": 0,
+          "y": 0.78,
+          "z": 0,
+          "c": "#c8ccd2"
+        },
+        {
+          "w": 0.34,
+          "h": 0.22,
+          "d": 0.02,
+          "x": 0,
+          "y": 0.89,
+          "z": -0.1,
+          "c": "#101014"
+        }
+      ]
+    }
+  },
+  {
+    "id": "desk_lamp",
+    "name": "Desk Lamp",
+    "category": "furniture",
+    "basePrice": 120,
+    "furniture": {
+      "sx": 0.35,
+      "sz": 0.35,
+      "h": 1.5,
+      "parts": [
+        {
+          "w": 0.2,
+          "h": 0.04,
+          "d": 0.2,
+          "x": 0,
+          "y": 0.02,
+          "z": 0,
+          "c": "#222"
+        },
+        {
+          "w": 0.04,
+          "h": 1.3,
+          "d": 0.04,
+          "x": 0,
+          "y": 0.67,
+          "z": 0,
+          "c": "#444"
+        },
+        {
+          "w": 0.32,
+          "h": 0.22,
+          "d": 0.32,
+          "x": 0,
+          "y": 1.4,
+          "z": 0,
+          "c": "#ffe9a8"
+        }
+      ]
+    }
+  },
+  {
+    "id": "rug",
+    "name": "Rug",
+    "category": "furniture",
+    "basePrice": 150,
+    "furniture": {
+      "sx": 2.0,
+      "sz": 1.4,
+      "h": 0.03,
+      "parts": [
+        {
+          "w": 2.0,
+          "h": 0.03,
+          "d": 1.4,
+          "x": 0,
+          "y": 0.015,
+          "z": 0,
+          "c": "#b9473d"
+        },
+        {
+          "w": 1.6,
+          "h": 0.032,
+          "d": 1.0,
+          "x": 0,
+          "y": 0.016,
+          "z": 0,
+          "c": "#e8c46a"
+        },
+        {
+          "w": 1.1,
+          "h": 0.034,
+          "d": 0.6,
+          "x": 0,
+          "y": 0.017,
+          "z": 0,
+          "c": "#3f6fa3"
+        }
+      ]
+    }
+  },
+  {
+    "id": "plant",
+    "name": "Potted Plant",
+    "category": "furniture",
+    "basePrice": 60,
+    "furniture": {
+      "sx": 0.5,
+      "sz": 0.5,
+      "h": 1.1,
+      "parts": [
+        {
+          "w": 0.34,
+          "h": 0.3,
+          "d": 0.34,
+          "x": 0,
+          "y": 0.15,
+          "z": 0,
+          "c": "#b05a3a"
+        },
+        {
+          "w": 0.1,
+          "h": 0.5,
+          "d": 0.1,
+          "x": 0,
+          "y": 0.55,
+          "z": 0,
+          "c": "#5b3a1e"
+        },
+        {
+          "w": 0.5,
+          "h": 0.5,
+          "d": 0.5,
+          "x": 0,
+          "y": 0.95,
+          "z": 0,
+          "c": "#3f9a4a"
+        }
+      ]
+    }
+  }
 ]

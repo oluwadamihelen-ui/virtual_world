@@ -34,7 +34,7 @@ export function generateWorld(base: any, city: GeoCity): any {
     if (b.sign) b.sign = `${b.name} - coming soon`;
   }
   for (const z of w.zones) {
-    if (z.kind === 'door') z.label = names.apt;
+    if (z.kind === 'door' && z.lot === 'apt') z.label = names.apt;
     if (z.kind === 'shop') { z.label = `${names.grocery} counter`; z.shopId = cityShopId(city.id); }
   }
   w.district = { id: city.id, name: city.name, place: names.apt.replace(/ (Apartments|Flats|Residences|Court)$/, '') };
@@ -55,4 +55,15 @@ export function generateWorld(base: any, city: GeoCity): any {
     w.npcRoutes = w.npcRoutes.map((r: { x: number; z: number }[]) => r.map((pt) => ({ x: fx(pt.x), z: fz(pt.z) })));
   }
   return w;
+}
+
+/** The building that appears on a plot of land once its owner builds a home. Same rules as the pre-built houses. */
+export function builtHouseSpec(lot: any) {
+  const h = lot.home ?? { sx: 6, sz: 5, doorWidth: 1.6, height: 3 };
+  const north = lot.cz < 0;   // doors face the road (the road runs along z = 0)
+  return {
+    building: { id: `home_${lot.id}`, name: 'Home', cx: lot.cx, cz: lot.cz, sx: h.sx, sz: h.sz, height: h.height, doorSide: north ? '+z' : '-z', doorWidth: h.doorWidth,
+      gate: lot.id, enterable: true, kind: 'house', wall: '#e8d9b5', roof: '#b4553a', floor: '#d8c8a6', builtOn: lot.id },
+    zone: { id: `${lot.id}_home_door`, kind: 'door', building: `home_${lot.id}`, lot: lot.id, x: lot.cx, z: lot.cz + (north ? 1 : -1) * (h.sz / 2 + 1.5), radius: 2.4, label: 'House' },
+  };
 }

@@ -7,6 +7,7 @@ import { syncGameData } from './seed.js';
 import { buildApp } from './app.js';
 import { Gateway } from './realtime/gateway.js';
 import { sweepTenancies } from './modules/housing/housing.js';
+import { updateAreaValues } from './modules/housing/values.js';
 import { simulateNpcCustomers } from './modules/commerce/business.js';
 
 loadEnvFile();
@@ -36,7 +37,9 @@ gateway.start();
 
 const timer = setInterval(() => {
   sweepTenancies(ctx).catch((err) => app.log.error({ err }, 'tenancy sweep failed'));
+  updateAreaValues(ctx).catch((err) => app.log.error({ err }, 'area value update failed'));
 }, 60_000);
+updateAreaValues(ctx).catch((err) => app.log.error({ err }, 'area value update failed'));
 
 const npcTimer = setInterval(() => {
   const tickId = new Date().toISOString().slice(0, 16); // one tick id per minute keeps sales idempotent across instances
