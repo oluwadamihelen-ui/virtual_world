@@ -9,6 +9,7 @@ import * as shop from './modules/commerce/shop.js';
 import * as housing from './modules/housing/housing.js';
 import * as jobs from './modules/employment/jobs.js';
 import * as mod from './modules/moderation/moderation.js';
+import * as topup from './modules/topup/topup.js';
 import * as ledger from './modules/economy/ledger.js';
 import { characterSummary } from './modules/summary.js';
 import * as biz from './modules/commerce/business.js';
@@ -161,6 +162,31 @@ export async function buildApp(ctx: AppContext, opts: { rateLimit?: boolean } = 
     requireRole(u, 'admin');
     const b = z.object({ characterId: uuid, delta: z.number().int(), reason: z.string(), idempotencyKey: z.string().min(8).max(100) }).parse(req.body);
     return mod.adjustBalance(ctx, u.accountId, b.characterId, b.delta, b.reason, b.idempotencyKey);
+  });
+  // ---------- Wallet top-ups ----------
+  // Provider webhooks need the exact raw body to check the signature, so this plugin keeps the JSON body as a string.
+  await app.register(async (hooks) => {
+    hooks.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => done(null, body));
+    hooks.post('/v1/webhooks/:provider', async (req, reply) => {
+      const r = await topup.handleWebhook(ctx, (req.params as any).provider, req.headers as Record<string, unknown>, String(req.body ?? ''));
+      return reply.code(r.status).send({ ok: r.status === 200 });
+    });
+  });
+  // Where the payment provider sends the player's browser afterwards: just bounce back to the game, which then checks the payment itself.
+  app.get('/topup/return', async (req, reply) => {
+    const ref = String((req.query as any)?.ref ?? '').replace(/[^A-Za-z0-9-]/g, '').slice(0, 40);
+    return reply.redirect(`/play/?topup=${ref}`);
+  });
+  app.get('/v1/admin/topups', async (req) => {
+    requireRole(await player(req), 'admin');
+    const status = z.enum(['pending', 'review', 'paid', 'failed', 'cancelled', 'rejected']).catch('review').parse((req.query as any)?.status);
+    return { orders: await topup.adminList(ctx, status) };
+  });
+  app.post('/v1/admin/topups/:id/decide', async (req) => {
+    const u = await player(req);
+    requireRole(u, 'admin');
+    const b = z.object({ approve: z.boolean(), note: z.string().max(200).default('') }).parse(req.body);
+    return topup.adminDecide(ctx, u.accountId, uuid.parse((req.params as any).id), b.approve, b.note);
   });
   app.get('/v1/admin/audit', async (req) => {
     requireRole(await player(req), 'admin');

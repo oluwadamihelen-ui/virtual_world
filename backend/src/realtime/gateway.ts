@@ -625,7 +625,7 @@ export class Gateway {
         if (r.goHome) await this.onHome(p).catch(() => {});   // move in immediately: walk straight into the new home
       } else if (m.app === 'store' || m.app === 'home') {
         await this.refresh(p);
-      } else if (m.app === 'bank' || m.app === 'odds') void this.refresh(p).catch(() => {});
+      } else if (m.app === 'bank' || m.app === 'odds' || m.app === 'topup') void this.refresh(p).catch(() => {});
     } catch (err) {
       this.send(p, { t: 'app', rid: m.rid, ok: false, code: err instanceof AppError ? err.code : 'error', message: this.friendly(err) });
     }

@@ -9,6 +9,8 @@ import * as betting from './betting.js';
 import * as estate from '../housing/estate.js';
 import * as housing from '../housing/housing.js';
 import * as furnish from '../housing/furnish.js';
+import * as topup from '../topup/topup.js';
+import * as social from '../social/social.js';
 import { updateAreaValues } from '../housing/values.js';
 
 export interface AppCaller { id: string; name: string; city: string }
@@ -57,6 +59,17 @@ const Body = {
   store: {
     list: z.object({}),
     buy: z.object({ itemId: z.string().max(60), key: Key }),
+  },
+  topup: {
+    info: z.object({}),
+    start: z.object({ provider: z.enum(['manual', 'paystack', 'flutterwave', 'korapay']), pack: z.string().max(40), currency: z.enum(['NGN', 'USD']) }),
+    check: z.object({ id: z.string().uuid() }),
+    submit: z.object({ id: z.string().uuid(), senderName: z.string().min(2).max(80), note: z.string().max(200).optional() }),
+    ref: z.object({ ref: z.string().max(40) }),
+  },
+  contacts: {
+    list: z.object({}),
+    unblock: z.object({ id: z.string().uuid() }),
   },
   odds: {
     state: z.object({}),
@@ -135,6 +148,17 @@ export async function handleApp(ctx: AppContext, who: AppCaller, app: string, ac
     case 'home.pickup': return { data: await furnish.pickUp(ctx, who.id, b.id) };
     case 'store.list': return { data: await furnish.storeList(ctx, who.city) };
     case 'store.buy': return { data: await furnish.storeBuy(ctx, who.id, who.city, b.itemId, b.key) };
+    case 'topup.info': return { data: { ...topup.catalogue(ctx), orders: await topup.listOrders(ctx, who.id) } };
+    case 'topup.start': return { data: await topup.start(ctx, who.id, b.provider, b.pack, b.currency) };
+    case 'topup.check': return { data: await topup.check(ctx, who.id, b.id) };
+    case 'topup.submit': return { data: await topup.submitManual(ctx, who.id, b.id, b.senderName, b.note) };
+    case 'topup.ref': {   // coming back from a provider's page: find the order by its reference and check it
+      const o = (await ctx.pool.query('SELECT id FROM topup_orders WHERE reference=$1 AND character_id=$2', [b.ref, who.id])).rows[0];
+      if (!o) throw badRequest('order_not_found');
+      return { data: await topup.check(ctx, who.id, o.id) };
+    }
+    case 'contacts.list': return { data: { blocked: await social.listBlocks(ctx, who.id), chats: await messages.inbox(ctx, who.id) } };
+    case 'contacts.unblock': await social.unblock(ctx, who.id, b.id); return { data: { ok: true } };
     case 'odds.state': return { data: await betting.overview(ctx, who.id) };
     case 'odds.bet': return { data: await betting.place(ctx, who.id, b.slot, b.pick, b.stake, b.key) };
     case 'odds.pause': return { data: await betting.takeBreak(ctx, who.id, b.hours) };

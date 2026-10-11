@@ -1,0 +1,17 @@
+{
+  "_note": "Prices are real money; 'mvc' is what the player receives. 1 MVC = 100 game naira, so 500 MVC = N50,000 game money. Rates match the reference screenshot. Prices are in major units (naira / dollars).",
+  "packs": [
+    { "id": "pack_s",  "name": "Starter pack",    "emoji": "🍲", "mvc": 500,   "ngn": 1000,  "usd": 1 },
+    { "id": "pack_m",  "name": "Standard pack",   "emoji": "🎉", "mvc": 3000,  "ngn": 5000,  "usd": 4 },
+    { "id": "pack_l",  "name": "Big pack",        "emoji": "💼", "mvc": 7000,  "ngn": 10000, "usd": 7, "best": true },
+    { "id": "pack_xl", "name": "Premium pack",    "emoji": "👑", "mvc": 16000, "ngn": 20000, "usd": 14 }
+  ],
+  "providers": [
+    { "id": "paystack",    "name": "Paystack",    "how": "card, bank transfer, USSD", "currencies": ["NGN", "USD"] },
+    { "id": "flutterwave", "name": "Flutterwave", "how": "card, bank transfer, USSD", "currencies": ["NGN", "USD"] },
+    { "id": "korapay",     "name": "Korapay",     "how": "card, bank transfer",        "currencies": ["NGN", "USD"] }
+  ],
+  "manual": { "name": "Bank transfer", "currencies": ["NGN", "USD"], "how": "Pay by bank transfer, then tell us. An admin confirms it." },
+  "limits": { "minAge": 18, "maxNgnPerDay": 100000, "maxOpenOrders": 5, "usdToNgnForLimits": 1450 },
+  "orderExpiresMinutes": 60
+}

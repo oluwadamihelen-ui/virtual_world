@@ -202,8 +202,88 @@ export function phoneApps(ctx) {
     });
     draw();
   }
+
+  // ------------------------------------------------------------------ Top up (real money -> MVC)
+  const money = (cur, minor) => (cur === 'USD' ? '$' : '₦') + (minor / 100).toLocaleString('en-US', { maximumFractionDigits: 2 });
+  const STATUS = { pending: ['Waiting for payment', 'dim'], review: ['Being checked', ''], paid: ['Paid', ''], failed: ['Failed', 'dim'], cancelled: ['Expired', 'dim'], rejected: ['Declined', 'dim'] };
+  let topupTimer = null;
+  async function topupApp(ph, st = { cur: 'NGN', pack: null }) {
+    clearInterval(topupTimer);
+    ph.app('Top up', '<p>Loading…</p>');
+    const d = await call('topup', 'info'); if (!d) return;
+    const packId = st.pack ?? d.packs.find((p) => p.best)?.id ?? d.packs[0].id;
+    const adultOk = adult();
+    const pk = d.packs.find((p) => p.id === packId);
+    const price = (p) => (st.cur === 'USD' ? `$${p.usd}` : `₦${p.ngn.toLocaleString('en-US')}`);
+    const orderRow = (o) => { const [label, cls] = STATUS[o.status] ?? [o.status, 'dim'];
+      return `<div class="li" data-o="${o.id}"><div><b>+${o.mvc.toLocaleString('en-US')} MVC</b><small>${esc(o.provider)} · ${money(o.currency, o.amountMinor)} · ${esc(o.reference)}</small></div><div style="text-align:right"><span class="pill ${cls}">${label}</span>${o.status === 'pending' && o.provider !== 'manual' ? `<br><button class="btn small" data-check="${o.id}">Check payment</button>` : ''}${o.status === 'pending' && o.provider !== 'manual' && o.checkoutUrl ? `<br><a href="${esc(o.checkoutUrl)}" target="_blank" rel="noopener" style="font-size:12px;color:#9fe">Open payment page</a>` : ''}${o.status === 'pending' && o.provider === 'manual' ? `<br><button class="btn small mint" data-paid="${o.id}">I have paid</button>` : ''}</div></div>`; };
+    const html = `<div class="card2"><small>Balance</small><div class="bignum">${fmt(G().summary.balance)}</div><small>≈ ${G().summary.balance.toLocaleString('en-US')} MVC</small></div>
+      ${adultOk ? '' : `<div class="card2"><b>🔒 Players aged ${d.minAge}+ only</b><div class="hint">Buying game money with real money is only for adult accounts.</div></div>`}
+      <div class="seg" id="tuCur"><button data-c="NGN" class="${st.cur === 'NGN' ? 'on' : ''}">₦ Naira</button><button data-c="USD" class="${st.cur === 'USD' ? 'on' : ''}">$ USD</button></div>
+      <div class="list" id="tuPacks">${d.packs.map((p) => `<button class="li" data-p="${p.id}" style="width:100%;text-align:left;${p.id === packId ? 'outline:2px solid #5be0a8' : ''}"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:26px">${p.emoji}</span><div><b>+₦${(p.mvc * 100).toLocaleString('en-US')} game money</b><small>${esc(p.name)} · ${p.mvc.toLocaleString('en-US')} MVC${p.best ? ' · best value' : ''}</small></div></div><span class="pill">${price(p)}</span></button>`).join('')}</div>
+      <div class="card2"><b>Pay ${price(pk)} with</b><div style="display:grid;gap:8px;margin-top:8px">
+        ${d.providers.map((p) => `<button class="btn ${p.available && p.currencies.includes(st.cur) && adultOk ? 'mint' : ''}" data-pay="${p.id}" ${p.available && p.currencies.includes(st.cur) && adultOk ? '' : 'disabled'}>${esc(p.name)} <small style="opacity:.8">· ${esc(p.how)}${p.available ? '' : ' · not set up yet'}${p.available && !p.currencies.includes(st.cur) ? ` · no ${st.cur}` : ''}</small></button>`).join('')}
+        <button class="btn" data-pay="manual" ${d.manual.available && adultOk ? '' : 'disabled'}>${esc(d.manual.name)} <small style="opacity:.8">· ${d.manual.available ? 'an admin confirms it' : 'not set up yet'}</small></button></div>
+        <div class="hint">You are sent to the provider's secure page to pay; the game never sees your card. Your MVC arrives as soon as the provider confirms (usually seconds). Game money cannot be cashed out or refunded to real money.</div></div>
+      <b>Your top-ups</b><div class="list" id="tuOrders">${d.orders.length ? d.orders.map(orderRow).join('') : '<p class="hint">Nothing yet.</p>'}</div>`;
+    ph.setBody(html, (el) => {
+      el.querySelectorAll('#tuCur button').forEach((b) => b.onclick = () => topupApp(ph, { cur: b.dataset.c, pack: packId }));
+      el.querySelectorAll('#tuPacks [data-p]').forEach((b) => b.onclick = () => topupApp(ph, { cur: st.cur, pack: b.dataset.p }));
+      const afterCredit = (r) => { if (r?.credited) { U.toast('ok', `+${r.order.mvc.toLocaleString('en-US')} MVC added to your wallet.`); return true; } return false; };
+      el.querySelectorAll('[data-check]').forEach((b) => b.onclick = async () => { const r = await call('topup', 'check', { id: b.dataset.check }); if (!r) return; if (r.unreachable) U.toast('info', 'The payment provider did not answer. Try again in a moment.'); else if (!afterCredit(r)) U.toast('info', 'Not paid yet.'); topupApp(ph, st); });
+      el.querySelectorAll('[data-paid]').forEach((b) => b.onclick = () => {
+        ph.setBody(`<div class="card2 field"><b>Tell us about your transfer</b><label>Name on the bank account you paid from</label><input id="tuName" maxlength="80"><label>Note (optional)</label><input id="tuNote" maxlength="200" placeholder="time, bank, anything that helps"><button class="btn mint" id="tuSend">Send for checking</button><button class="btn" id="tuBack">Back</button></div>`, (e2) => {
+          e2.querySelector('#tuBack').onclick = () => topupApp(ph, st);
+          e2.querySelector('#tuSend').onclick = async () => { const nm = e2.querySelector('#tuName').value.trim(); if (nm.length < 2) return U.toast('error', 'Type the name on the account.'); const r = await call('topup', 'submit', { id: b.dataset.paid, senderName: nm, note: e2.querySelector('#tuNote').value }); if (r) { U.toast('ok', 'Thanks. An admin will check your transfer and add your MVC.'); topupApp(ph, st); } };
+        });
+      });
+      el.querySelectorAll('[data-pay]').forEach((b) => b.onclick = async () => {
+        const provider = b.dataset.pay;
+        const r = await call('topup', 'start', { provider, pack: packId, currency: st.cur }); if (!r) return;
+        if (provider === 'manual') {
+          ph.setBody(`<div class="card2"><b>Pay ${money(r.order.currency, r.order.amountMinor)} by bank transfer</b><div style="white-space:pre-wrap;margin:8px 0">${esc(r.instructions)}</div><div class="card2"><small>Use this reference</small><div class="bignum" style="font-size:22px;letter-spacing:1px">${esc(r.order.reference)}</div></div><div class="hint">After you transfer, come back and tap <b>I have paid</b> next to this order.</div><button class="btn mint" id="tuOk">Done</button></div>`, (e2) => e2.querySelector('#tuOk').onclick = () => topupApp(ph, st));
+          return;
+        }
+        window.open(r.order.checkoutUrl, '_blank', 'noopener');
+        U.toast('info', 'Complete the payment in the new tab. We will add your MVC as soon as it is confirmed.');
+        let tries = 0;
+        topupTimer = setInterval(async () => {   // while this screen is open, ask about the payment every few seconds
+          if (!document.getElementById('tuOrders') || ++tries > 120) return clearInterval(topupTimer);
+          const c = await ctx.ask({ app: 'topup', a: 'check', d: { id: r.order.id } });
+          if (c.ok && c.data.order.status !== 'pending') { clearInterval(topupTimer); afterCredit(c.data) || U.toast('info', `Payment ${c.data.order.status}.`); topupApp(ph, st); }
+        }, 4000);
+        topupApp(ph, st);
+      });
+    });
+  }
+
+  // ------------------------------------------------------------------ Contacts, Help, Places, Soon
+  async function contactsApp(ph) {
+    ph.app('Contacts', '<p>Loading…</p>');
+    const d = await call('contacts', 'list'); if (!d) return;
+    ph.setBody(`<b>People you have chatted with</b><div class="list">${d.chats.length ? d.chats.map((c) => `<div class="li"><div style="display:flex;gap:10px;align-items:center">${ava(c.name, '34px')}<b>${esc(c.name)}</b></div><button class="btn small" data-msg="${c.id}" data-name="${esc(c.name)}">Message</button></div>`).join('') : '<p class="hint">No chats yet. Tap a player in the world and choose Message.</p>'}</div>
+      <b>Blocked players</b><div class="list">${d.blocked.length ? d.blocked.map((b) => `<div class="li"><b>${esc(b.displayName)}</b><button class="btn small" data-unb="${b.characterId}">Unblock</button></div>`).join('') : '<p class="hint">You have not blocked anyone. To block or report someone, tap them in the world.</p>'}</div>`, (el) => {
+      el.querySelectorAll('[data-msg]').forEach((b) => b.onclick = () => messagesApp(ph, { id: b.dataset.msg, name: b.dataset.name }));
+      el.querySelectorAll('[data-unb]').forEach((b) => b.onclick = async () => { if (await call('contacts', 'unblock', { id: b.dataset.unb })) { U.toast('ok', 'Unblocked.'); contactsApp(ph); } });
+    });
+  }
+  function helpApp(ph) {
+    ph.app('Help & guide', `<div class="card2"><b>Moving</b><div class="hint">WASD or arrow keys (hold Shift to run). On a phone use the on-screen stick. Tap a floating label in city view to travel there.</div></div>
+      <div class="card2"><b>Keys</b><div class="hint">E use or buy · Enter chat · T hold to talk (voice, 18+) · V city view · M map · P phone</div></div>
+      <div class="card2"><b>Money</b><div class="hint">Everything is paid in MVC; your wallet shows the local currency of the country you are in. Earn from Jobs, buy and sell homes in Homes, top up in <b>Top up</b>. Game money cannot be cashed out.</div></div>
+      <div class="card2"><b>Safety</b><div class="hint">Tap any player to message, block or report them. Reports send the recent messages between you and them to the moderators. Voice and betting are 18+ only. Never share your password; staff will never ask for it.</div></div>`);
+  }
+  function placesApp(ph) {
+    const S = ctx.S, here = G().city, me = G().me;
+    const list = (S.world.pois ?? []).filter((p) => p.district === here.id).map((p) => ({ p, d: Math.hypot(p.x - me.x, p.z - me.z) })).sort((a, b) => a.d - b.d);
+    ph.app('Places', `<div class="hint" style="margin-bottom:6px">Businesses and landmarks in ${esc(here.name)}. Tap one to get there on foot, by bike, bus or taxi.</div><div class="list">${list.map(({ p, d }) => `<button class="li" data-poi="${p.id}" style="width:100%;text-align:left"><div><b>${p.emoji ?? '📍'} ${esc(p.name)}</b><small>${esc(p.type)}${p.enterable ? ' · open to the public' : ''}</small></div><span class="pill">${d < 1000 ? Math.round(d) + ' m' : (d / 1000).toFixed(1) + ' km'}</span></button>`).join('') || '<p class="hint">Nothing listed here.</p>'}</div>`, (el) => {
+      el.querySelectorAll('[data-poi]').forEach((b) => b.onclick = () => ctx.openPlace(list.find((x) => x.p.id === b.dataset.poi).p));
+    });
+  }
+  const soon = (id, name, emoji, color, blurb) => ({ id, name, emoji, color, soon: true, open: (ph) => ph.app(name, `<div class="card2" style="text-align:center"><div style="font-size:44px">${emoji}</div><b>${esc(name)} is coming soon</b><p class="hint">${esc(blurb)}</p></div>`) });
   return [
     { id: 'bank', name: 'Vault', icon: 'bank', color: GRAD.bank, open: (ph) => bankApp(ph) },
+    { id: 'topup', name: 'Top up', emoji: '💳', color: 'linear-gradient(135deg,#0ea5e9,#22d3ee)', isNew: true, open: (ph) => topupApp(ph) },
     { id: 'chat', name: 'Chatter', icon: 'chat', color: GRAD.chat, badge: G().phone?.unread || 0, open: (ph, arg) => messagesApp(ph, arg) },
     { id: 'love', name: 'Spark', icon: 'heart', color: GRAD.love, adult: true, open: (ph) => loveApp(ph) },
     { id: 'odds', name: 'Odds', icon: 'dice', color: GRAD.odds, adult: true, open: (ph) => oddsApp(ph) },
@@ -220,6 +300,19 @@ export function phoneApps(ctx) {
     { id: 'store', name: 'Home Store', icon: 'sofa', color: 'linear-gradient(135deg,#7c3aed,#c084fc)', open: (ph) => storeApp(ph) },
     { id: 'estate', name: 'Homes', icon: 'home', color: 'linear-gradient(135deg,#c2410c,#fb923c)', open: () => ctx.openEstate() },
     { id: 'map', name: 'Maps', icon: 'map', color: GRAD.map, open: () => ctx.openMap() },
+    { id: 'contacts', name: 'Contacts', emoji: '📞', color: 'linear-gradient(135deg,#16a34a,#86efac)', isNew: true, open: (ph) => contactsApp(ph) },
+    { id: 'places', name: 'Places', emoji: '🛍️', color: 'linear-gradient(135deg,#e11d48,#fb7185)', isNew: true, open: (ph) => placesApp(ph) },
+    { id: 'ride', name: 'Ride', emoji: '🚕', color: 'linear-gradient(135deg,#f59e0b,#fde047)', isNew: true, open: () => ctx.rideHelp() },
+    { id: 'invest', name: 'Invest', emoji: '📈', color: 'linear-gradient(135deg,#65a30d,#bef264)', isNew: true, open: () => ctx.openEstate() },
+    { id: 'help', name: 'Help & guide', emoji: '💡', color: 'linear-gradient(135deg,#eab308,#fde68a)', isNew: true, open: (ph) => helpApp(ph) },
+    soon('cars', 'Cars', '🚗', 'linear-gradient(135deg,#3b82f6,#1e40af)', 'Buy, own and drive a car around the city instead of paying for taxis.'),
+    soon('health', 'Health', '💊', 'linear-gradient(135deg,#f43f5e,#fb7185)', 'Energy and wellbeing, clinics and hospitals that treat you.'),
+    soon('courses', 'Courses', '🎓', 'linear-gradient(135deg,#2563eb,#1e3a8a)', 'Study to unlock better jobs and higher pay.'),
+    soon('assurance', 'Assurance', '🛡️', 'linear-gradient(135deg,#0f766e,#14b8a6)', 'Insure your home and belongings.'),
+    soon('police', 'Police', '🚓', 'linear-gradient(135deg,#1d4ed8,#312e81)', 'Report crimes in the world and track the cases.'),
+    soon('court', 'Court', '⚖️', 'linear-gradient(135deg,#78350f,#b45309)', 'Settle disputes between players.'),
+    soon('gov', 'City Gov', '🏛️', 'linear-gradient(135deg,#15803d,#4ade80)', 'Permits, taxes and city announcements.'),
+    soon('company', 'Company', '🏢', 'linear-gradient(135deg,#0d9488,#99f6e4)', 'Start and manage your own business, with staff and customers.'),
     { id: 'settings', name: 'Settings', icon: 'gear', color: GRAD.settings, open: (ph) => {
       const c = cur(), city = G().city;
       ph.app('Settings', `<div class="card2"><div class="list"><div class="li"><span>City</span><b>${esc(city.name)}</b></div><div class="li"><span>Country</span><b>${esc(c.flag)} ${esc(c.countryName)}</b></div><div class="li"><span>Currency</span><b>${esc(c.symbol)} ${esc(c.code)}</b></div><div class="li"><span>Age group</span><b>${adult() ? '18+' : 'Under 18'}</b></div></div></div>`);

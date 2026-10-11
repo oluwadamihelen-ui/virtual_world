@@ -8,4 +8,6 @@ export interface AppContext {
   data: GameData;
   /** Injectable clock so rent/shift timing is testable and the server owns time. */
   now: () => Date;
+  /** Injectable HTTP client for payment providers (tests pass a fake; production uses global fetch). */
+  http?: typeof fetch;
 }

@@ -66,6 +66,13 @@ const Geo = z.object({
     car: z.object({ name: z.string(), icon: z.string(), base: z.number(), perMeter: z.number(), secPerMeter: z.number(), minSeconds: z.number(), maxSeconds: z.number(), minMeters: z.number() }),
   }),
 });
+const Topup = z.object({
+  packs: z.array(z.object({ id: z.string(), name: z.string(), emoji: z.string(), mvc: z.number().int().positive(), ngn: z.number().positive(), usd: z.number().positive(), best: z.boolean().optional() })).min(1),
+  providers: z.array(z.object({ id: z.enum(['paystack', 'flutterwave', 'korapay']), name: z.string(), how: z.string(), currencies: z.array(z.enum(['NGN', 'USD'])) })),
+  manual: z.object({ name: z.string(), currencies: z.array(z.enum(['NGN', 'USD'])), how: z.string() }),
+  limits: z.object({ minAge: z.number().int(), maxNgnPerDay: z.number().positive(), maxOpenOrders: z.number().int().positive(), usdToNgnForLimits: z.number().positive() }),
+  orderExpiresMinutes: z.number().int().positive(),
+}).passthrough();
 const Phone = z.object({
   minAgeToMessage: z.number().int(),
   transfer: z.object({ min: z.number().int().positive(), maxPerTransfer: z.number().int().positive(), maxPerDay: z.number().int().positive(), minorMaxPerDay: z.number().int().positive() }),
@@ -126,6 +133,7 @@ function parseAll(read: (f: string) => unknown) {
   const world = World.parse(read('world.json'));
   const geo = Geo.parse(read('geo.json'));
   const phone = Phone.parse(read('phone.json'));
+  const topup = Topup.parse(read('topup.json'));
   const metroFile = read('metros.json') as MetroFile;
   const estate = Estate.parse(read('estate.json'));
   // Cross-reference validation: catch typos in data at boot rather than at purchase time.
@@ -186,7 +194,7 @@ function parseAll(read: (f: string) => unknown) {
   }
   const cityById = new Map(geo.cities.map((c) => [c.id, c]));
   const countryById = new Map(geo.countries.map((c) => [c.id, c]));
-  return { economy, items, shops: allShops, properties: allProps, jobs, appearance, businesses, chat, achievements, world, geo, phone, estate, worlds, metroWorlds, cityById, countryById, itemIds };
+  return { economy, items, shops: allShops, properties: allProps, jobs, appearance, businesses, chat, achievements, world, geo, phone, topup, estate, worlds, metroWorlds, cityById, countryById, itemIds };
 }
 
 export function loadGameData(dir: string): GameData {

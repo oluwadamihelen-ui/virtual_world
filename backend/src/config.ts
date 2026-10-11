@@ -9,6 +9,13 @@ const Env = z.object({
   SERVER_API_KEY: z.string().min(24, 'SERVER_API_KEY must be at least 24 characters'),
   // Optional separate key for encrypting direct messages at rest (falls back to a key derived from JWT_SECRET).
   MESSAGE_KEY: z.string().min(32).optional(),
+  // Wallet top-ups. All optional: a provider is offered to players only when its keys are set. Never commit real keys.
+  PUBLIC_BASE_URL: z.string().url().optional(),                 // where players' browsers can reach this server, e.g. https://play.example.com (used for payment return pages)
+  PAYSTACK_SECRET_KEY: z.string().min(8).optional(),
+  FLUTTERWAVE_SECRET_KEY: z.string().min(8).optional(),
+  FLUTTERWAVE_SECRET_HASH: z.string().min(8).optional(),        // the 'secret hash' you set for webhooks in the Flutterwave dashboard
+  KORAPAY_SECRET_KEY: z.string().min(8).optional(),
+  MANUAL_TOPUP_INSTRUCTIONS: z.string().max(600).optional(),    // e.g. "Zenith Bank, 0123456789, My Virtual World Ltd" shown to players who pay by transfer
   GAME_DATA_DIR: z.string().default('../game-data'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'silent']).default('info'),
   // Load-testing aid only. Ignored (forced off) when NODE_ENV=production.

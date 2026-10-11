@@ -160,6 +160,15 @@ function enterWorld(w) {
   G.pingTimer = setInterval(() => G && S.conn.send({ t: 'ping', c: Math.round(performance.now()) }), 3000);
   if (w.arrived) U.toast('ok', `Welcome to ${w.city.name}!`);
   else U.toast('info', `Welcome, ${w.you.name}!`);
+  // coming back from a payment provider's page (…/play/?topup=<reference>): check that payment and show the Top up app
+  const topupRef = new URLSearchParams(location.search).get('topup');
+  if (topupRef) {
+    history.replaceState(null, '', location.pathname);
+    sendWait({ app: 'topup', a: 'ref', d: { ref: topupRef } }).then((r) => {
+      if (r.ok) U.toast(r.data.credited ? 'ok' : 'info', r.data.credited ? `+${r.data.order.mvc.toLocaleString('en-US')} MVC added to your wallet.` : `Payment status: ${r.data.order.status}.`);
+      openPhone('topup');
+    });
+  }
 }
 /** The player walked (or was carried) into another area of the same city: prices, place name and listings follow. */
 function onArea(m) {
@@ -424,7 +433,7 @@ const sendWait = (msg) => new Promise((resolve) => {
 
 function openPhone(openApp, arg) {
   const c = gameClock(now());
-  const ctx = { G: () => G, S, U, send: (m) => S.conn.send(m), ask: sendWait, fmt: U.fmt, openMap: () => openMap(), openEstate: () => openEstateOverview(), furnish: () => { U.closePanel(); toggleFurnish(); }, openChat: null, onSummary: (fn) => { if (G) G.onSummary = fn; } };
+  const ctx = { G: () => G, S, U, send: (m) => S.conn.send(m), ask: sendWait, fmt: U.fmt, openMap: () => openMap(), openEstate: () => openEstateOverview(), openPlace: (poi) => { U.closePanel(); openPlaceSheet({ kind: 'poi', ...poi }); }, rideHelp: () => { U.closePanel(); if (!G.cityView) toggleCityView(); U.toast('info', 'Tap any floating place label, then choose bike, bus or taxi.'); }, furnish: () => { U.closePanel(); toggleFurnish(); }, openChat: null, onSummary: (fn) => { if (G) G.onSummary = fn; } };
   const phone = U.openPhone({ apps: phoneApps(ctx), hour: c.hour, cityName: `${G.city.name}, ${G.currency.countryName}`, onClose: () => { U.closePanel(); if (G) { G.onSummary = null; G.onNotify = null; G.phoneWait = null; } } });
   if (openApp) phoneApps(ctx).find((a) => a.id === openApp)?.open(phone, arg);
 }

@@ -189,3 +189,4 @@ body.panelopen .stack,body.panelopen .chatlog,body.panelopen .journal{visibility
 
 .rail button.on{color:var(--mint);outline:1px solid var(--mint)}.rail button.live{background:var(--mint);color:#06231f}
 .tag.speaking .name{box-shadow:0 0 0 2px var(--mint),0 0 14px 2px rgba(111,224,160,.7)}
+.btn:disabled{opacity:.45;filter:grayscale(.7);cursor:not-allowed}

@@ -261,7 +261,7 @@ export function openPhone({ apps, hour, cityName, onClose }) {
   $('#ov').addEventListener('pointerdown', (e) => { if (e.target.id === 'ov') close(); });
   const api = {
     home() {
-      body.innerHTML = `<div class="home"><div class="big">${time}</div><div class="date">${esc(cityName)} · tap an app</div><div class="apps">${apps.map((a) => `<button class="app" data-id="${a.id}"><div class="ic" style="background:${a.color}">${icon(a.icon)}</div>${esc(a.name)}${a.isNew ? '<span class="new">NEW</span>' : ''}${a.badge ? `<span class="new bd">${a.badge}</span>` : ''}${a.adult ? '<span class="age">18+</span>' : ''}</button>`).join('')}</div></div>`;
+      body.innerHTML = `<div class="home"><div class="big">${time}</div><div class="date">${esc(cityName)} · tap an app</div><div class="apps">${apps.map((a) => `<button class="app" data-id="${a.id}"><div class="ic" style="background:${a.color}${a.soon ? ';filter:saturate(.35) brightness(.85)' : ''}">${a.emoji ? `<span style="font-size:28px;line-height:1">${a.emoji}</span>` : icon(a.icon)}</div>${esc(a.name)}${a.soon ? '<span class="new" style="background:#64748b">SOON</span>' : a.isNew ? '<span class="new">NEW</span>' : ''}${a.badge ? `<span class="new bd">${a.badge}</span>` : ''}${a.adult ? '<span class="age">18+</span>' : ''}</button>`).join('')}</div></div>`;
       body.querySelectorAll('.app').forEach((b) => b.onclick = () => apps.find((a) => a.id === b.dataset.id).open(api));
     },
     app(title, html, wire) {
