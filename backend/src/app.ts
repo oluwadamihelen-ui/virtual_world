@@ -25,7 +25,7 @@ const uuid = z.string().uuid();
 const Idem = z.object({ idempotencyKey: z.string().min(8).max(100) });
 
 export async function buildApp(ctx: AppContext, opts: { rateLimit?: boolean } = {}): Promise<FastifyInstance> {
-  const app = Fastify({ trustProxy: ctx.config.TRUST_PROXY === '1' ? 1 : false, logger: ctx.config.NODE_ENV === 'test' ? false : { level: ctx.config.LOG_LEVEL, redact: ['req.headers.authorization', 'req.headers["x-server-key"]'] }, bodyLimit: 64 * 1024 });
+  const app = Fastify({ trustProxy: ctx.config.TRUST_PROXY === '1' ? (_addr: string, hop: number) => hop < 1 : false, logger: ctx.config.NODE_ENV === 'test' ? false : { level: ctx.config.LOG_LEVEL, redact: ['req.headers.authorization', 'req.headers["x-server-key"]'] }, bodyLimit: 64 * 1024 });
 
   if (opts.rateLimit !== false) {
     // The dedicated game server calls from ONE address at high volume, so requests carrying the correct server key are exempt.
