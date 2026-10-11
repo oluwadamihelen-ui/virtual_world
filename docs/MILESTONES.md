@@ -141,7 +141,8 @@ Legend: ✅ done and verified by automated tests · 🟡 done but unverified/par
 | Cafes, restaurants, pubs, markets and malls sell food at area prices | ✅ | tests |
 | Map lists places and businesses per area; route planning for walking | ✅ | browser |
 | Real-GPU frame rate of the larger world | ⬜ **untested** (about 1 fps on software rendering; 343 to 473 draw calls) | `mvwStats()` |
-| Hospitals, schools, banks, gyms, salons etc. do something | ⬜ scenery only | |
+| Public buildings are walk-in with staff and customers inside | ✅ server tests (hollow buildings, NPCs inside, shop/service zones); browser check noted in WEB_CLIENT | `test/travel.test.ts` |
+| Hospitals, gyms, salons etc. offer real services | ⬜ walk-in but "coming soon" | |
 | Player-run businesses visible and manageable in the world (backend exists, no client) | ⬜ | |
 | 60-player WebSocket test after the change | ✅ 9.9 snapshots/s, 0 errors | `docs/LOAD_TESTING.md` |
 

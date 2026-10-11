@@ -34,7 +34,7 @@ Top bar (clock, online count, ping, MVC balance + wallet), goal cards from real 
 Each state (Lagos, Abuja, Accra, Nairobi, London, and single-district Port Harcourt, Kano, Kumasi) is **one continuous world**. Lagos has six districts (Ikeja, Yaba/Maple Court, Surulere, Ikoyi, Victoria Island, Lekki) laid out on a grid with avenues between them, a lagoon crossed by two bridges, streetlights, townspeople and about 40 landmark and business buildings (hospital, mosque, church, market, university, stadium, hotels, restaurants, salons, gym, cinema, mall, bank, boat cruise, beach, golf club...). Walk anywhere. The area, place name, prices and listings follow your feet. Press **V** (or the pin button on the right) for **city view**: the camera pulls far back and every building shows a floating name label; the mouse wheel zooms between 7 and 170 m. Zoom in and the labels hide again.
 - **Tap a floating label** (in city view, press V) to open its place sheet: distance, what it is, and four ways to get there. **Walk** is free and follows the streets and bridges. **Bike** costs a small rental fee (₦300) and makes you 2.2 times faster for 4 minutes (the server applies the speed, so it cannot be faked). **City bus** (from ₦200) and **Taxi** (from ₦800) charge by distance, run a short journey screen and drop you at the door. All numbers are in `game-data/geo.json` (`localTransport`). Messages: `transit{mode,x,z,name}` and `ride{on}`.
 - Open the Map and pick any area or building: **Walk there yourself** plans a route along the streets and over a bridge. Bus and taxi are quick journeys that cost money. Each area (and each state) lists its **places and businesses**.
-- Cafes, restaurants, markets and malls are open: stand at the door and buy food and drink at that area's prices. The other buildings (hospital, university...) are scenery with labels for now.
+- **Public buildings are walk-in.** Banks, cafes, restaurants, hospital, gym, salon, cinema, hotels and similar have an open doorway, an interior (counter, seating, furniture) with staff standing at their posts and customers moving about. Walk, bike, bus or taxi to a place and you are routed through the door to the counter. Food places sell at the counter; the bank counter offers "Open my Vault". Other services show a card saying the service is coming soon. Markets and parks are open-air with people strolling. Layouts come from `src/world/interiors.ts`; the people are server-side NPCs (`npcSpecs`), so every player sees the same ones.
 - Other states are other worlds: use the Map to fly or take a bus.
 
 ## Cities, travel and currency
@@ -48,7 +48,7 @@ Vault (activity, send money, loans, rates), Chatter (direct messages), Spark (da
 
 ## Known limitations
 - All tenants share the one apartment interior (per-tenant instanced rooms come later).
-- The cafe, job centre and bank are scenery. No sound or music. Art is simple stylized primitives, not final.
+- Most public-building services other than food and the bank are "coming soon", and every interior is a template per building type. No sound or music. Art is simple stylized primitives, not final.
 - The 3D client was exercised on software rendering (SwiftShader); real-GPU frame rates, low-end phones and Safari are **untested**.
 - Chat history is not stored; only the last few lines are shown. The chat rate limit and word list are the starter versions described in `docs/ARCHITECTURE.md`.
 - Game-server scale is untested: one process, one world instance. The earlier backend load test does not cover WebSocket traffic.

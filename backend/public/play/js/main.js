@@ -198,7 +198,7 @@ function onSnap(m) {
   for (const s of m.spawns) {
     if (G.ents.has(s.id)) continue;
     const av = createAvatar(s.appearance); scene.add(av.group);
-    const ent = { id: s.id, name: s.name, npc: s.npc, av, tag: makeTag(s.name ?? 'Resident', { npc: s.npc }), x: 0, z: 0, ry: 0, tx: 0, tz: 0, tr: 0, moving: false, first: true, bubble: null };
+    const ent = { id: s.id, name: s.name, npc: s.npc, av, tag: makeTag(s.name ?? s.role ?? 'Resident', { npc: s.npc }), x: 0, z: 0, ry: 0, tx: 0, tz: 0, tr: 0, moving: false, first: true, bubble: null };
     if (!s.npc) ent.tag.onclick = (ev) => playerMenu(ent, ev);
     G.ents.set(s.id, ent);
   }
@@ -317,14 +317,16 @@ function doorPoints(b) {
 }
 const rowRoad = (zz) => (S.world.rowZ ?? [0]).reduce((best, r) => (Math.abs(r - zz) < Math.abs(best - zz) ? r : best), (S.world.rowZ ?? [0])[0]);
 /** Walk anywhere in the city: out of the current building, along the street, over a bridge if the target is on the other side, to the target. */
-function routeTo(tx, tz) {
+function routeTo(tx, tz, into = null) {
   const here = S.world.buildings.find((b) => b.enterable && inBuilding(b, G.me.x, G.me.z));
   const path = [];
   if (here) { const dp = doorPoints(here); path.push(dp.inn, dp.out); }
   const r0 = rowRoad(G.me.z), r1 = rowRoad(tz), startX = here ? doorPoints(here).out.x : G.me.x;
   path.push({ x: startX, z: r0 });
   if (r0 !== r1) { const ax = (S.world.avenueX ?? [0]).reduce((best, x) => (Math.abs(x - startX) < Math.abs(best - startX) ? x : best), (S.world.avenueX ?? [0])[0]); path.push({ x: ax, z: r0 }, { x: ax, z: r1 }); }
-  path.push({ x: tx, z: r1 }, { x: tx, z: tz });
+  if (into) { const d = doorPoints(into); path.push({ x: d.out.x, z: r1 }, d.out, d.inn); }
+  else path.push({ x: tx, z: r1 });
+  path.push({ x: tx, z: tz });
   G.auto = path; U.closePanel();
 }
 function walkToArea(areaId) { const d = S.world.districts.find((x) => x.id === areaId); if (!d) return; routeTo(d.spawn.x, d.spawn.z); U.toast('info', `Walking to ${d.name}…`); }
@@ -354,6 +356,7 @@ function primaryAction() {
   const z = zoneNear(); if (!z) return;
   if (z.kind === 'door' || z.kind === 'work') return act(z.id);
   if (z.kind === 'shop') return act(z.id, z.items[0].itemId);
+  if (z.kind === 'service' && z.bank) return openPhone('bank');
 }
 function renderCtx() {
   if (G.traveling) return U.showCtx(null);
@@ -373,6 +376,8 @@ function renderCtx() {
       : d.state === 'free' ? `<h3>${U.esc(d.name)}</h3><p>${U.fmt(d.rent)} per week · you have ${U.fmt(s.balance)}</p><div class="row">${btn('door', 'Rent &amp; move in [E]', 'go', s.balance < d.rent)}${s.balance < d.rent ? '<small style="color:#a33">Not enough money yet</small>' : ''}</div>`
         : d.state === 'away' ? `<h3>${U.esc(z.label)}</h3><p>You already rent ${U.esc(d.name)} in ${U.esc(d.city)}. One home at a time.</p>`
           : `<h3>${U.esc(z.label)}</h3><p>Every room is taken right now. Check back soon!</p>`;
+  } else if (z.kind === 'service') {
+    body = `<h3>${U.esc(z.label)} · ${U.esc(z.title ?? '')}</h3><p>${U.esc(z.text)}</p>${z.bank ? `<div class="row">${btn('vault', 'Open my Vault [E]', 'go')}</div>` : ''}`;
   } else if (z.kind === 'shop') {
     if (!G.shop[z.id]) { S.conn.send({ t: 'shopinfo', zone: z.id }); G.shop[z.id] = { items: z.items.map((i) => ({ ...i, price: null })), at: performance.now() }; }
     const items = G.shop[z.id].items;
@@ -384,7 +389,7 @@ function renderCtx() {
       : `<h3>${U.esc(job?.name ?? 'Work station')}</h3><p>${job ? `${job.tasksPerShift} tasks · pays ${U.fmt(job.wagePerShift)}` : 'Earn money with a shift.'}</p><div class="row">${btn('work', 'Start a shift [E]', 'go')}</div>`;
   }
   U.showCtx(body, (el) => el.querySelectorAll('button[data-a]').forEach((b) => b.onclick = () => {
-    const a = b.dataset.a; if (a === 'details') openEstateSheet(`${z.area}:${z.lot}`); else if (a === 'door' || a === 'work') act(z.id); else if (a.startsWith('buy:')) act(z.id, a.slice(4));
+    const a = b.dataset.a; if (a === 'vault') openPhone('bank'); else if (a === 'details') openEstateSheet(`${z.area}:${z.lot}`); else if (a === 'door' || a === 'work') act(z.id); else if (a.startsWith('buy:')) act(z.id, a.slice(4));
   }));
 }
 
@@ -732,23 +737,28 @@ function openPlaceSheet(place) {
   let tx, tz;
   if (place.kind === 'poi') { tx = place.x; tz = place.z + (place.face === '+z' ? 1 : -1) * (place.sz / 2 + 1.6); }
   else { const rz = rowRoad(place.cz); tx = place.cx; tz = place.cz + (rz > place.cz ? 1 : -1) * (place.sz / 2 + 1.6); }
+  // Walking and cycling go right inside to the counter of a public building; a bus or taxi drops you at its door.
+  const bld = place.kind === 'poi' ? S.world.buildings.find((b) => b.id === place.id && b.enterable) : S.world.buildings.find((b) => b.id === place.id && b.enterable);
+  const inner = bld ? S.world.zones.find((z) => z.building === bld.id && (z.kind === 'shop' || z.kind === 'service')) : null;
   const meters = Math.hypot(G.me.x - tx, G.me.z - tz);
   const areaName = S.geo.cities.find((c) => c.id === place.area)?.name ?? '';
   const zone = S.world.zones.find((z) => (z.poi && z.poi === place.id) || (place.kind === 'building' && z.building === place.id && z.kind !== 'door'));
   const sells = zone?.kind === 'shop' && zone.items ? `<p><b>Sells:</b> ${zone.items.map((i) => U.esc(i.label)).join(', ')}. Walk up to the door to buy.</p>` : '';
   const type = place.kind === 'poi' ? place.type : place.id.split(':')[1];
   const blurb = place.kind === 'building' && place.sign ? 'Coming soon.' : sells ? '' : TYPE_BLURB[type] ?? '';
+  const inside = bld ? '<p>Open to the public: walk in. Staff and customers are going about their day.</p>' : '';
   const home = place.kind === 'building' && place.id.endsWith(':apt');
   const opts = localQuoteClient(meters);
   const row = (o) => `<button class="opt" data-go="${o.mode}" ${o.ok && G.summary.balance >= o.fare ? '' : 'disabled'}><span class="em">${o.icon}</span><span><b>${U.esc(o.name)}</b><small>${o.ok ? fmtSecs(o.seconds) : o.why}${o.mode === 'bike' ? ' · faster than walking, for a few minutes' : ''}</small></span><span class="pr">${o.fare ? U.fmt(o.fare) : 'Free'}${o.ok && G.summary.balance < o.fare ? '<small style="display:block;color:var(--mut)">Not enough money</small>' : ''}</span></button>`;
-  U.openPanel(`${place.emoji} ${U.esc(place.name)}`, `<div class="hd"><p style="margin:0">${U.esc(areaName)} · ${Math.round(meters)} m from you${place.business ? ' · business' : ''}</p>${blurb ? `<p>${U.esc(blurb)}</p>` : ''}${sells}</div>
+  U.openPanel(`${place.emoji} ${U.esc(place.name)}`, `<div class="hd"><p style="margin:0">${U.esc(areaName)} · ${Math.round(meters)} m from you${place.business ? ' · business' : ''}</p>${blurb ? `<p>${U.esc(blurb)}</p>` : ''}${sells}${inside}</div>
     <h4 style="margin:12px 0 6px">How do you want to get there?</h4><div class="list">${opts.map(row).join('')}</div>
     ${home ? '<p style="margin-top:10px"><button class="btn small gold" id="plHomes">🏠 Rooms and apartments here</button></p>' : ''}
     <p class="hint" style="margin-top:8px">Bus and taxi take you to the door. Walking and cycling follow the streets; press any movement key to take over.</p>`, (el) => {
     el.querySelectorAll('[data-go]').forEach((b) => b.onclick = () => {
       const m = b.dataset.go;
-      if (m === 'walk') { routeTo(tx, tz); U.toast('info', `Walking to ${place.name}…`); }
-      else if (m === 'bike') { S.conn.send({ t: 'ride', on: true }); routeTo(tx, tz); }
+      const go = () => (inner ? routeTo(inner.x, inner.z, bld) : routeTo(tx, tz));
+      if (m === 'walk') { go(); U.toast('info', `Walking to ${place.name}…`); }
+      else if (m === 'bike') { S.conn.send({ t: 'ride', on: true }); go(); }
       else { S.conn.send({ t: 'transit', mode: m, x: tx, z: tz, name: place.name }); U.closePanel(); }
     });
     el.querySelector('#plHomes')?.addEventListener('click', () => openEstateSheet(`${place.area}:apt`));

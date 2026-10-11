@@ -271,7 +271,7 @@ describe('a metro is one continuous world', () => {
     // every district spawn is on solid ground and every area is reachable along its street
     for (const d of world.districts) expect(isBlocked(d.spawn.x, d.spawn.z, col, () => true, world.bounds), `${d.id} spawn`).toBe(false);
     // points of interest are solid buildings except open ground (parks, beaches)
-    const b = world.pois.find((q: any) => !q.walk)!; expect(isBlocked(b.x, b.z, col, () => true, world.bounds)).toBe(true);
+    const b = world.pois.find((q: any) => q.enterable)!; expect(isBlocked(b.x + b.sx / 2 - 0.1, b.z, col, () => true, world.bounds)).toBe(true);   // walls are solid (the inside is walkable)
     // no two areas overlap, no landmark sits inside a district
     for (const p of world.pois) for (const d of world.districts) expect(p.x + p.sx / 2 < d.bounds.minX || p.x - p.sx / 2 > d.bounds.maxX || p.z + p.sz / 2 < d.bounds.minZ || p.z - p.sz / 2 > d.bounds.maxZ, `${p.name} in ${d.id}`).toBe(true);
   });
@@ -332,7 +332,7 @@ describe('a metro is one continuous world', () => {
     c.send({ t: 'transit', mode: 'bus', x: me(p).x + 5, z: me(p).z }); await c.until(() => c.of('toast').some((m) => m.kind === 'error'));   // too close: walk
     expect((await summary(p)).balance).toBe(before);
     c.send({ t: 'transit', mode: 'bus', x: 99999, z: 0 }); await new Promise((r) => setTimeout(r, 200));
-    c.send({ t: 'transit', mode: 'bus', x: ik.x, z: ik.z });                                   // inside a solid building
+    c.send({ t: 'transit', mode: 'bus', x: ik.x + ik.sx / 2 - 0.1, z: ik.z });                  // inside a solid wall
     await c.until(() => c.of('toast').filter((m) => m.kind === 'error').length > 1);
     expect((await summary(p)).balance).toBe(before);
     const meters = Math.hypot(front.x - me(p).x, front.z - me(p).z);
@@ -364,5 +364,34 @@ describe('a metro is one continuous world', () => {
     for (let i = 0; i < 20; i++) gw.step(0.05);
     const slow = me(p).x - x0;
     expect(fast / slow).toBeGreaterThan(2);
+  });
+  it('public buildings are real places: open doorway, furnished inside, staff at the counter, customers wandering the walkway', async () => {
+    const world = w.ctx.data.worlds.get('lagos')!; const col = buildColliders(world);
+    const pubs = world.buildings.filter((b: any) => b.kind === 'public');
+    expect(pubs.length).toBeGreaterThanOrEqual(20);
+    for (const b of pubs) {
+      const f = b.doorSide === '+z' ? 1 : -1;
+      for (const dv of [b.sz / 2 + 1, b.sz / 2 - 0.15, b.sz / 2 - 1.2, 0]) expect(isBlocked(b.cx, b.cz + f * dv, col, () => false, world.bounds), `${b.name} doorway ${dv}`).toBe(false);   // no key needed
+      expect(isBlocked(b.cx + b.sx / 2 - 0.1, b.cz, col, () => true, world.bounds), `${b.name} wall`).toBe(true);
+    }
+    const specs = world.npcSpecs;
+    expect(specs.filter((s: any) => s.role === 'Staff').length).toBeGreaterThanOrEqual(25);
+    expect(specs.filter((s: any) => s.kind === 'wander').reduce((n: number, s: any) => n + s.count, 0)).toBeGreaterThanOrEqual(80);
+    for (const s of specs) if (s.kind === 'stand') expect(isBlocked(s.x, s.z, col, () => false, world.bounds), `staff of ${s.poi}`).toBe(false);
+    // the bank has a teller zone that opens the Vault
+    const bank = world.zones.find((z: any) => z.kind === 'service' && z.bank); expect(bank).toBeTruthy();
+    expect(isBlocked(bank.x, bank.z, col, () => false, world.bounds)).toBe(false);
+  });
+  it('people really are inside: customers wander within their building and never walk through walls', async () => {
+    const p = await w.newPlayer('Visitor'); const c = await join(p);
+    const world = w.ctx.data.worlds.get('lagos')!; const col = buildColliders(world);
+    const bankB = world.buildings.find((b: any) => b.kind === 'public' && b.short === 'bank')!; me(p).x = bankB.cx; me(p).z = bankB.cz; gw.step(0.05);
+    for (let i = 0; i < 400; i++) gw.step(0.05);   // 20 simulated seconds
+    await c.until(() => c.of('snap').some((s) => s.spawns.some((x: any) => x.npc && x.role === 'Customer')) && c.of('snap').some((s) => s.spawns.some((x: any) => x.npc && x.role === 'Staff')));
+    const rt = (gw as any).rt('lagos');
+    const people = rt.npcs.filter((n: any) => n.mode === 'wander' && n.id.includes(bankB.id));
+    expect(people.length).toBeGreaterThan(1);
+    for (const n of people) expect(isBlocked(n.x, n.z, col, () => false, world.bounds), `${n.id} inside a wall`).toBe(false);
+    expect(people.some((n: any) => n.moving || n.wait > 0)).toBe(true);
   });
 });

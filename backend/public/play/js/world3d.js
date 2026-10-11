@@ -123,6 +123,25 @@ function buildPOI(p, root, labelGroup) {
   const awning = (sx, sz, m) => add(sx * 0.9, 0.25, 1.6, m, 0, 2.6, f * (sz / 2 + 0.8));
   const tree = (x, z, s = 1) => { const t = new THREE.Mesh(CYL_T, mat('#7a5230')); t.scale.set(s, 1.5 * s, s); t.position.set(p.x + x, 0.75 * s, p.z + z); t.castShadow = true; const l = new THREE.Mesh(ICO, mat('#4f9d45')); l.scale.set(1.4 * s, 1.2 * s, 1.4 * s); l.position.set(p.x + x, 2.2 * s, p.z + z); l.castShadow = true; g.add(t, l); };
   const palmAt = (x, z) => { const t = box(0.22, 4.5, 0.22, mat('#8a6a43'), p.x + x, 2.25, p.z + z); g.add(t); for (let i = 0; i < 6; i++) { const l = new THREE.Mesh(CONE_P, mat('#3e9a4d')); l.scale.set(0.35, 3, 0.35); l.position.set(p.x + x + Math.cos(i * 1.05) * 1.1, 4.5, p.z + z + Math.sin(i * 1.05) * 1.1); l.rotation.set(Math.sin(i * 1.05) * 1.2, 0, -Math.cos(i * 1.05) * 1.2); g.add(l); } };
+  if (p.enterable) {   // the walls, floor and doorway come from the building renderer; here only the roof-top features
+    const top = Math.max(3.2, p.h);
+    switch (p.type) {
+      case 'church': add(3, 7, 3, white, 0, top, -f * (p.sz / 2 - 2)); { const c = new THREE.Mesh(CONE_P, roof); c.scale.set(2.4, 3.5, 2.4); c.position.set(p.x, top + 8.75, p.z - f * (p.sz / 2 - 2)); g.add(c); } add(0.25, 1.6, 0.25, mat('#e8c46a'), 0, top + 10.5, -f * (p.sz / 2 - 2)); add(1, 0.25, 0.25, mat('#e8c46a'), 0, top + 11.1, -f * (p.sz / 2 - 2)); break;
+      case 'mosque': { const dome = new THREE.Mesh(DOME, mat('#4fa58f')); dome.scale.set(3.6, 3.6, 3.6); dome.position.set(p.x, top, p.z); dome.castShadow = true; g.add(dome);
+        for (const sx of [-1, 1]) { add(1, 8, 1, white, sx * (p.sx / 2 - 0.8), top, f * (p.sz / 2 - 0.8)); const c = new THREE.Mesh(CONE_P, mat('#4fa58f')); c.scale.set(0.9, 1.6, 0.9); c.position.set(p.x + sx * (p.sx / 2 - 0.8), top + 8.8, p.z + f * (p.sz / 2 - 0.8)); g.add(c); } break; }
+      case 'hospital': case 'clinic': add(2.4, 0.5, 0.6, mat('#e23b3b'), 0, top + 0.5, 0); add(0.6, 2.4, 0.6, mat('#e23b3b'), 0, top + 0.5, 0); break;
+      case 'police': add(1.2, 0.5, 0.6, mat('#e23b3b'), -0.7, top + 0.5); add(1.2, 0.5, 0.6, mat('#3b6fe2'), 0.7, top + 0.5); break;
+      case 'school': case 'university': add(2.2, 3, 2.2, white, 0, top, 0); add(0.15, 4, 0.15, dark, p.sx * 0.35, top, 0); add(1.2, 0.7, 0.05, mat('#e94f4f'), p.sx * 0.35 + 0.6, top + 3, 0); break;
+      case 'stadium': for (const [x, z] of PALMS) add(0.3, 8, 0.3, dark, x * (p.sx / 2), 0, z * (p.sz / 2)); break;
+      case 'hotel': add(p.sx * 0.5, 0.3, 3, mat('#e94f4f'), 0, 3.2, f * (p.sz * 0.5 + 1.2)); break;
+      case 'mall': add(p.sx * 0.7, 0.35, 2.4, mat('#e94f4f'), 0, 3, f * (p.sz * 0.5 + 1.2)); break;
+      default: add(p.sx * 0.8, 0.25, 1.6, mat(p.roof), 0, 2.7, f * (p.sz * 0.5 + 0.8)); break;
+    }
+    mergeStatic(g);
+    const lab0 = makeLabel(p.emoji, p.name, p.business ? 'biz' : 'civic');
+    lab0.position.set(p.x, top + (p.type === 'church' ? 12 : p.type === 'mosque' ? 10 : 2.6), p.z); lab0.userData.place = { kind: 'poi', id: p.id, area: p.district, name: p.name, emoji: p.emoji, type: p.type, business: p.business, x: p.x, z: p.z, face: p.face, sz: p.sz }; labelGroup.add(lab0);
+    return g;
+  }
   switch (p.type) {
     case 'church': {
       add(p.sx * 0.8, p.h * 0.7, p.sz * 0.7, white, 0, 0, f * 1.2); add(p.sx * 0.9, 0.5, p.sz * 0.8, roof, 0, p.h * 0.7, f * 1.2);
@@ -269,7 +288,7 @@ export function createWorld3D(world, scene) {
       if (y + 0.6 > b.height) continue;
       winList.push([b.cx + dx, y, faceZ, faceSign < 0 ? Math.PI : 0]);
     }
-    const sign = b.kind === 'house' ? null : textSprite(b.sign ?? b.name, b.doorSide ? 4.6 : 6.2, b.doorSide ? 0.62 : 0.9, b.doorSide ? b.roof : '#1e2a44', '#fff', b.doorSide ? 40 : 46);
+    const sign = b.kind === 'house' || b.kind === 'public' ? null : textSprite(b.sign ?? b.name, b.doorSide ? 4.6 : 6.2, b.doorSide ? 0.62 : 0.9, b.doorSide ? b.roof : '#1e2a44', '#fff', b.doorSide ? 40 : 46);
     if (sign) { sign.position.set(b.cx, b.doorSide ? 3.05 : b.height - 0.7, faceZ + faceSign * 0.03); if (faceSign < 0) sign.rotation.y = Math.PI; g.add(sign); }
 
     buildings.push({ b, group: g, wallMeshes, lintel, roof, cut: 0, minX: b.cx - b.sx / 2, maxX: b.cx + b.sx / 2, minZ: b.cz - b.sz / 2, maxZ: b.cz + b.sz / 2 });
@@ -280,15 +299,17 @@ export function createWorld3D(world, scene) {
 
   // ---- furniture & goods ----
   const goodsColors = ['#e94f4f', '#4fa3e9', '#f2c94c', '#6fcf97', '#bb6bd9', '#f2994a'];
+  const furnG = new THREE.Group(); root.add(furnG);
   for (const f of world.furniture) {
-    const g = new THREE.Group(); root.add(g);
+    const g = furnG, sid = f.id.split(':').pop();
     g.add(box(f.sx, f.h, f.sz, mat(f.color), f.x, f.h / 2, f.z));
-    if (f.id === 'bed') g.add(box(0.7, 0.18, 1.0, mat('#ffffff'), f.x - 0.6, f.h + 0.09, f.z), box(0.25, 0.8, f.sz, mat('#7a5230'), f.x - f.sx / 2 + 0.12, 0.4, f.z));
-    if (f.id === 'sofa') g.add(box(f.sx, 0.55, 0.22, mat('#7e2b2b'), f.x, f.h + 0.27, f.z - f.sz / 2 + 0.11));
-    if (f.id === 'counter') { g.add(box(0.7, 0.35, 0.5, mat('#2d3a5a'), f.x + 1.6, f.h + 0.17, f.z)); for (let i = 0; i < 6; i++) g.add(box(0.28, 0.28, 0.28, mat(goodsColors[i]), f.x - 2 + i * 0.45, f.h + 0.14, f.z - 0.1)); }
-    if (f.id === 'crate') g.add(box(0.9, 0.9, 0.9, mat('#e6bd2c'), f.x + 0.1, f.h + 0.45, f.z - 0.05));
-    if (f.id.startsWith('shelf')) for (let r = 0; r < 3; r++) for (let i = 0; i < Math.floor(f.sx / 0.55); i++) g.add(box(0.4, 0.3, 0.3, mat(goodsColors[(i + r) % 6]), f.x - f.sx / 2 + 0.35 + i * 0.55, 0.5 + r * 0.6, f.z));
+    if (sid === 'bed') g.add(box(0.7, 0.18, 1.0, mat('#ffffff'), f.x - 0.6, f.h + 0.09, f.z), box(0.25, 0.8, f.sz, mat('#7a5230'), f.x - f.sx / 2 + 0.12, 0.4, f.z));
+    if (sid === 'sofa') g.add(box(f.sx, 0.55, 0.22, mat('#7e2b2b'), f.x, f.h + 0.27, f.z - f.sz / 2 + 0.11));
+    if (sid === 'counter') { g.add(box(0.7, 0.35, 0.5, mat('#2d3a5a'), f.x + 1.6, f.h + 0.17, f.z)); for (let i = 0; i < 6; i++) g.add(box(0.28, 0.28, 0.28, mat(goodsColors[i]), f.x - 2 + i * 0.45, f.h + 0.14, f.z - 0.1)); }
+    if (sid === 'crate') g.add(box(0.9, 0.9, 0.9, mat('#e6bd2c'), f.x + 0.1, f.h + 0.45, f.z - 0.05));
+    if (sid.startsWith('shelf')) for (let r = 0; r < 3; r++) for (let i = 0; i < Math.floor(f.sx / 0.55); i++) g.add(box(0.4, 0.3, 0.3, mat(goodsColors[(i + r) % 6]), f.x - f.sx / 2 + 0.35 + i * 0.55, 0.5 + r * 0.6, f.z));
   }
+  mergeStatic(furnG);
 
   // ---- props (instanced: one draw call per kind) ----
   const trunkG = new THREE.CylinderGeometry(0.14, 0.2, 1, 6), leafG = new THREE.IcosahedronGeometry(1, 0), poleG = new THREE.CylinderGeometry(0.05, 0.07, 1, 6), headG = new THREE.SphereGeometry(0.22, 8, 6), binG = new THREE.CylinderGeometry(0.22, 0.2, 0.7, 8);
@@ -312,11 +333,11 @@ export function createWorld3D(world, scene) {
   const placeLamps = (me) => { if (!lampPos.length) return; const near = lampPos.map((l) => ({ l, d: (l.x - me.x) ** 2 + (l.z - me.z) ** 2 })).sort((a, b) => a.d - b.d); lamps.forEach((light, i) => { const n = near[i]; if (n) light.position.set(n.l.x, 4.1, n.l.z); }); };
 
   // ---- interaction markers ----
-  const ICON = { door: '🏠', shop: '🛒', work: '💼' };
+  const ICON = { door: '🏠', shop: '🛒', work: '💼', service: '💁' };
   for (const z of world.zones) {
     const ring = new THREE.Mesh(new THREE.RingGeometry(0.9, 1.15, 40), new THREE.MeshBasicMaterial({ color: '#ffe36e', transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false }));
     ring.rotation.x = -Math.PI / 2; ring.position.set(z.x, 0.12, z.z); root.add(ring);
-    const icon = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTexture(ICON[z.kind]), transparent: true, depthWrite: false }));
+    const icon = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTexture(z.bank ? '🏦' : ICON[z.kind] ?? '❔'), transparent: true, depthWrite: false }));
     icon.scale.set(1.1, 1.1, 1.1); icon.position.set(z.x, 2.6, z.z); root.add(icon);
     markers.push({ z, ring, icon });
   }

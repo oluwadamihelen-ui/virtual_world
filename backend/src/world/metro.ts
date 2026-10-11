@@ -1,4 +1,5 @@
 import { generateWorld, type GeoCity } from './cities.js';
+import { ENTERABLE, layoutInterior } from './interiors.js';
 
 /**
  * A metro (Lagos, Abuja, ...) is ONE continuous world made of its districts (areas) laid out on a grid with avenues between them,
@@ -17,7 +18,7 @@ export const POI_SHOPS: Record<string, string[]> = {
 
 /** Footprint and look of each point-of-interest type. `walk` types are open ground you can walk on (no wall collider). */
 export const POI_TYPES: Record<string, { sx: number; sz: number; h: number; walk?: boolean; business?: boolean; emoji: string }> = {
-  church: { sx: 9, sz: 12, h: 5, emoji: '⛪' }, mosque: { sx: 11, sz: 11, h: 5, emoji: '🕌' }, market: { sx: 14, sz: 10, h: 3, business: true, emoji: '🛍️' },
+  church: { sx: 9, sz: 12, h: 5, emoji: '⛪' }, mosque: { sx: 11, sz: 11, h: 5, emoji: '🕌' }, market: { sx: 14, sz: 10, h: 3, walk: true, business: true, emoji: '🛍️' },
   hospital: { sx: 13, sz: 9, h: 7, emoji: '🏥' }, clinic: { sx: 8, sz: 7, h: 4, emoji: '🩺' }, police: { sx: 9, sz: 8, h: 4, emoji: '🚓' }, school: { sx: 12, sz: 8, h: 4, emoji: '🏫' },
   university: { sx: 14, sz: 10, h: 6, emoji: '🎓' }, stadium: { sx: 20, sz: 15, h: 6, emoji: '🏟️' }, park: { sx: 12, sz: 12, h: 0, walk: true, emoji: '🌳' },
   beach: { sx: 14, sz: 10, h: 0, walk: true, emoji: '🏖️' }, golf: { sx: 16, sz: 12, h: 0, walk: true, emoji: '⛳' }, hotel: { sx: 9, sz: 9, h: 14, business: true, emoji: '🏨' },
@@ -44,11 +45,25 @@ export function buildMetroWorld(base: any, cities: GeoCity[], metroId: string, f
   const hubCell = cell(order.indexOf(hub.id));
   const center = (c: number, r: number) => ({ x: (c - hubCell.c) * pitchX, z: (r - hubCell.r) * pitchZ });
 
-  const w: any = { name: hub.name, metro: metroId, cityId: hub.id, districts: [], buildings: [], furniture: [], props: [], zones: [], lots: [], npcRoutes: [], roads: [], water: [], bridges: [], blockers: [], pois: [] };
+  const w: any = { name: hub.name, metro: metroId, cityId: hub.id, districts: [], buildings: [], furniture: [], props: [], zones: [], lots: [], npcRoutes: [], npcSpecs: [], roads: [], water: [], bridges: [], blockers: [], pois: [] };
   for (let i = 0; i < order.length; i++) {
     const city = areas.find((a) => a.id === order[i])!, { c, r } = cell(i), o = center(c, r), dw = generateWorld(base, city), a = city.id;
     const P = (id: string) => `${a}:${id}`;
     for (const b of dw.buildings) w.buildings.push({ ...b, id: P(b.id), cx: b.cx + o.x, cz: b.cz + o.z, gate: b.gate ? P(b.gate) : undefined, area: a, short: b.id });
+    // the template's cafe, bank and job centre were scenery with a sign; make them real walk-in public buildings facing the street
+    for (const b of w.buildings) {
+      const type = b.area === a ? ({ cafe: 'cafe', bank: 'bank', jobs: 'gov' } as Record<string, string>)[b.short] : undefined;
+      if (!type || b.enterable) continue;
+      const front: 1 | -1 = b.cz - o.z > 0 ? -1 : 1;
+      Object.assign(b, { enterable: true, kind: 'public', poi: true, sign: undefined, doorSide: front === 1 ? '+z' : '-z', doorWidth: 2.4, height: Math.max(3.2, b.height ?? 3.2) });
+      const lay = layoutInterior({ id: b.id, type, x: b.cx, z: b.cz, sx: b.sx, sz: b.sz }, b.id, front);
+      if (!lay) continue;
+      b.floor = lay.plan.floor; w.furniture.push(...lay.furniture);
+      for (const sp of lay.npcs) w.npcSpecs.push({ ...sp, poi: b.id, area: a });
+      const zp = lay.counterZone ?? { x: b.cx, z: b.cz + front * (b.sz / 2 - 1.7) };
+      const svc = lay.plan.service ?? { label: 'Counter', text: 'Welcome in. Table service is coming soon.' };
+      w.zones.push({ id: `${b.id}_svc`, kind: 'service', poi: b.id, building: b.id, area: a, x: zp.x, z: zp.z, radius: 2.4, label: svc.label, title: b.name, text: svc.text, bank: !!svc.bank });
+    }
     for (const f of dw.furniture) w.furniture.push({ ...f, id: P(f.id), building: P(f.building), x: f.x + o.x, z: f.z + o.z });
     for (const p of dw.props) w.props.push({ ...p, x: p.x + o.x, z: p.z + o.z });
     for (const z of dw.zones) w.zones.push({ ...z, id: P(z.id), building: z.building ? P(z.building) : undefined, area: a, x: z.x + o.x, z: z.z + o.z });
@@ -122,10 +137,27 @@ export function buildMetroWorld(base: any, cities: GeoCity[], metroId: string, f
       const district = w.districts.reduce((best: any, d: any) => (dist(d.center, s) < dist(best.center, s) ? d : best), w.districts[0]);
       const poiObj = ({ id: `poi_${i}`, type: p.type, name: p.name, x: s.x, z: s.z, sx: t.sx, sz: t.sz, h: t.h, walk: !!t.walk, business: !!t.business, emoji: t.emoji,
         face: nearRow > s.z ? '+z' : '-z', wall: COLORS[h % COLORS.length], roof: ROOFS[h % ROOFS.length], district: district.id });
+      const f: 1 | -1 = poiObj.face === '+z' ? 1 : -1;
+      const enterable = ENTERABLE.has(p.type) && !t.walk;
+      (poiObj as any).enterable = enterable;
       w.pois.push(poiObj);
-      if (POI_SHOPS[p.type]) {
-        const f = poiObj.face === '+z' ? 1 : -1;
-        w.zones.push({ id: `${poiObj.id}_shop`, kind: 'shop', poi: poiObj.id, area: district.id, x: s.x, z: s.z + f * (t.sz / 2 + 1.6), radius: 2.6, label: p.name, shopId: `shop_${district.id}_${p.type}`, shopType: p.type, itemIds: POI_SHOPS[p.type] });
+      if (enterable) {
+        // a real building you can walk into: open doorway, furnished inside, with staff and customers
+        const b = { id: poiObj.id, name: p.name, cx: s.x, cz: s.z, sx: t.sx, sz: t.sz, height: Math.max(3.2, t.h), doorSide: poiObj.face, doorWidth: 2.4, wall: poiObj.wall, roof: poiObj.roof,
+          floor: '#d9d2c0', enterable: true, kind: 'public', poi: true, area: district.id, short: p.type };
+        const lay = layoutInterior({ id: poiObj.id, type: p.type, x: s.x, z: s.z, sx: t.sx, sz: t.sz }, b.id, f);
+        if (lay) {
+          b.floor = lay.plan.floor; w.buildings.push(b); w.furniture.push(...lay.furniture);
+          for (const sp of lay.npcs) w.npcSpecs.push({ ...sp, poi: poiObj.id, area: district.id });
+          const zp = lay.counterZone ?? { x: s.x, z: s.z + f * (t.sz / 2 - 1.7) };
+          if (POI_SHOPS[p.type]) w.zones.push({ id: `${poiObj.id}_shop`, kind: 'shop', poi: poiObj.id, building: b.id, area: district.id, x: zp.x, z: zp.z, radius: 2.4, label: p.name, shopId: `shop_${district.id}_${p.type}`, shopType: p.type, itemIds: POI_SHOPS[p.type] });
+          else if (lay.plan.service) w.zones.push({ id: `${poiObj.id}_svc`, kind: 'service', poi: poiObj.id, building: b.id, area: district.id, x: zp.x, z: zp.z, radius: 2.4, label: lay.plan.service.label, title: p.name, text: lay.plan.service.text, bank: !!lay.plan.service.bank });
+        }
+      } else {
+        // open-air places (parks, beaches, markets, the dock...): people strolling about
+        const strollers = p.type === 'market' ? 7 : p.type === 'park' ? 5 : p.type === 'beach' ? 5 : 3;
+        w.npcSpecs.push({ kind: 'wander', role: p.type === 'market' ? 'Shopper' : 'Visitor', poi: poiObj.id, area: district.id, count: strollers, rect: { minX: s.x - t.sx / 2 + 1.5, maxX: s.x + t.sx / 2 - 1.5, minZ: s.z - t.sz / 2 + 1.5, maxZ: s.z + t.sz / 2 - 1.5 } });
+        if (POI_SHOPS[p.type]) w.zones.push({ id: `${poiObj.id}_shop`, kind: 'shop', poi: poiObj.id, area: district.id, x: s.x, z: s.z + f * (t.sz / 2 + 1.6), radius: 2.6, label: p.name, shopId: `shop_${district.id}_${p.type}`, shopType: p.type, itemIds: POI_SHOPS[p.type] });
       }
       break;
     }

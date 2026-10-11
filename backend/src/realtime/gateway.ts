@@ -69,7 +69,10 @@ interface Player extends Body {
   emote: string | null; emoteUntil: number;
 }
 interface CityRuntime { id: string; world: any; colliders: Colliders; npcs: Npc[]; builtLoaded: boolean }
-interface Npc extends Body { id: string; name: string; appearance: unknown; route: { x: number; z: number }[]; leg: number; dir: 1 | -1; loop: boolean }
+interface Npc extends Body {
+  id: string; name: string; role: string; appearance: unknown; route: { x: number; z: number }[]; leg: number; dir: 1 | -1; loop: boolean;
+  mode: 'route' | 'stand' | 'wander'; rect?: { minX: number; maxX: number; minZ: number; maxZ: number }; target?: { x: number; z: number }; wait: number;
+}
 
 const NPC_APPEARANCES = [
   { bodyPreset: 'body_a', skinTone: 1, hairstyle: 'short', hairColor: 'black', outfit: 'casual_1' },
@@ -100,10 +103,24 @@ export class Gateway {
       world.npcRoutes.forEach((route: { x: number; z: number }[], i: number) => {
         const a = route[0]!;
         rt.npcs.push({
-          id: `npc-${id}-${i + 1}`, name: 'Resident', appearance: NPC_APPEARANCES[(i + id.length) % NPC_APPEARANCES.length],
-          x: a.x, z: a.z, ry: 0, moving: true, route, leg: 1 % route.length, dir: 1, loop: route.length > 2,
+          id: `npc-${id}-${i + 1}`, name: 'Resident', role: 'Resident', appearance: NPC_APPEARANCES[(i + id.length) % NPC_APPEARANCES.length],
+          x: a.x, z: a.z, ry: 0, moving: true, route, leg: 1 % route.length, dir: 1, loop: route.length > 2, mode: 'route', wait: 0,
         });
       });
+      // People already inside the public buildings and out in the open-air places, going about their business.
+      let k = 0;
+      for (const sp of world.npcSpecs ?? []) {
+        const n = sp.kind === 'stand' ? 1 : sp.count;
+        for (let j = 0; j < n; j++, k++) {
+          const staff = sp.role === 'Staff';
+          const app = staff ? { ...NPC_APPEARANCES[k % NPC_APPEARANCES.length]!, outfit: 'work_1' } : NPC_APPEARANCES[(k * 5 + id.length) % NPC_APPEARANCES.length];
+          const pos = sp.kind === 'stand' ? { x: sp.x, z: sp.z } : { x: sp.rect.minX + Math.random() * (sp.rect.maxX - sp.rect.minX), z: sp.rect.minZ + Math.random() * (sp.rect.maxZ - sp.rect.minZ) };
+          rt.npcs.push({
+            id: `npc-${id}-${sp.poi}-${k}`, name: sp.role, role: sp.role, appearance: app, x: pos.x, z: pos.z, ry: sp.ry ?? Math.random() * 6.28, moving: false,
+            route: [], leg: 0, dir: 1, loop: false, mode: sp.kind, rect: sp.rect, wait: Math.random() * 5,
+          });
+        }
+      }
       this.cities.set(id, rt);
     }
   }
@@ -570,6 +587,15 @@ export class Gateway {
   }
 
   private stepNpc(n: Npc, dt: number) {
+    if (n.mode === 'stand') { n.moving = false; return; }
+    if (n.mode === 'wander') {
+      if (n.wait > 0) { n.wait -= dt; n.moving = false; return; }
+      if (!n.target) { const r = n.rect!; n.target = { x: r.minX + Math.random() * (r.maxX - r.minX), z: r.minZ + Math.random() * (r.maxZ - r.minZ) }; }
+      const dx = n.target.x - n.x, dz = n.target.z - n.z, d = Math.hypot(dx, dz), step = 1.1 * dt;
+      if (d <= step) { n.x = n.target.x; n.z = n.target.z; n.target = undefined; n.wait = 2 + Math.random() * 7; n.moving = false; }
+      else { n.x += (dx / d) * step; n.z += (dz / d) * step; n.ry = Math.atan2(dx, dz); n.moving = true; }
+      return;
+    }
     const target = n.route[n.leg]!;
     const dx = target.x - n.x, dz = target.z - n.z, d = Math.hypot(dx, dz);
     const step = 1.5 * dt;
@@ -588,7 +614,7 @@ export class Gateway {
     const consider = (o: Body & { id: string; name: string; appearance: unknown }, npc: boolean, emote: string | null) => {
       if (o.id === p.id || dist2(p.x, p.z, o.x, o.z) > INTEREST_RADIUS) return;
       seen.add(o.id);
-      if (!p.known.has(o.id)) { p.known.add(o.id); spawns.push({ id: o.id, name: npc ? null : o.name, appearance: o.appearance, npc }); }
+      if (!p.known.has(o.id)) { p.known.add(o.id); spawns.push({ id: o.id, name: npc ? null : o.name, role: npc ? (o as any).role : undefined, appearance: o.appearance, npc }); }
       ps.push([o.id, +o.x.toFixed(2), +o.z.toFixed(2), +o.ry.toFixed(2), o.moving ? 1 : 0, emote ?? 0]);
     };
     let online = 0;
